@@ -6,6 +6,8 @@ export interface RoomPlayer {
   color: string;
   leader: boolean;
   connected: boolean;
+  /** Браузер телефона не подходит для игры (§15). */
+  warning?: boolean;
 }
 
 export interface Room {

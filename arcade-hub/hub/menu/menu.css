@@ -726,3 +726,50 @@
     0 0 0 var(--focus-offset) var(--surface),
     0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
 }
+
+/* Сервер недоступен (§15): вместо QR — сообщение и одно действие. */
+.join--offline {
+  gap: var(--space-2);
+}
+
+.join__offline-icon {
+  width: calc(92rem / 24);
+  height: calc(92rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--warn);
+  font-size: calc(44rem / 24);
+}
+
+.join__retry {
+  height: calc(64rem / 24);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gw__error {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: rgb(255 90 110 / 0.14);
+  color: var(--danger);
+  font-size: var(--fs-caption);
+}
+
+/* Неподходящий браузер телефона (§15). */
+.avatar__warning {
+  position: absolute;
+  right: calc(-6rem / 24);
+  bottom: calc(-6rem / 24);
+  padding: calc(3rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--warn);
+  color: var(--bg);
+  font-size: calc(22rem / 24);
+}

@@ -123,3 +123,18 @@ export const INPUT_QUANT = 1000;
 export const RESULTS_AWARD_STEP_MS = 700; // награды появляются по одной
 export const RESULTS_AWARDS_HOLD_MS = 2500; // после последней награды — к таблице
 export const MENU_MUSIC_VOLUME = 0.3; // от громкости игр
+
+// Настройки хаба (§13)
+export const UI_SCALE_RANGE = { min: 90, max: 130, step: 10 } as const; // масштаб интерфейса, %
+export const PERCENT_STEP = 10; // шаг ползунков 0–100 %
+export const MUSIC_FADE_MS = 600; // музыка меню уходит при запуске игры
+
+// Витрина и заставка (§5, §14)
+export const ATTRACT_SLIDE_S = 15; // по столько секунд на игру
+export const ATTRACT_BOTS = 4; // ботов в живой демо-сцене
+export const SPLASH_MS = 1500; // заставка при первом запуске
+export const LOADING_CAPTION_S = 3; // дольше — подпись «Загружаем игры…»
+
+// Ошибки и связь (§15)
+export const SERVER_DOWN_AFTER_S = 3; // столько без связи — «Телефоны сейчас недоступны»
+export const TOAST_MS = 3500;

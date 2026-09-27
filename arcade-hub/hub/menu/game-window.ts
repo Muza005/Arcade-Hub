@@ -11,7 +11,8 @@ import { recordsView } from './records-view';
 export interface GameWindow {
   readonly el: HTMLDialogElement;
   readonly openGameId: string | null;
-  open(game: GameManifest, returnFocus: HTMLElement): void;
+  /** failed — игра не запустилась (§15): сообщение и «Повторить» вместо «Играть». */
+  open(game: GameManifest, returnFocus: HTMLElement, failed?: { retry(): void }): void;
   close(): void;
 }
 
@@ -32,9 +33,15 @@ function fact(svg: string, text: string): HTMLElement {
   return h('li', { class: 'chip' }, icon(svg, 'chip__icon'), text);
 }
 
-function content(game: GameManifest, onPlay: () => void, onClose: () => void, onRecords: () => void): HTMLElement {
+function content(
+  game: GameManifest,
+  onPlay: () => void,
+  onClose: () => void,
+  onRecords: () => void,
+  failed: boolean,
+): HTMLElement {
   const tg = gameText(game);
-  const play = h('button', { class: 'btn btn--play', type: 'button', autofocus: true }, t('game.play'));
+  const play = h('button', { class: 'btn btn--play', type: 'button', autofocus: true }, t(failed ? 'err.retry' : 'game.play'));
   const back = h('button', { class: 'btn btn--ghost', type: 'button' }, t('game.back'));
   const records = h('button', { class: 'link-btn gw__records', type: 'button' }, t('game.records'));
   records.addEventListener('click', onRecords);
@@ -107,6 +114,7 @@ function content(game: GameManifest, onPlay: () => void, onClose: () => void, on
           ...recordLines(game).map((line) => h('p', { class: 'gw__record-line' }, line)),
         ),
         records,
+        failed && h('p', { class: 'gw__error', role: 'alert' }, icon(ICONS.alert), t('err.gameFailed')),
         h('div', { class: 'gw__actions' }, play, back),
       ),
     ),
@@ -142,18 +150,19 @@ export function createGameWindow(onPlay: (game: GameManifest) => void): GameWind
     get openGameId() {
       return current?.game.id ?? null;
     },
-    open(game, returnFocus) {
+    open(game, returnFocus, failed) {
       current = { game, returnFocus };
       const showMain = (): void => {
         el.replaceChildren(
           content(
             game,
-            () => onPlay(game),
+            () => (failed ? (close(), failed.retry()) : onPlay(game)),
             () => close(),
             () => {
               el.replaceChildren(recordsView(game, showMain));
               el.querySelector<HTMLElement>('[autofocus]')?.focus();
             },
+            failed !== undefined,
           ),
         );
         el.querySelector<HTMLElement>('[autofocus]')?.focus();

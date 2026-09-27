@@ -72,6 +72,20 @@ describe('handoff', () => {
   });
 });
 
+describe('autoHandoff', () => {
+  it('роль переходит к следующему подключённому по порядку входа', () => {
+    const room = make();
+    room.join('c1');
+    room.join('c2');
+    room.join('c3');
+    room.leave('c2');
+    expect(room.autoHandoff()).toBeUndefined(); // ведущий на связи
+    room.leave('c1');
+    expect(room.autoHandoff()?.cid).toBe('c3');
+    expect(room.players().find((p) => p.leader)?.id).toBe('3');
+  });
+});
+
 it('cleanNick', () => {
   expect(cleanNick('  Очень  длинный ник ')).toBe('Очень дл');
   expect(cleanNick('   ')).toBe('');

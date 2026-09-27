@@ -21,6 +21,7 @@ export function avatar(player: RoomPlayer, isNew = false): HTMLElement {
       player.nick.slice(0, 1).toUpperCase(),
       player.leader && icon(ICONS.crown, 'avatar__crown'),
       !player.connected && icon(ICONS.offline, 'avatar__offline'),
+      player.connected && player.warning && icon(ICONS.alert, 'avatar__warning'),
     ),
     h('span', { class: 'avatar__nick' }, player.nick),
   );

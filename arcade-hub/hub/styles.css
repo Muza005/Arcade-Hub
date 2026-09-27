@@ -4,10 +4,12 @@
 @import './menu/records-view.css';
 @import './lobby/lobby.css';
 @import './results/results.css';
+@import './settings/settings.css';
+@import './attract.css';
 
 /* Корневой масштаб от высоты окна: при 1080 это 24 px, всё остальное — в rem (ARCADE_HUB_SPEC §18). */
 html {
-  font-size: calc(100vh / 45);
+  font-size: calc(100vh / 45 * var(--ui-scale, 1));
 }
 
 *,
@@ -90,4 +92,30 @@ body {
   font-size: var(--fs-secondary);
   font-weight: 400;
   color: var(--text-2);
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-zone) + calc(140rem / 24));
+  translate: -50% 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  box-shadow:
+    inset 0 0 0 calc(3rem / 24) var(--player, var(--focus)),
+    0 calc(12rem / 24) calc(40rem / 24) rgb(0 0 0 / 0.5);
+  font-size: var(--fs-body);
+  z-index: 10;
+}
+
+.toast--in {
+  animation: toast-in var(--dur-slow) var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(24rem / 24)) scale(var(--enter-scale));
+  }
 }

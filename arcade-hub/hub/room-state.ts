@@ -10,6 +10,8 @@ export interface Slot {
   cid: string | null;
   nick: string;
   color: string;
+  /** Браузер телефона не подходит (§15). */
+  unsupported?: boolean;
 }
 
 export interface RoomStateOptions {
@@ -63,6 +65,15 @@ export class RoomState {
     return this.slots.find((s) => s.id === this.leaderId);
   }
 
+  /** Ведущий на связи не вернулся (§15): роль — следующему подключённому по порядку входа. */
+  autoHandoff(): Slot | undefined {
+    const leader = this.leader();
+    if (leader?.cid) return undefined;
+    const next = this.slots.find((s) => s.cid !== null && s !== leader);
+    if (next) this.leaderId = next.id;
+    return next;
+  }
+
   /** «Передать ведущего»: только текущий ведущий и только игроку этой комнаты. */
   handoff(fromCid: string, targetId: number): boolean {
     const from = this.bySid(fromCid);
@@ -77,10 +88,11 @@ export class RoomState {
     return this.slots.filter((s) => s !== slot).map((s) => s.color);
   }
 
-  join(cid: string, token?: string): JoinResult {
+  join(cid: string, token?: string, unsupported = false): JoinResult {
     const known = token ? this.slots.find((s) => s.token === token) : undefined;
     if (known) {
       known.cid = cid;
+      known.unsupported = unsupported;
       return { slot: known, returning: true };
     }
     if (this.slots.length >= this.options.maxPlayers) return { error: 'full' };
@@ -91,6 +103,7 @@ export class RoomState {
       cid,
       nick: this.options.defaultNick(id),
       color: this.nearestFree(0, null),
+      unsupported,
     };
     this.slots.push(slot);
     this.leaderId ??= slot.id;
@@ -121,6 +134,7 @@ export class RoomState {
       color: s.color,
       leader: this.isLeader(s),
       connected: s.cid !== null,
+      ...(s.unsupported ? { warning: true } : {}),
     }));
   }
 

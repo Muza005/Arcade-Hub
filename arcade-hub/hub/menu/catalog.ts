@@ -2,6 +2,7 @@
 import type { GameManifest } from '../../shared/game-manifest';
 
 export type Badge =
+  | { kind: 'needPhone' }
   | { kind: 'daily' }
   | { kind: 'needMore'; n: number }
   | { kind: 'max'; n: number }
@@ -27,7 +28,9 @@ export function orderGames(
  * Один бейдж на карточку — первый подходящий по таблице §6.
  * Подсказку о числе игроков показываем, только когда в комнате кто-то есть: пустая комната — не повод.
  */
-export function badgeFor(game: GameManifest, people: number, launched: boolean): Badge | null {
+export function badgeFor(game: GameManifest, people: number, launched: boolean, phonesOk = true): Badge | null {
+  // Сервер недоступен (§15): играм без клавиатуры нужен телефон.
+  if (!phonesOk && !game.controls.includes('keyboard')) return { kind: 'needPhone' };
   if (game.meta?.().dailyBest) return { kind: 'daily' };
   if (people > 0 && people < game.players.min) return { kind: 'needMore', n: game.players.min - people };
   if (people > game.players.max) return { kind: 'max', n: game.players.max };

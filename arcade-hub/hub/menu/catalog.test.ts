@@ -29,6 +29,11 @@ describe('badgeFor', () => {
     expect(badgeFor(game('a'), 1, false)).toEqual({ kind: 'needMore', n: 1 });
   });
 
+  it('сервер недоступен — «Нужен телефон» играм без клавиатуры', () => {
+    expect(badgeFor(game('a', { controls: ['phone-joystick'] }), 0, true, false)).toEqual({ kind: 'needPhone' });
+    expect(badgeFor(game('a', { controls: ['keyboard'] }), 0, true, false)).toBeNull();
+  });
+
   it('рекорд дня — первым', () => {
     const g = game('a', { meta: () => ({ dailyBest: '100', hasReplays: false }) });
     expect(badgeFor(g, 1, false)).toEqual({ kind: 'daily' });

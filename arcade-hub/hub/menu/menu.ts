@@ -1,11 +1,11 @@
 // Меню игр (ARCADE_HUB_SPEC §6): верхняя полоса, заголовок, сетка, нижняя полоса с QR и игроками.
 // В простое ничего не рисуется: движение — только в ответ на действие.
-import QRCode from 'qrcode-svg';
 import { CONTROLLER_PATH, QR_SIZE_PX } from '../../shared/config';
 import type { GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import type { Room } from '../room';
 import { h, icon } from '../ui/dom';
+import { qrSvg } from '../ui/qr';
 import { ICONS } from '../ui/icons';
 import { avatarRow } from './avatars';
 import { badgeFor, orderGames } from './catalog';
@@ -17,14 +17,17 @@ export interface MenuOptions {
   history: () => readonly string[];
   sound: { get(): boolean; set(on: boolean): void };
   onPlay(game: GameManifest): void;
+  onSettings(): void;
 }
 
 export interface Menu {
   readonly el: HTMLElement;
   setRoom(room: Room): void;
+  /** Сервер комнат недоступен (§15): вместо QR — сообщение и «Повторить». */
+  setOnline(online: boolean, retry: () => void): void;
   /** Перерисовать сетку (например, после запуска игры порядок меняется) и поставить фокус.
    *  openWindow — сразу открыть окно этой игры («Назад» из лобби, «К игре»). */
-  show(focusGameId?: string, openWindow?: boolean): void;
+  show(focusGameId?: string, openWindow?: boolean, failed?: { retry(): void }): void;
   hide(): void;
 }
 
@@ -41,6 +44,8 @@ export function createMenu(options: MenuOptions): Menu {
     { class: 'icon-btn', type: 'button', 'aria-label': t('menu.settings'), title: t('menu.settings') },
     icon(ICONS.gear),
   );
+
+  settingsButton.addEventListener('click', () => options.onSettings());
 
   const renderSound = (): void => {
     const on = options.sound.get();
@@ -83,15 +88,28 @@ export function createMenu(options: MenuOptions): Menu {
   const joinCode = h('p', { class: 'join__code' });
   const inRoom = h('p', { class: 'players__count' });
   const avatarsSlot = h('div', { class: 'players__row' });
+  const joinArea = h(
+    'div',
+    { class: 'join' },
+    qr,
+    h('div', {}, h('p', { class: 'join__title' }, t('menu.joinTitle')), joinCode),
+  );
+  const retryButton = h('button', { class: 'btn btn--ghost join__retry', type: 'button' }, icon(ICONS.refresh), t('err.retry'));
+  const offlineArea = h(
+    'div',
+    { class: 'join join--offline', hidden: true, role: 'status' },
+    h('span', { class: 'join__offline-icon' }, icon(ICONS.wifiOff)),
+    h('p', { class: 'join__title' }, t('err.serverDown')),
+    retryButton,
+  );
+  let onRetry: () => void = () => undefined;
+  let online = true;
+  retryButton.addEventListener('click', () => onRetry());
   const bottomBar = h(
     'footer',
     { class: 'bottombar' },
-    h(
-      'div',
-      { class: 'join' },
-      qr,
-      h('div', {}, h('p', { class: 'join__title' }, t('menu.joinTitle')), joinCode),
-    ),
+    joinArea,
+    offlineArea,
     h('div', { class: 'players' }, inRoom, avatarsSlot),
   );
 
@@ -105,22 +123,13 @@ export function createMenu(options: MenuOptions): Menu {
   const title = (g: GameManifest): string => gameText(g)(g.title);
 
   const renderRoom = (): void => {
-    const code = room.code ?? t('menu.roomPending');
+    // Без связи с сервером код ничего не даёт — как при загрузке.
+    const code = (online ? room.code : null) ?? t('menu.roomPending');
     roomCode.textContent = code;
     joinCode.textContent = t('menu.joinCode', { url: `${location.host}${CONTROLLER_PATH}`, code });
     if (room.code !== qrFor) {
       qrFor = room.code;
-      qr.innerHTML = room.code
-        ? new QRCode({
-            content: `${location.origin}${CONTROLLER_PATH}?room=${room.code}`,
-            padding: 0,
-            width: QR_SIZE_PX,
-            height: QR_SIZE_PX,
-            ecl: 'M',
-            join: true,
-            container: 'svg-viewbox',
-          }).svg()
-        : '';
+      qr.innerHTML = room.code ? qrSvg(room.code, QR_SIZE_PX) : '';
     }
     const people = room.players.length;
     countLine.textContent = people > 0 ? t('menu.count', { n: people }) : t('menu.countEmpty');
@@ -134,7 +143,7 @@ export function createMenu(options: MenuOptions): Menu {
     const history = options.history();
     const people = room.players.length;
     const cards = orderGames(options.games, history, title).map((game) => {
-      const card = gameCard(game, badgeFor(game, people, history.includes(game.id)));
+      const card = gameCard(game, badgeFor(game, people, history.includes(game.id), online));
       card.setAttribute('role', 'listitem');
       card.dataset.sound = 'open';
       card.addEventListener('click', () => gameWindow.open(game, card));
@@ -158,14 +167,27 @@ export function createMenu(options: MenuOptions): Menu {
       renderGrid();
       if (focused) cardFor(focused)?.focus();
     },
-    show(focusGameId, openWindow = false) {
+    setOnline(next, retry) {
+      onRetry = retry;
+      if (online === next) return;
+      online = next;
+      joinArea.hidden = !next;
+      offlineArea.hidden = next;
+      renderRoom();
+      if (!el.hidden) {
+        const focused = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.game : undefined;
+        renderGrid();
+        if (focused) cardFor(focused)?.focus();
+      }
+    },
+    show(focusGameId, openWindow = false, failed) {
       renderRoom();
       renderGrid();
       el.hidden = false;
       const card = cardFor(focusGameId);
       card?.focus();
       const game = options.games.find((g) => g.id === focusGameId);
-      if (openWindow && card && game) gameWindow.open(game, card);
+      if (openWindow && card && game) gameWindow.open(game, card, failed);
     },
     hide() {
       gameWindow.close();

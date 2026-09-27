@@ -21,6 +21,8 @@ export function minutesLabel(game: GameManifest): string {
 
 function badgeLabel(badge: Badge): string {
   switch (badge.kind) {
+    case 'needPhone':
+      return t('badge.needPhone');
     case 'daily':
       return t('badge.daily');
     case 'needMore':

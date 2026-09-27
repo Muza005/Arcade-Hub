@@ -79,6 +79,8 @@ export interface JoinMsg {
   t: 'join';
   room: string;
   token?: string;
+  /** Браузер телефона не подходит (§15): на экране у аватара значок предупреждения. */
+  unsupported?: boolean;
 }
 
 // ─── Телефон → экран ──────────────────────────────────────────────
@@ -136,7 +138,7 @@ export interface RosterEntry {
   online: boolean;
 }
 
-export type ErrorCode = 'no-room' | 'full';
+export type ErrorCode = 'no-room' | 'full' | 'removed';
 
 /** Отказ во входе: комнаты нет или она заполнена. */
 export interface ErrMsg {

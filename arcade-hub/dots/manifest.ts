@@ -32,6 +32,7 @@ export const dotsManifest: GameManifest = {
   strings,
   controllerLayout: { mainButton: true },
   bots: true,
+  attract: { kind: 'live' },
   meta: () => {
     const records = readRecords(GAME_ID);
     const daily = dailyBest(records);

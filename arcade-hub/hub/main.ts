@@ -3,10 +3,11 @@
 import '../shared/ui/fonts';
 import './styles.css';
 import { createKeyboardSource, type InputSource } from '../engine/input';
-import { DEV_TEST_PHONE_KEY } from '../shared/config';
+import { DEV_TEST_PHONE_KEY, SPLASH_MS } from '../shared/config';
 import type { GameManifest } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
-import { getLang, t } from '../shared/i18n';
+import { readHubSettings, writeHubSettings, type HubSettings } from '../shared/hub-settings';
+import { getLang, setLang, t } from '../shared/i18n';
 import { createUiSounds } from './audio';
 import { randomSeed } from '../engine/rng';
 import { dailySeed, today } from '../shared/daily';
@@ -20,12 +21,28 @@ import { createPauseOverlay } from './pause-overlay';
 import { connectPhones, type Phones } from './phones';
 import type { Room } from './room';
 import { connectRoom, type RoomClient } from './room-client';
-import { applyReducedMotion, launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
+import { createAttract } from './attract';
+import { createSettingsScreen } from './settings/settings';
+import { launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
+import { createToast } from './ui/toast';
 import { createFocusManager } from './ui/focus';
 
+// Язык — до первой строки интерфейса.
+let hubSettings: HubSettings = readHubSettings();
+setLang(hubSettings.lang);
 document.documentElement.lang = getLang();
 document.title = t('hub.title');
-applyReducedMotion();
+
+const PERCENT = 100;
+const SPLASH_KEY = 'arcade-hub:splashed';
+
+/** Настройки хаба (§13) применяются сразу. */
+function applyHubSettings(next: HubSettings): void {
+  const root = document.documentElement;
+  root.style.setProperty('--ui-scale', String(next.uiScale / PERCENT));
+  root.toggleAttribute('data-reduced-motion', next.reducedMotion);
+  sounds.configure(next);
+}
 
 const root = document.getElementById('hub');
 if (!root) throw new Error('#hub not found');
@@ -47,6 +64,8 @@ const results = createResults();
 
 const sounds = createUiSounds(soundEnabled());
 const focus = createFocusManager(sounds);
+const toast = createToast();
+applyHubSettings(hubSettings);
 
 let room: RoomClient | null = null;
 let phones: Phones | null = null;
@@ -69,10 +88,12 @@ async function play(start: LobbyStart): Promise<void> {
   const { game, players, mode, settings, daily } = start;
   lobby.hide();
   gameMount.hidden = false;
+  sounds.music(false);
   rememberLaunch(game.id);
   const sources = inputSources(start);
   const seed = daily ? dailySeed() : randomSeed();
   let choice: ResultsChoice | null = null;
+  let failed = false;
   try {
     const match = await runGame(game, gameMount, {
       players,
@@ -121,12 +142,19 @@ async function play(start: LobbyStart): Promise<void> {
     });
     match.dispose();
   } catch (err) {
-    // Сообщение об ошибке запуска — этап А8.
+    // Игра не загрузилась (§15): окно игры с сообщением и «Повторить».
     console.error(err);
+    failed = true;
     for (const source of sources) source.dispose();
   }
   gameMount.hidden = true;
   phones?.enterMenu();
+  sounds.music(true);
+
+  if (failed) {
+    menu.show(game.id, true, { retry: () => void play(start) });
+    return;
+  }
 
   if (choice === 'again') {
     const next = lobby.restart();
@@ -163,9 +191,43 @@ const menu = createMenu({
     menu.hide();
     lobby.open(game);
   },
+  onSettings: () => {
+    menu.hide();
+    settingsScreen.show();
+  },
 });
 
-root.append(menu.el, lobby.el, gameMount, results.el, pause.el);
+const settingsScreen = createSettingsScreen({
+  get: () => hubSettings,
+  set: (next) => {
+    const langChanged = next.lang !== hubSettings.lang;
+    hubSettings = next;
+    writeHubSettings(next);
+    // Язык меняет все строки — проще и надёжнее перезагрузить хаб (комната и телефоны вернутся сами).
+    if (langChanged) location.reload();
+    else applyHubSettings(next);
+  },
+  changeCode: () => room?.changeCode(),
+  removeAll: () => room?.removeAll(),
+  onBack: () => {
+    settingsScreen.hide();
+    menu.show();
+  },
+});
+
+const attract = createAttract({
+  games,
+  canStart: () =>
+    !menu.el.hidden &&
+    !document.querySelector('dialog[open]') &&
+    !hubSettings.reducedMotion &&
+    !(room?.room.players.some((p) => p.connected) ?? false),
+  roomCode: () => room?.room.code ?? null,
+  onStart: () => undefined,
+  onStop: () => undefined,
+});
+
+root.append(menu.el, lobby.el, settingsScreen.el, gameMount, results.el, pause.el, attract.el, toast.el);
 
 if (fixtureRoom) {
   menu.setRoom(fixtureRoom);
@@ -179,7 +241,13 @@ if (fixtureRoom) {
     menu.setRoom(r);
     lobby.setRoom(r);
   });
-  client.onJoin(() => sounds.play('join'));
+  client.onJoin(() => {
+    attract.poke();
+    sounds.play('join');
+  });
+  client.onInput(() => attract.poke());
+  client.onLeaderChange((player) => toast.show(t('toast.leader', { nick: player.nick }), player.color));
+  client.onStatus((online) => menu.setOnline(online, () => client.retry()));
   phones = connectPhones({
     room: client,
     nav: focus,
@@ -189,6 +257,28 @@ if (fixtureRoom) {
   if (import.meta.env.DEV) await enableTestPhones(() => client.room.code);
 }
 menu.show();
+finishBoot();
+
+/** Загрузка закончилась; при первом запуске за сессию — заставка на SPLASH_MS (§5). */
+function finishBoot(): void {
+  const boot = document.getElementById('boot');
+  if (!boot) return;
+  let first = false;
+  try {
+    first = sessionStorage.getItem(SPLASH_KEY) === null;
+    sessionStorage.setItem(SPLASH_KEY, '1');
+  } catch {
+    // без хранилища — без заставки
+  }
+  const hide = (): void => {
+    boot.classList.add('boot--done');
+    setTimeout(() => boot.remove(), SPLASH_MS);
+  };
+  if (first && !hubSettings.reducedMotion) {
+    boot.classList.add('boot--splash');
+    setTimeout(hide, SPLASH_MS);
+  } else hide();
+}
 
 /** Dev: P — добавить тестовый телефон, Shift+P — отключить последний. */
 async function enableTestPhones(code: () => string | null): Promise<void> {

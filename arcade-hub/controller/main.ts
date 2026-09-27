@@ -239,10 +239,15 @@ function send(msg: JoinMsg | PhoneToScreen): void {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+/** Браузер, в котором контроллер не заработает: нет Pointer Events или встроенный браузер соцсети (§15). */
+const IN_APP_BROWSER = /FBAN|FBAV|Instagram|Line\//;
+const unsupported = !('PointerEvent' in window) || IN_APP_BROWSER.test(navigator.userAgent);
+
 function join(): void {
   const token = tokenFor(room);
   freshJoin = !token;
-  send(token ? { t: 'join', room, token } : { t: 'join', room });
+  const base: JoinMsg = token ? { t: 'join', room, token } : { t: 'join', room };
+  send(unsupported ? { ...base, unsupported: true } : base);
 }
 
 function playFlash(color: string): void {
@@ -266,7 +271,11 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       freshJoin = false;
       pad.setProfile(msg.nick, msg.color);
       app?.style.setProperty('--player', msg.color);
-      if (screen === 'connecting') show(ready ? 'pad' : 'ready');
+      if (unsupported) {
+        // В комнате виден (значок на экране), но играть просим из нормального браузера.
+        errorText.textContent = t('ctrl.unsupported');
+        show('error');
+      } else if (screen === 'connecting') show(ready ? 'pad' : 'ready');
       else render();
       return;
     }
@@ -280,8 +289,9 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       return;
     case 'err':
       stopped = true;
-      if (msg.code === 'no-room') {
-        codeError.textContent = t('ctrl.noRoom');
+      if (msg.code === 'no-room' || msg.code === 'removed') {
+        codeError.textContent = t(msg.code === 'removed' ? 'ctrl.removed' : 'ctrl.noRoom');
+        slot = null;
         show('code');
       } else {
         errorText.textContent = t('ctrl.full');
@@ -373,5 +383,12 @@ codeForm.addEventListener('submit', (e) => {
 });
 
 applyPrefs();
-if (room.length === ROOM_CODE_LEN) start(room);
-else show('code');
+if (!('WebSocket' in window)) {
+  // Без WebSocket не войти даже в комнату.
+  errorText.textContent = t('ctrl.unsupported');
+  show('error');
+} else if (room.length === ROOM_CODE_LEN) {
+  start(room);
+} else {
+  show('code');
+}

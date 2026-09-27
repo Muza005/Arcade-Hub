@@ -1,7 +1,16 @@
 // Связь экрана с сервером комнат. Комната создаётся при открытии хаба и переживает смену игр (§2).
 // При перезагрузке страницы хаб возвращается в ту же комнату: код и слоты лежат в sessionStorage.
 import { IDLE_INPUT, type InputState } from '../engine/input';
-import { DEFAULT_ASPECT, MAX_PLAYERS, PLAYER_COLORS, RECONNECT_DELAYS_S, TOKEN_BYTES, WS_PATH } from '../shared/config';
+import {
+  DEFAULT_ASPECT,
+  LEADER_HANDOFF_S,
+  MAX_PLAYERS,
+  PLAYER_COLORS,
+  RECONNECT_DELAYS_S,
+  SERVER_DOWN_AFTER_S,
+  TOKEN_BYTES,
+  WS_PATH,
+} from '../shared/config';
 import { t } from '../shared/i18n';
 import type {
   CmdMsg,
@@ -22,6 +31,13 @@ export interface RoomClient {
   onChange(cb: (room: Room) => void): void;
   /** Новый игрок вошёл (не возврат после обрыва) — для анимации и звука. */
   onJoin(cb: (player: RoomPlayer) => void): void;
+  /** Роль ведущего перешла сама (ведущий не вернулся за LEADER_HANDOFF_S). */
+  onLeaderChange(cb: (player: RoomPlayer) => void): void;
+  /** Есть ли связь с сервером комнат (§15 «Сервер недоступен»). */
+  readonly online: boolean;
+  onStatus(cb: (online: boolean) => void): void;
+  /** «Повторить»: переподключиться сейчас, не дожидаясь паузы. */
+  retry(): void;
   /** Ввод с телефона пришёл (id игрока = id слота строкой). */
   onInput(cb: (playerId: string, input: InputState) => void): void;
   /** Команда с телефона (pause, back, …); `leader` — прислал ли её ведущий. */
@@ -30,6 +46,10 @@ export interface RoomClient {
   inputOf(playerId: string): InputState;
   leaderId(): string | null;
   send(playerId: string, msg: ScreenToPhone): void;
+  /** Убрать всех игроков: телефоны получают «вас убрали», места освобождаются. */
+  removeAll(): void;
+  /** Новая комната с новым кодом; старые телефоны получают «вас убрали». */
+  changeCode(): void;
   /** Каждому подключённому телефону — своё сообщение. */
   sendEach(make: (playerId: string) => ScreenToPhone): void;
 }
@@ -44,6 +64,14 @@ function load(): SavedRoom | null {
     return raw ? (JSON.parse(raw) as SavedRoom) : null;
   } catch {
     return null;
+  }
+}
+
+function clearSaved(): void {
+  try {
+    sessionStorage.removeItem(SAVE_KEY);
+  } catch {
+    // нечего чистить
   }
 }
 
@@ -71,8 +99,34 @@ export function connectRoom(): RoomClient {
   const joinListeners: Array<(player: RoomPlayer) => void> = [];
   const inputListeners: Array<(playerId: string, input: InputState) => void> = [];
   const cmdListeners: Array<(playerId: string, msg: CmdMsg, leader: boolean) => void> = [];
+  const leaderListeners: Array<(player: RoomPlayer) => void> = [];
+  const statusListeners: Array<(online: boolean) => void> = [];
   let ws: WebSocket | null = null;
   let attempt = 0;
+  let online = false;
+  let downTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let handoffTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const setOnline = (value: boolean): void => {
+    if (online === value) return;
+    online = value;
+    for (const cb of statusListeners) cb(value);
+  };
+
+  /** Ведущий отключился — ждём LEADER_HANDOFF_S, потом роль переходит дальше. */
+  const scheduleHandoff = (): void => {
+    if (handoffTimer) clearTimeout(handoffTimer);
+    handoffTimer = setTimeout(() => {
+      handoffTimer = null;
+      const next = state.autoHandoff();
+      if (!next) return;
+      syncPhones();
+      changed();
+      const player = state.players().find((p) => p.id === String(next.id));
+      if (player) for (const cb of leaderListeners) cb(player);
+    }, LEADER_HANDOFF_S * MS_PER_S);
+  };
 
   const snapshot = (): Room => ({ code: state.code, players: state.players() });
   const changed = (): void => {
@@ -107,7 +161,7 @@ export function connectRoom(): RoomClient {
   const onPhone = ({ from, msg }: FromMsg): void => {
     switch (msg.t) {
       case 'join': {
-        const result = state.join(from, typeof msg.token === 'string' ? msg.token : undefined);
+        const result = state.join(from, typeof msg.token === 'string' ? msg.token : undefined, msg.unsupported === true);
         if ('error' in result) {
           toPhone(from, { t: 'err', code: result.error });
           return;
@@ -160,6 +214,9 @@ export function connectRoom(): RoomClient {
     ws = new WebSocket(`${protocol}//${location.host}${WS_PATH}`);
     ws.addEventListener('open', () => {
       attempt = 0;
+      if (downTimer) clearTimeout(downTimer);
+      downTimer = null;
+      setOnline(true);
       send(state.code ? { t: 'host', code: state.code } : { t: 'host' });
     });
     ws.addEventListener('message', (e) => {
@@ -179,6 +236,7 @@ export function connectRoom(): RoomClient {
         const slot = state.leave(msg.from);
         if (slot) {
           inputs.delete(String(slot.id));
+          if (state.isLeader(slot)) scheduleHandoff();
           syncPhones();
           changed();
         }
@@ -189,12 +247,18 @@ export function connectRoom(): RoomClient {
       for (const slot of state.connected()) if (slot.cid) state.leave(slot.cid);
       inputs.clear();
       changed();
+      // Короткий обрыв (перезапуск сервера) не пугаем: «недоступен» — только после SERVER_DOWN_AFTER_S.
+      downTimer ??= setTimeout(() => setOnline(false), SERVER_DOWN_AFTER_S * MS_PER_S);
       const delay = RECONNECT_DELAYS_S[Math.min(attempt, RECONNECT_DELAYS_S.length - 1)] ?? 1;
       attempt++;
-      setTimeout(connect, delay * MS_PER_S);
+      reconnectTimer = setTimeout(connect, delay * MS_PER_S);
     });
   };
   connect();
+  // Сервер не ответил при открытии хаба — тоже «недоступен».
+  downTimer = setTimeout(() => {
+    if (ws?.readyState !== WebSocket.OPEN) setOnline(false);
+  }, SERVER_DOWN_AFTER_S * MS_PER_S);
 
   return {
     get room() {
@@ -203,6 +267,17 @@ export function connectRoom(): RoomClient {
     onChange: (cb) => void changeListeners.push(cb),
     onJoin: (cb) => void joinListeners.push(cb),
     onInput: (cb) => void inputListeners.push(cb),
+    onLeaderChange: (cb) => void leaderListeners.push(cb),
+    get online() {
+      return online;
+    },
+    onStatus: (cb) => void statusListeners.push(cb),
+    retry() {
+      if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      attempt = 0;
+      connect();
+    },
     onCmd: (cb) => void cmdListeners.push(cb),
     inputOf: (id) => inputs.get(id) ?? { ...IDLE_INPUT },
     leaderId: () => {
@@ -215,6 +290,21 @@ export function connectRoom(): RoomClient {
     },
     sendEach: (make) => {
       for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, make(String(slot.id)));
+    },
+    removeAll() {
+      send({ t: 'to', to: '*', msg: { t: 'err', code: 'removed' } });
+      inputs.clear();
+      state.restore({ code: state.code ?? '', nextId: 1, slots: [] });
+      changed();
+    },
+    changeCode() {
+      send({ t: 'to', to: '*', msg: { t: 'err', code: 'removed' } });
+      inputs.clear();
+      state.restore({ code: '', nextId: 1, slots: [] });
+      state.code = null;
+      clearSaved();
+      // Переподключение без кода — сервер выдаст новую комнату.
+      ws?.close();
     },
   };
 }
