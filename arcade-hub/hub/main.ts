@@ -1,15 +1,15 @@
-// Точка входа хаба: меню игр → окно игры → матч → снова меню.
-// Лобби — этап А6; пока «Играть» запускает матч с подключёнными телефонами,
-// а если телефонов нет — с двумя игроками на клавиатуре.
+// Точка входа хаба: меню игр → окно игры → лобби → матч → снова лобби.
+// «Играть» в окне игры ведёт в лобби: там собираются телефоны, клавиатура и боты.
 import '../shared/ui/fonts';
 import './styles.css';
-import { createKeyboardSource, type InputSource, type KeyboardScheme } from '../engine/input';
-import { DEV_TEST_PHONE_KEY, PLAYER_COLORS } from '../shared/config';
-import type { GameManifest, GamePlayer } from '../shared/game-manifest';
+import { createKeyboardSource, type InputSource } from '../engine/input';
+import { DEV_TEST_PHONE_KEY } from '../shared/config';
+import type { GameManifest } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
 import { getLang, t } from '../shared/i18n';
 import { createUiSounds } from './audio';
 import { runGame } from './game-runner';
+import { createLobby, type LobbyStart } from './lobby/lobby';
 import { createMenu } from './menu/menu';
 import { createPauseOverlay } from './pause-overlay';
 import { connectPhones, type Phones } from './phones';
@@ -34,29 +34,6 @@ if (import.meta.env.DEV) {
   fixtureRoom = dev.devRoom();
 }
 
-const KEYBOARD_PLAYERS: readonly KeyboardScheme[] = ['wasd', 'arrows'];
-
-/** Игроки матча до лобби (этап А6): телефоны по порядку входа, не больше максимума игры. */
-function matchPlayers(game: GameManifest, room: RoomClient | null): { players: GamePlayer[]; sources: InputSource[] } {
-  const phones = (room?.room.players ?? []).filter((p) => p.connected).slice(0, game.players.max);
-  if (room && phones.length > 0) {
-    return {
-      players: phones.map((p) => ({ id: p.id, nick: p.nick, color: p.color, kind: 'phone' })),
-      sources: phones.map((p) => ({ id: p.id, read: () => room.inputOf(p.id), dispose: () => undefined })),
-    };
-  }
-  const keyboard = KEYBOARD_PLAYERS.slice(0, game.players.keyboardMax);
-  return {
-    players: keyboard.map((scheme, i) => ({
-      id: `kb-${scheme}`,
-      nick: t('player.keyboard', { n: i + 1 }),
-      color: PLAYER_COLORS[i % PLAYER_COLORS.length] as string,
-      kind: 'keyboard',
-    })),
-    sources: keyboard.map((scheme) => createKeyboardSource(`kb-${scheme}`, scheme)),
-  };
-}
-
 const gameMount = document.createElement('div');
 gameMount.className = 'game-mount';
 gameMount.hidden = true;
@@ -68,15 +45,32 @@ const focus = createFocusManager(sounds);
 let room: RoomClient | null = null;
 let phones: Phones | null = null;
 
-async function play(game: GameManifest): Promise<void> {
-  menu.hide();
+/** Источники ввода матча: телефоны — из комнаты, клавиатура — своя раскладка. Ботов ведёт сама игра. */
+function inputSources(start: LobbyStart): InputSource[] {
+  const sources: InputSource[] = [];
+  for (const player of start.players) {
+    const scheme = start.keyboard.get(player.id);
+    if (scheme) sources.push(createKeyboardSource(player.id, scheme));
+    else if (player.kind === 'phone' && room) {
+      const client = room;
+      sources.push({ id: player.id, read: () => client.inputOf(player.id), dispose: () => undefined });
+    }
+  }
+  return sources;
+}
+
+async function play(start: LobbyStart): Promise<void> {
+  const { game, players, mode, settings } = start;
+  lobby.hide();
   gameMount.hidden = false;
   rememberLaunch(game.id);
-  const { players, sources } = matchPlayers(game, room);
+  const sources = inputSources(start);
   try {
     const match = await runGame(game, gameMount, {
       players,
       sources,
+      mode,
+      settings,
       fx: (playerId, fx) => room?.send(playerId, { t: 'fx', ...fx }),
     });
     phones?.enterGame(game, match);
@@ -88,8 +82,17 @@ async function play(game: GameManifest): Promise<void> {
   }
   gameMount.hidden = true;
   phones?.enterMenu();
-  menu.show(game.id);
+  // Итоги — этап А7; пока после матча — снова лобби, «Старт» запускает следующий.
+  lobby.show();
 }
+
+const lobby = createLobby({
+  onStart: (start) => void play(start),
+  onBack: (game) => {
+    lobby.hide();
+    menu.show(game.id, true);
+  },
+});
 
 const menu = createMenu({
   games,
@@ -101,18 +104,26 @@ const menu = createMenu({
       sounds.setEnabled(on);
     },
   },
-  onPlay: (game) => void play(game),
+  onPlay: (game) => {
+    menu.hide();
+    lobby.open(game);
+  },
 });
 
-root.append(menu.el, gameMount, pause.el);
+root.append(menu.el, lobby.el, gameMount, pause.el);
 
 if (fixtureRoom) {
   menu.setRoom(fixtureRoom);
+  lobby.setRoom(fixtureRoom);
 } else {
   const client = connectRoom();
   room = client;
   menu.setRoom(client.room);
-  client.onChange((r) => menu.setRoom(r));
+  lobby.setRoom(client.room);
+  client.onChange((r) => {
+    menu.setRoom(r);
+    lobby.setRoom(r);
+  });
   client.onJoin(() => sounds.play('join'));
   phones = connectPhones({
     room: client,

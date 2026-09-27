@@ -1,0 +1,323 @@
+/* Лобби (§11). Размеры — px макета 1920×1080 в rem: calc(N rem / 24). */
+
+.lobby {
+  --content-w: min(calc(1792rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--safe-zone) calc((100vw - var(--content-w)) / 2);
+}
+
+.lobby__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.lobby__back {
+  height: calc(64rem / 24);
+}
+
+.lobby__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-screen-title);
+  line-height: 1.1;
+}
+
+.lobby__modes {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-2);
+}
+
+.mode-chip {
+  height: calc(56rem / 24);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-secondary);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.mode-chip[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.lobby__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr calc(480rem / 24);
+  gap: var(--space-6);
+}
+
+.lobby__players {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* запас под рамку фокуса */
+  margin: calc(-1 * var(--space-3));
+  padding: var(--space-3);
+}
+
+.lobby__cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(220rem / 24), 1fr));
+  gap: var(--space-2);
+}
+
+.lcard,
+.lslot {
+  position: relative;
+  min-height: calc(180rem / 24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: center;
+}
+
+.lcard__avatar {
+  position: relative;
+  width: calc(72rem / 24);
+  height: calc(72rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-card-title);
+}
+
+.lcard--bot .lcard__avatar .icon {
+  font-size: calc(36rem / 24);
+}
+
+.lcard__crown {
+  position: absolute;
+  top: calc(-18rem / 24);
+  left: 50%;
+  translate: -50% 0;
+  font-size: calc(26rem / 24);
+  color: var(--warn);
+}
+
+.lcard__nick {
+  font-size: var(--fs-body);
+}
+
+.lcard__sub {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.lcard--waiting {
+  opacity: 0.5;
+}
+
+.lcard__remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.lslot {
+  background: none;
+  border: calc(3rem / 24) dashed rgb(255 255 255 / 0.16);
+  color: var(--text-2);
+  font-size: var(--fs-secondary);
+}
+
+.lslot--off {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+
+.lobby__waiting {
+  margin-top: var(--space-4);
+}
+
+.lobby__note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  color: var(--warn);
+}
+
+.lobby__side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.lobby__settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.lobby__label {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__label {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.field__options,
+.field__slider {
+  display: flex;
+  gap: calc(6rem / 24);
+}
+
+.field__option,
+.field__step,
+.field--toggle {
+  min-height: calc(56rem / 24);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-secondary);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.field__option {
+  flex: 1;
+}
+
+.field__option[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.field__step {
+  width: calc(56rem / 24);
+}
+
+.field__value {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.field--toggle {
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-2);
+}
+
+.field--toggle::after {
+  content: '';
+  width: calc(56rem / 24);
+  height: calc(32rem / 24);
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(circle calc(12rem / 24) at calc(16rem / 24) 50%, var(--text-2) 98%, transparent) no-repeat,
+    var(--bg);
+}
+
+.field--toggle[aria-checked='true']::after {
+  background:
+    radial-gradient(circle calc(12rem / 24) at calc(40rem / 24) 50%, var(--on-accent) 98%, transparent) no-repeat,
+    var(--accent);
+}
+
+.lcard .field {
+  width: 100%;
+}
+
+.link-btn {
+  align-self: flex-start;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+}
+
+.lobby__actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lobby__start {
+  height: calc(96rem / 24);
+  font-size: var(--fs-card-title);
+}
+
+.lobby button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Фокус в лобби — тот же вид, что в меню (§8). */
+.mode-chip:focus,
+.lcard__remove:focus,
+.field__option:focus,
+.field__step:focus,
+.field--toggle:focus,
+.link-btn:focus {
+  outline: none;
+  z-index: 1;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus),
+    0 0 calc(28rem / 24) var(--accent);
+}

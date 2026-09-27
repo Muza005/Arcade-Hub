@@ -85,3 +85,12 @@ describe('Точки: симуляция', () => {
     expect(sim.stars.length).toBe(starsBefore);
   });
 });
+
+describe('Точки: бот', () => {
+  it('бот собирает звёзды сам', async () => {
+    const { botInput } = await import('./bot');
+    const sim = createSim(['bot-1'], 5, { durationS: 20, dashEnabled: true });
+    while (!sim.over) sim.step(STEP, (id) => botInput(sim, id));
+    expect(sim.dots[0]!.score).toBeGreaterThan(3);
+  });
+});

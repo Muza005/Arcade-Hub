@@ -28,6 +28,7 @@ import {
   WORLD_W,
 } from './config';
 import { dotsManifest } from './manifest';
+import { botInput } from './bot';
 import { createSim, type Sim } from './sim';
 import { strings } from './strings';
 
@@ -52,6 +53,8 @@ export function createDotsGame(): GameModule {
   let stage: Stage;
   let paused = false;
   let ended = false;
+  /** Боты управляются самой игрой: платформа для них ввода не даёт. */
+  let bots = new Set<string>();
 
   const dotViews = new Map<string, DotView>();
   const starsLayer = new Graphics();
@@ -113,6 +116,7 @@ export function createDotsGame(): GameModule {
   return {
     async init(context) {
       ctx = context;
+      bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
       sim = createSim(
         ctx.players.map((p) => p.id),
         ctx.seed,
@@ -167,7 +171,7 @@ export function createDotsGame(): GameModule {
 
     update(dtS) {
       if (paused || ended) return;
-      sim.step(dtS, (id) => ctx.input.read(id));
+      sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : ctx.input.read(id)));
       for (const id of sim.pickups) ctx.fx(id, { vib: PICKUP_VIBRATE_MS, flash: STAR_COLOR });
       if (sim.over) endMatch();
     },

@@ -13,6 +13,43 @@ export interface GameMode {
   icon: string;
 }
 
+// ─── Схема лобби (§11): игра описывает поля, лобби их рисует и сохраняет ───
+
+interface FieldBase {
+  key: string;
+  /** Ключ словаря игры. */
+  label: string;
+}
+
+export interface ToggleField extends FieldBase {
+  kind: 'toggle';
+  default: boolean;
+}
+
+export interface SliderField extends FieldBase {
+  kind: 'slider';
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+}
+
+export interface SelectField extends FieldBase {
+  kind: 'select';
+  /** label — ключ словаря игры. */
+  options: Array<{ value: string | number; label: string }>;
+  default: string | number;
+}
+
+export type LobbyField = ToggleField | SliderField | SelectField;
+
+export interface LobbySchema {
+  /** Настройки матча: общие для всех. */
+  settings: LobbyField[];
+  /** Поля каждого игрока (например, форма корпуса). */
+  playerFields?: LobbyField[];
+}
+
 export interface GameMetaSummary {
   lastMatch?: string; // «14 волн · лучший — Мурад, 23 400»
   dailyBest?: string;
@@ -42,6 +79,10 @@ export interface GameManifest {
   meta?: () => GameMetaSummary; // строка для карточки и блок меты
   /** Словарь игры: хабу нужны title, tagline, howToPlay, modes до загрузки кода. */
   strings: GameStrings;
+  /** Можно ли добирать игроков ботами. Как бот играет, решает игра. */
+  bots?: boolean;
+  /** Настройки матча и поля игроков для лобби. */
+  lobby?: LobbySchema;
   /** Контроллер на телефоне (§10). Виды управления берутся из `controls`. */
   controllerLayout: {
     mainButton: boolean;
@@ -59,6 +100,8 @@ export interface GamePlayer {
   nick: string;
   color: string;
   kind: PlayerKind;
+  /** Значения полей игрока из схемы лобби (playerFields). */
+  fields?: Readonly<Record<string, LobbyValue>>;
 }
 
 export type MatchSettings = Readonly<Record<string, LobbyValue>>;

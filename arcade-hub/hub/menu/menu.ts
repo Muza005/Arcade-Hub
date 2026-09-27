@@ -22,8 +22,9 @@ export interface MenuOptions {
 export interface Menu {
   readonly el: HTMLElement;
   setRoom(room: Room): void;
-  /** Перерисовать сетку (например, после запуска игры порядок меняется) и поставить фокус. */
-  show(focusGameId?: string): void;
+  /** Перерисовать сетку (например, после запуска игры порядок меняется) и поставить фокус.
+   *  openWindow — сразу открыть окно этой игры («Назад» из лобби, «К игре»). */
+  show(focusGameId?: string, openWindow?: boolean): void;
   hide(): void;
 }
 
@@ -157,11 +158,14 @@ export function createMenu(options: MenuOptions): Menu {
       renderGrid();
       if (focused) cardFor(focused)?.focus();
     },
-    show(focusGameId) {
+    show(focusGameId, openWindow = false) {
       renderRoom();
       renderGrid();
       el.hidden = false;
-      cardFor(focusGameId)?.focus();
+      const card = cardFor(focusGameId);
+      card?.focus();
+      const game = options.games.find((g) => g.id === focusGameId);
+      if (openWindow && card && game) gameWindow.open(game, card);
     },
     hide() {
       gameWindow.close();

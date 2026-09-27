@@ -11,7 +11,12 @@ export type DotsKey =
   | 'modeFfaDesc'
   | 'timer'
   | 'score'
-  | 'status';
+  | 'status'
+  | 'setDuration'
+  | 'dur30'
+  | 'dur60'
+  | 'dur90'
+  | 'setDash';
 
 export const strings: GameStrings<DotsKey> = {
   ru: {
@@ -25,6 +30,11 @@ export const strings: GameStrings<DotsKey> = {
     timer: '{s}',
     score: '{nick}: {score}',
     status: 'Осталось {time}',
+    setDuration: 'Длительность',
+    dur30: '30 с',
+    dur60: '60 с',
+    dur90: '90 с',
+    setDash: 'Рывок',
   },
   en: {
     title: 'Dots',
@@ -37,5 +47,10 @@ export const strings: GameStrings<DotsKey> = {
     timer: '{s}',
     score: '{nick}: {score}',
     status: '{time} left',
+    setDuration: 'Duration',
+    dur30: '30 s',
+    dur60: '60 s',
+    dur90: '90 s',
+    setDash: 'Dash',
   },
 };

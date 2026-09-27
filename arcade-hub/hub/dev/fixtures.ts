@@ -35,8 +35,8 @@ function coverSvg(accent: string, alt: string, w: number, h: number): string {
 
 function stubManifest(stub: Stub): GameManifest {
   const strings: GameStrings = {
-    ru: { title: stub.ru[0], tagline: stub.ru[1], s1: 'Шаг один', s2: 'Шаг два', s3: 'Шаг три', mode: 'Обычный', modeDesc: 'Для проверки меню' },
-    en: { title: stub.en[0], tagline: stub.en[1], s1: 'Step one', s2: 'Step two', s3: 'Step three', mode: 'Classic', modeDesc: 'Menu check' },
+    ru: { title: stub.ru[0], tagline: stub.ru[1], s1: 'Шаг один', s2: 'Шаг два', s3: 'Шаг три', mode: 'Обычный', modeDesc: 'Для проверки меню', mode2: 'Командный', laps: 'Круги', car: 'Машина', carA: 'Быстрая', carB: 'Тяжёлая' },
+    en: { title: stub.en[0], tagline: stub.en[1], s1: 'Step one', s2: 'Step two', s3: 'Step three', mode: 'Classic', modeDesc: 'Menu check', mode2: 'Teams', laps: 'Laps', car: 'Car', carA: 'Fast', carB: 'Heavy' },
   };
   const cover = coverSvg(stub.accent, stub.accentAlt, 1920, 1080);
   return {
@@ -58,6 +58,31 @@ function stubManifest(stub: Stub): GameManifest {
     load: () => Promise.reject(new Error(`${stub.id}: заглушка для проверки меню`)),
     strings,
     controllerLayout: { mainButton: true },
+    // Первая заглушка проверяет все виды полей лобби: ползунок, поле игрока, два режима, боты.
+    ...(stub === STUBS[0]
+      ? {
+          bots: true,
+          modes: [
+            { id: 'classic', title: 'mode', description: 'modeDesc', icon: cover },
+            { id: 'teams', title: 'mode2', description: 'modeDesc', icon: cover },
+          ],
+          lobby: {
+            settings: [{ key: 'laps', label: 'laps', kind: 'slider' as const, min: 1, max: 10, step: 1, default: 3 }],
+            playerFields: [
+              {
+                key: 'car',
+                label: 'car',
+                kind: 'select' as const,
+                options: [
+                  { value: 'a', label: 'carA' },
+                  { value: 'b', label: 'carB' },
+                ],
+                default: 'a',
+              },
+            ],
+          },
+        }
+      : {}),
   };
 }
 

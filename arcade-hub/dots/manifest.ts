@@ -4,7 +4,7 @@ import cardArt from './assets/card.svg';
 import cover from './assets/cover.svg';
 import logo from './assets/logo.svg';
 import modeFfaIcon from './assets/mode-ffa.svg';
-import { ACCENT } from './config';
+import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS } from './config';
 import { strings } from './strings';
 
 export const dotsManifest: GameManifest = {
@@ -25,4 +25,17 @@ export const dotsManifest: GameManifest = {
   load: async () => (await import('./game')).createDotsGame(),
   strings,
   controllerLayout: { mainButton: true },
+  bots: true,
+  lobby: {
+    settings: [
+      {
+        key: 'durationS',
+        label: 'setDuration',
+        kind: 'select',
+        options: MATCH_S_OPTIONS.map((s) => ({ value: s, label: `dur${s}` })),
+        default: MATCH_S_DEFAULT,
+      },
+      { key: 'dash', label: 'setDash', kind: 'toggle', default: DASH_ENABLED_DEFAULT },
+    ],
+  },
 };

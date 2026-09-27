@@ -28,6 +28,20 @@ export const PLAYER_COLORS = [
 export const LEADER_HANDOFF_S = 10; // ведущий отключился → роль переходит дальше
 export const ATTRACT_IDLE_S = 60; // витрина при пустой комнате
 
+/** Боты (§11): своя приглушённая палитра, не пересекается с цветами игроков. Тёмный текст — от 7.8:1. */
+export const BOT_COLORS = [
+  '#9AA3B5',
+  '#C2B8A3',
+  '#A7C4BC',
+  '#C9A9A6',
+  '#B3B7D6',
+  '#C8C48E',
+  '#A9B8C9',
+  '#C4A9C4',
+  '#B5C49A',
+  '#C7B294',
+] as const;
+
 // Сервер комнат (§2, §17)
 export const WS_PATH = '/ws';
 export const CONTROLLER_PATH = '/controller/';

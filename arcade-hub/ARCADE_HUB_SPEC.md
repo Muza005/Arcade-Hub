@@ -414,6 +414,8 @@ interface GameMetaSummary {
 Результат матча `MatchResult`: `gameId`, `mode`, `seed`, `version`, строки по игрокам (`playerId`, `score`, `place`). Награды и повтор добавляются на этапе А7.
 
 - `controllerLayout: { mainButton, warning? }` — есть ли главная кнопка и ключ жёлтой плашки в настройках телефона. Виды управления на телефоне берутся из `controls`: `phone-buttons` → стрелки, `phone-gyro` → гироскоп, `phone-joystick` → джойстик.
+- `bots?: boolean` — можно ли добирать ботами; как бот играет, решает игра (платформа передаёт игроков с `kind: 'bot'` без ввода).
+- `lobby?: { settings, playerFields? }` — схема лобби: поля `toggle` (`default`), `slider` (`min`, `max`, `step`, `default`), `select` (`options: {value, label}`, `default`); `label` — ключи словаря игры. Лобби рисует поля, сохраняет настройки матча между запусками по игре, даёт «Сбросить»; значения приходят игре в `ctx.settings`, поля игрока — в `players[].fields`.
 - Дополнительно к полям выше манифест объявляет: `controllerLayout` (виды управления, главная кнопка, особые раскладки), схему лобби (настройки матча и поля игроков), поддержку ботов.
 
 ## 17. Протокол (`shared/protocol.ts`)

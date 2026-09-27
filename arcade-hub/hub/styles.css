@@ -1,5 +1,6 @@
 @import '../shared/ui/tokens.css';
 @import './menu/menu.css';
+@import './lobby/lobby.css';
 
 /* Корневой масштаб от высоты окна: при 1080 это 24 px, всё остальное — в rem (ARCADE_HUB_SPEC §18). */
 html {
