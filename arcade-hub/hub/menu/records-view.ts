@@ -2,15 +2,13 @@
 // Воспроизведение записи — дело игры; здесь только то, что хранит платформа.
 import type { GameManifest } from '../../shared/game-manifest';
 import { getLang, t } from '../../shared/i18n';
-import { dailyBest, readRecords, type MatchRow, type RecordEntry } from '../../shared/records';
+import { dailyBest, readRecords, type RecordEntry } from '../../shared/records';
 import { isCompatible, listReplays, type Replay } from '../../shared/replays';
 import { h, icon } from '../ui/dom';
 import { ICONS } from '../ui/icons';
+import { avatar, podium } from '../ui/podium';
 import { accentStyle, gameText } from './game-card';
 
-/** Пьедестал: второе место слева, первое в центре, третье справа. */
-const PODIUM_ORDER = [2, 1, 3];
-const PODIUM_SIZE = PODIUM_ORDER.length;
 /** Сколько аватаров показать в записи, дальше — «+N». */
 const REPLAY_AVATARS = 5;
 
@@ -18,14 +16,6 @@ function formatDate(day: string): string {
   const [y, m, d] = day.split('-').map(Number);
   if (!y || !m || !d) return day;
   return new Intl.DateTimeFormat(getLang(), { day: 'numeric', month: 'long' }).format(new Date(y, m - 1, d));
-}
-
-function avatar(nick: string, color: string | undefined, className = 'rv-avatar'): HTMLElement {
-  return h(
-    'span',
-    { class: `${className}${color ? '' : ' rv-avatar--plain'}`, style: color ? `--player: ${color}` : '' },
-    nick.slice(0, 1).toUpperCase(),
-  );
 }
 
 function recordCard(kind: 'best' | 'daily', svg: string, label: string, entry: RecordEntry | undefined): HTMLElement {
@@ -46,44 +36,6 @@ function recordCard(kind: 'best' | 'daily', svg: string, label: string, entry: R
     h('span', { class: 'rcard__score' }, String(entry.score)),
     h('span', { class: 'rcard__who' }, avatar(entry.nick, entry.color), h('span', { class: 'rcard__nick' }, entry.nick)),
     h('span', { class: 'rcard__date' }, formatDate(entry.date)),
-  );
-}
-
-function podium(rows: readonly MatchRow[]): HTMLElement {
-  const sorted = [...rows].sort((a, b) => a.place - b.place);
-  const top = sorted.slice(0, PODIUM_SIZE);
-  const rest = sorted.slice(PODIUM_SIZE);
-  const steps = PODIUM_ORDER.map((rank) => top[rank - 1])
-    .filter((r): r is MatchRow => r !== undefined)
-    .map((r) =>
-      h(
-        'li',
-        { class: `pstep pstep--${Math.min(r.place, PODIUM_SIZE)}` },
-        avatar(r.nick, r.color, 'rv-avatar pstep__avatar'),
-        h('span', { class: 'pstep__nick' }, r.nick),
-        h('span', { class: 'pstep__score' }, String(r.score)),
-        h('span', { class: 'pstep__block' }, h('span', { class: 'pstep__place' }, String(r.place))),
-      ),
-    );
-  return h(
-    'div',
-    { class: 'podium' },
-    h('ol', { class: 'podium__steps' }, ...steps),
-    rest.length > 0 &&
-      h(
-        'ul',
-        { class: 'podium__rest' },
-        ...rest.map((r) =>
-          h(
-            'li',
-            { class: 'rest-chip' },
-            h('span', { class: 'rest-chip__place' }, String(r.place)),
-            avatar(r.nick, r.color, 'rv-avatar rv-avatar--sm'),
-            r.nick,
-            h('span', { class: 'rest-chip__score' }, String(r.score)),
-          ),
-        ),
-      ),
   );
 }
 

@@ -1,11 +1,5 @@
 /* «Рекорды и записи» (§7). Размеры — px макета 1920×1080 в rem: calc(N rem / 24). */
 
-.rv {
-  --gold: #ffd84d;
-  --silver: #c9d1e0;
-  --bronze: #e0a370;
-}
-
 .rv__head {
   position: relative;
   flex: none;
@@ -195,33 +189,6 @@
   color: var(--text-3);
 }
 
-/* ─── Аватары ─── */
-.rv-avatar {
-  width: calc(44rem / 24);
-  height: calc(44rem / 24);
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--player);
-  color: var(--bg);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: calc(20rem / 24);
-}
-
-.rv-avatar--plain {
-  background: var(--surface-2);
-  color: var(--text);
-  box-shadow: inset 0 0 0 calc(2rem / 24) var(--line);
-}
-
-.rv-avatar--sm {
-  width: calc(36rem / 24);
-  height: calc(36rem / 24);
-  font-size: calc(16rem / 24);
-}
-
 /* ─── Разделы ─── */
 .rv__section {
   display: flex;
@@ -251,126 +218,6 @@
   background: var(--surface-2);
   font-size: var(--fs-secondary);
   color: var(--text-3);
-}
-
-/* ─── Пьедестал ─── */
-.podium__steps {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  gap: var(--space-2);
-}
-
-.pstep {
-  --medal: var(--bronze);
-  width: calc(180rem / 24);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: calc(4rem / 24);
-  animation: award-in var(--dur-slow) var(--ease) both;
-}
-
-.pstep--1 {
-  --medal: var(--gold);
-  animation-delay: 160ms;
-}
-
-.pstep--2 {
-  --medal: var(--silver);
-}
-
-.pstep__avatar {
-  width: calc(64rem / 24);
-  height: calc(64rem / 24);
-  font-size: calc(28rem / 24);
-  box-shadow: 0 0 0 calc(4rem / 24) var(--medal);
-}
-
-.pstep--1 .pstep__avatar {
-  width: calc(80rem / 24);
-  height: calc(80rem / 24);
-  font-size: calc(34rem / 24);
-}
-
-.pstep__nick {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: var(--fs-secondary);
-}
-
-.pstep__score {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--fs-body);
-  font-variant-numeric: tabular-nums;
-}
-
-.pstep__block {
-  width: 100%;
-  height: calc(56rem / 24);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--medal) 55%, var(--surface-2)), var(--surface-2));
-}
-
-.pstep--1 .pstep__block {
-  height: calc(96rem / 24);
-}
-
-.pstep--2 .pstep__block {
-  height: calc(72rem / 24);
-}
-
-.pstep__place {
-  width: calc(40rem / 24);
-  height: calc(40rem / 24);
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  background: var(--medal);
-  color: var(--bg);
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: var(--fs-caption);
-}
-
-.podium__rest {
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--space-1);
-}
-
-.rest-chip {
-  display: flex;
-  align-items: center;
-  gap: calc(10rem / 24);
-  padding: calc(4rem / 24) var(--space-2) calc(4rem / 24) calc(6rem / 24);
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
-  font-size: var(--fs-caption);
-}
-
-.rest-chip__place {
-  width: calc(28rem / 24);
-  text-align: center;
-  color: var(--text-3);
-  font-weight: 700;
-}
-
-.rest-chip__score {
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ─── Записи матчей ─── */

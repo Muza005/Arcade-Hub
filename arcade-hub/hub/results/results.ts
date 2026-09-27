@@ -1,10 +1,12 @@
-// Итоги матча (ARCADE_HUB_SPEC §12) в три шага: повтор конца → именные награды → таблица.
+// Итоги матча (ARCADE_HUB_SPEC §12) в три шага: повтор конца → именные награды → места (пьедестал).
 // Содержимое шагов присылает игра; оболочка отвечает за порядок, анимацию и кнопки.
 // После итогов фокус на «Ещё раз»; рядом «К игре» и «В меню».
 import { RESULTS_AWARD_STEP_MS, RESULTS_AWARDS_HOLD_MS } from '../../shared/config';
 import type { GamePlayer, MatchResult, MatchResults } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
-import { h } from '../ui/dom';
+import { h, icon } from '../ui/dom';
+import { ICONS } from '../ui/icons';
+import { podium } from '../ui/podium';
 
 export type ResultsChoice = 'again' | 'game' | 'menu';
 
@@ -93,30 +95,25 @@ export function createResults(): Results {
         h(
           'div',
           { class: 'results__panel' },
-          h('h2', { class: 'results__title' }, t('results.title')),
-          note && h('p', { class: 'results__note' }, note),
           h(
-            'table',
-            { class: 'rtable' },
-            h(
-              'thead',
-              {},
-              h('tr', {}, h('th', {}, '#'), h('th', {}, t('results.player')), ...table.columns.map((c) => h('th', {}, c))),
-            ),
-            h(
-              'tbody',
-              {},
-              ...table.rows.map((row) => {
-                const player = byId.get(row.playerId);
-                return h(
-                  'tr',
-                  { style: `--player: ${player?.color ?? 'var(--text)'}` },
-                  h('td', { class: 'rtable__place' }, String(placeOf.get(row.playerId) ?? '')),
-                  h('td', { class: 'rtable__player' }, h('span', { class: 'rtable__dot' }), player?.nick ?? row.playerId),
-                  ...row.cells.map((c) => h('td', { class: 'rtable__cell' }, c)),
-                );
-              }),
-            ),
+            'header',
+            { class: 'results__head' },
+            h('span', { class: 'results__badge' }, icon(ICONS.trophy)),
+            h('h2', { class: 'results__title' }, t('results.title')),
+            table.columns[0] && h('span', { class: 'results__column' }, table.columns[0]),
+            note && h('span', { class: 'results__note' }, note),
+          ),
+          podium(
+            table.rows.map((row) => {
+              const player = byId.get(row.playerId);
+              return {
+                nick: player?.nick ?? row.playerId,
+                ...(player?.color ? { color: player.color } : {}),
+                place: placeOf.get(row.playerId) ?? 0,
+                // Счёт — первая колонка игры; её заголовок стоит рядом с «Итоги».
+                score: row.cells[0] ?? '',
+              };
+            }),
           ),
           h('div', { class: 'results__actions' }, again, toGame, toMenu),
         ),
