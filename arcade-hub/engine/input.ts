@@ -1,8 +1,9 @@
 // Единый поток ввода. Игра читает состояние игрока по id и не знает, откуда оно пришло:
 // клавиатура сейчас, телефоны (сообщения `in`) и тестовые игроки — на следующих этапах.
+import { KEYBOARD_KEYS, type KeyboardScheme } from '../shared/config';
 import type { InputState } from '../shared/protocol';
 
-export type { InputState };
+export type { InputState, KeyboardScheme };
 
 export interface InputSource {
   readonly id: string;
@@ -12,33 +13,16 @@ export interface InputSource {
 
 export const IDLE_INPUT: Readonly<InputState> = Object.freeze({ x: 0, y: 0, btn: false });
 
-/** Раскладки клавиатурных игроков (ARCADE_HUB_SPEC §11: WASD и стрелки). Клавиши по `code` — не зависят от языка. */
-export type KeyboardScheme = 'arrows' | 'wasd';
-
-interface KeyMap {
-  up: string;
-  down: string;
-  left: string;
-  right: string;
-}
-
-const KEY_MAPS: Record<KeyboardScheme, KeyMap> = {
-  arrows: { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight' },
-  wasd: { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' },
-};
-
 /** Ограничивает вектор единичной длиной, чтобы по диагонали не было быстрее. */
 export function clampUnit(x: number, y: number): { x: number; y: number } {
   const len = Math.hypot(x, y);
   return len > 1 ? { x: x / len, y: y / len } : { x, y };
 }
 
-/**
- * Клавиатурный игрок. Главная кнопка пока не назначена (см. отчёт этапа А0): btn всегда false.
- */
+/** Клавиатурный игрок: движение и главная кнопка по раскладке KEYBOARD_KEYS. */
 export function createKeyboardSource(id: string, scheme: KeyboardScheme, target: Window = window): InputSource {
-  const map = KEY_MAPS[scheme];
-  const handled = new Set(Object.values(map));
+  const map = KEYBOARD_KEYS[scheme];
+  const handled = new Set<string>(Object.values(map));
   const down = new Set<string>();
 
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -60,7 +44,7 @@ export function createKeyboardSource(id: string, scheme: KeyboardScheme, target:
 
   return {
     id,
-    read: () => ({ ...clampUnit(axis(map.left, map.right), axis(map.up, map.down)), btn: false }),
+    read: () => ({ ...clampUnit(axis(map.left, map.right), axis(map.up, map.down)), btn: down.has(map.btn) }),
     dispose: () => {
       target.removeEventListener('keydown', onKeyDown);
       target.removeEventListener('keyup', onKeyUp);

@@ -27,6 +27,7 @@ export class FixedLoop {
   private lastMs: number | null = null;
   private handle: number | null = null;
   private tickCount = 0;
+  private halted = false;
 
   constructor(
     private readonly handlers: LoopHandlers,
@@ -48,10 +49,13 @@ export class FixedLoop {
     if (this.running) return;
     this.lastMs = null;
     this.accumulatorS = 0;
+    this.halted = false;
     this.handle = this.scheduler.request(this.frame);
   }
 
+  /** Останавливает цикл. Если вызвано из update, оставшиеся шаги и отрисовка этого кадра не выполняются. */
   stop(): void {
+    this.halted = true;
     if (this.handle !== null) this.scheduler.cancel(this.handle);
     this.handle = null;
   }
@@ -68,6 +72,7 @@ export class FixedLoop {
       this.handlers.update(this.stepS, this.tickCount);
       this.tickCount++;
       this.accumulatorS -= this.stepS;
+      if (this.halted) return;
     }
     this.handlers.render(this.accumulatorS / this.stepS);
   }

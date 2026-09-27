@@ -1,10 +1,14 @@
-// Словарь платформы (ARCADE_HUB_SPEC §0 п. 6, §21). Все видимые строки — только через t().
+// Словари (ARCADE_HUB_SPEC §0 п. 6, §21). Все видимые строки — только через t() платформы
+// или переводчик игры (createTranslator со словарём из папки игры).
 import { en } from './en';
 import { ru } from './ru';
 
 export type I18nKey = keyof typeof ru;
 export type Dictionary = Record<I18nKey, string>;
 export type Lang = 'ru' | 'en';
+/** Словарь игры: одни и те же ключи на каждом языке. */
+export type GameStrings<K extends string = string> = Record<Lang, Record<K, string>>;
+export type Params = Record<string, string | number>;
 
 export const LANGS: readonly Lang[] = ['ru', 'en'];
 export const DEFAULT_LANG: Lang = 'ru';
@@ -21,11 +25,20 @@ export function setLang(lang: Lang): void {
   current = lang;
 }
 
-/** Строка по ключу; `{name}` в строке заменяется значением из params. */
-export function t(key: I18nKey, params?: Record<string, string | number>): string {
-  const template = dictionaries[current][key];
+/** `{name}` в строке заменяется значением из params. */
+function format(template: string, params?: Params): string {
   if (!params) return template;
   return template.replace(/\{(\w+)\}/g, (match, name: string) =>
     name in params ? String(params[name]) : match,
   );
+}
+
+/** Строка платформы по ключу. */
+export function t(key: I18nKey, params?: Params): string {
+  return format(dictionaries[current][key], params);
+}
+
+/** Переводчик для словаря игры. Неизвестный ключ возвращается как есть — так его видно на экране. */
+export function createTranslator<K extends string>(strings: GameStrings<K>): (key: K, params?: Params) => string {
+  return (key, params) => format(strings[current][key] ?? key, params);
 }

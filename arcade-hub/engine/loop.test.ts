@@ -47,3 +47,26 @@ describe('FixedLoop', () => {
     expect(ticks.length).toBe(Math.floor(MAX_FRAME_S * 60));
   });
 });
+
+describe('FixedLoop.stop', () => {
+  it('stop() из update прекращает шаги и отрисовку этого кадра', () => {
+    let updates = 0;
+    let renders = 0;
+    const loop = new FixedLoop(
+      {
+        update: () => {
+          updates++;
+          loop.stop();
+        },
+        render: () => renders++,
+      },
+      { request: () => 1, cancel: () => {} },
+      60,
+    );
+    loop.start();
+    loop.advance(0);
+    loop.advance(100); // хватило бы на 6 шагов
+    expect(updates).toBe(1);
+    expect(renders).toBe(1); // только первый кадр, до stop()
+  });
+});

@@ -47,6 +47,7 @@
   /* Фокус */
   --focus-width: calc(4rem / 24);
   --focus-offset: calc(4rem / 24);
+  --focus-scale: 1.04; /* 4–8 % по §8 */
 
   /* Движение */
   --dur-fast: 120ms; /* фокус, нажатие */
@@ -60,5 +61,6 @@
     --dur-fast: 0ms;
     --dur-base: 0ms;
     --dur-slow: 0ms;
+    --focus-scale: 1;
   }
 }
