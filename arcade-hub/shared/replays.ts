@@ -1,0 +1,45 @@
+// Записи матчей (§12): сид и поток ввода, последние REPLAYS_KEPT на игру, с версией правил.
+// Хранит платформа; воспроизведение, перемотку и метки делает игра.
+import type { InputEvent } from '../engine/replay';
+import { REPLAYS_KEPT } from './config';
+import type { LobbyValue } from './protocol';
+
+export interface Replay {
+  gameId: string;
+  /** Версия правил игры: запись другой версии несовместима. */
+  version: string;
+  date: string;
+  seed: number;
+  daily: boolean;
+  mode: string;
+  settings: Record<string, LobbyValue>;
+  players: Array<{ id: string; nick: string; color: string; kind: string }>;
+  inputs: InputEvent[];
+}
+
+const PREFIX = 'arcade-hub:replays:';
+
+export function listReplays(gameId: string): Replay[] {
+  try {
+    const raw = localStorage.getItem(PREFIX + gameId);
+    return raw ? (JSON.parse(raw) as Replay[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveReplay(replay: Replay): void {
+  const list = [replay, ...listReplays(replay.gameId)].slice(0, REPLAYS_KEPT);
+  try {
+    localStorage.setItem(PREFIX + replay.gameId, JSON.stringify(list));
+  } catch {
+    // Места не хватило — оставляем только новую запись.
+    try {
+      localStorage.setItem(PREFIX + replay.gameId, JSON.stringify([replay]));
+    } catch {
+      // и она не влезла — матч просто не запишется
+    }
+  }
+}
+
+export const isCompatible = (replay: Replay, version: string): boolean => replay.version === version;

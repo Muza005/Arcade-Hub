@@ -1,7 +1,9 @@
 // Модуль «Точек» по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Шаблон для новой игры: симуляция — sim.ts, отрисовка — здесь, числа — config.ts, строки — strings.ts.
 import { Container, Graphics, Text } from 'pixi.js';
+import { FixedLoop } from '../engine/loop';
 import { createStage, cssVar, loadFonts, type Stage } from '../engine/stage';
+import { FIXED_STEP_HZ } from '../shared/config';
 import { createTranslator } from '../shared/i18n';
 import { rankByScore, type GameContext, type GameModule } from '../shared/game-manifest';
 import {
@@ -14,6 +16,8 @@ import {
   NICK_FONT_PX,
   NICK_GAP_PX,
   PICKUP_VIBRATE_MS,
+  REPLAY_FRAME_HZ,
+  REPLAY_TAIL_S,
   SECONDS_PER_MINUTE,
   SCORE_FONT_PX,
   SCORE_GAP_PX,
@@ -29,7 +33,7 @@ import {
 } from './config';
 import { dotsManifest } from './manifest';
 import { botInput } from './bot';
-import { createSim, type Sim } from './sim';
+import { createSim, type Sim, type Vec } from './sim';
 import { strings } from './strings';
 
 const t = createTranslator(strings);
@@ -55,6 +59,17 @@ export function createDotsGame(): GameModule {
   let ended = false;
   /** Боты управляются самой игрой: платформа для них ввода не даёт. */
   let bots = new Set<string>();
+
+  /** Кадры последних REPLAY_TAIL_S секунд — для повтора в итогах (кольцевой буфер). */
+  interface Frame {
+    dots: Vec[];
+    stars: Vec[];
+    timeLeftS: number;
+  }
+  const tail: Frame[] = [];
+  /** Повтор могут пропустить — тогда dispose останавливает его цикл. */
+  let replayLoop: FixedLoop | null = null;
+  const TAIL_FRAMES = REPLAY_TAIL_S * FIXED_STEP_HZ;
 
   const dotViews = new Map<string, DotView>();
   const starsLayer = new Graphics();
@@ -90,9 +105,10 @@ export function createDotsGame(): GameModule {
       .fill(cssVar('--surface'))
       .stroke({ color: cssVar('--line'), width: FIELD_LINE_PX });
 
-  const drawStars = (): void => {
+  const drawStars = (): void => drawStarsAt(sim.stars);
+  const drawStarsAt = (stars: readonly Vec[]): void => {
     starsLayer.clear();
-    for (const star of sim.stars) {
+    for (const star of stars) {
       starsLayer.star(star.x, star.y, STAR_POINTS, STAR_RADIUS, STAR_RADIUS * STAR_INNER_RATIO);
     }
     starsLayer.fill(STAR_COLOR);
@@ -173,7 +189,62 @@ export function createDotsGame(): GameModule {
       if (paused || ended) return;
       sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : ctx.input.read(id)));
       for (const id of sim.pickups) ctx.fx(id, { vib: PICKUP_VIBRATE_MS, flash: STAR_COLOR });
+      tail.push({
+        dots: sim.dots.map((d) => ({ x: d.pos.x, y: d.pos.y })),
+        stars: sim.stars.map((s) => ({ ...s })),
+        timeLeftS: sim.timeLeftS,
+      });
+      if (tail.length > TAIL_FRAMES) tail.shift();
       if (sim.over) endMatch();
+    },
+
+    replay() {
+      // Проигрываем сохранённые кадры с частотой REPLAY_FRAME_HZ — на той же сцене, без симуляции.
+      const frames = [...tail];
+      if (frames.length === 0) return Promise.resolve();
+      return new Promise<void>((done) => {
+        let i = 0;
+        const loop: FixedLoop = new FixedLoop(
+          {
+            update() {
+              i++;
+              if (i >= frames.length) {
+                loop.stop();
+                replayLoop = null;
+                done();
+              }
+            },
+            render() {
+              const frame = frames[Math.min(i, frames.length - 1)] as Frame;
+              sim.dots.forEach((dot, n) => {
+                const p = frame.dots[n];
+                if (p) dotViews.get(dot.id)?.node.position.set(p.x, p.y);
+              });
+              drawStarsAt(frame.stars);
+              stage.render();
+            },
+          },
+          undefined,
+          REPLAY_FRAME_HZ,
+        );
+        replayLoop = loop;
+        loop.start();
+      });
+    },
+
+    results() {
+      const ranked = rankByScore(sim.dots.map((d) => ({ playerId: d.id, score: d.score })));
+      const topScore = ranked[0]?.score ?? 0;
+      return {
+        // «Больше всех звёзд» — всем, кто разделил первое место, если звёзды вообще были.
+        awards:
+          topScore > 0
+            ? ranked
+                .filter((r) => r.score === topScore)
+                .map((r) => ({ playerId: r.playerId, title: t('awardStars'), value: `${r.score} ★` }))
+            : [],
+        table: { columns: [t('colStars')], rows: ranked.map((r) => ({ playerId: r.playerId, cells: [String(r.score)] })) },
+      };
     },
 
     render(alpha) {
@@ -218,6 +289,8 @@ export function createDotsGame(): GameModule {
     },
 
     dispose() {
+      replayLoop?.stop();
+      replayLoop = null;
       stage?.destroy();
       dotViews.clear();
     },

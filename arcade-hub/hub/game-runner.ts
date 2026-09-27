@@ -1,14 +1,15 @@
-// Запуск игры: ленивая загрузка по манифесту, цикл, ввод, пауза, конец матча и уборка.
+// Запуск игры: ленивая загрузка по манифесту, цикл, ввод, пауза, конец матча, итоги и уборка.
 // Хаб знает об игре только манифест и контракт GameModule.
 import { InputHub, type InputSource } from '../engine/input';
 import { FixedLoop } from '../engine/loop';
-import { randomSeed } from '../engine/rng';
+import { createInputRecorder, type InputEvent } from '../engine/replay';
 import type {
   GameContext,
   GameManifest,
-  GamePlayer,
   GameModule,
+  GamePlayer,
   MatchResult,
+  MatchResults,
   MatchSettings,
 } from '../shared/game-manifest';
 import type { MainButtonState } from '../shared/protocol';
@@ -18,6 +19,7 @@ export interface LaunchOptions {
   /** Источники ввода: клавиатура, телефоны. id источника = id игрока. */
   sources: readonly InputSource[];
   fx: GameContext['fx'];
+  seed: number;
   mode?: string;
   settings?: MatchSettings;
 }
@@ -28,12 +30,19 @@ export interface Match {
   /** Id игроков матча. */
   readonly players: readonly string[];
   readonly paused: boolean;
+  /** Записанный поток ввода (для записи матча). */
+  readonly inputs: readonly InputEvent[];
   pause(): void;
   resume(): void;
   /** «Завершить матч»: к итогам, счёт сохраняется. */
   finish(): void;
   mainButton(playerId: string): MainButtonState | undefined;
   status(): string | undefined;
+  /** Повтор конца матча (после конца, до dispose). Без повтора у игры — сразу. */
+  replay(): Promise<void>;
+  results(): MatchResults | undefined;
+  /** Выгрузить игру: после итогов или при выходе. */
+  dispose(): void;
 }
 
 /** Загружает игру и запускает матч. Ошибка загрузки или init — исключение. */
@@ -41,18 +50,29 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   const game: GameModule = await manifest.load();
   const input = new InputHub();
   for (const source of options.sources) input.add(source);
+  // Игра видит тот же округлённый ввод, что пишется в запись, — повтор совпадёт один в один.
+  const recorder = createInputRecorder(
+    options.players.filter((p) => p.kind !== 'bot').map((p) => p.id),
+    (id) => input.read(id),
+  );
 
   let resolve!: (result: MatchResult) => void;
   const result = new Promise<MatchResult>((r) => (resolve = r));
   let paused = false;
   let over = false;
+  let disposed = false;
 
   const loop = new FixedLoop({
-    update: (dtS, tick) => game.update(dtS, tick),
+    update: (dtS, tick) => {
+      recorder.setTick(tick);
+      game.update(dtS, tick);
+    },
     render: (alpha) => game.render(alpha),
   });
 
-  const cleanup = (): void => {
+  const dispose = (): void => {
+    if (disposed) return;
+    disposed = true;
     loop.stop();
     input.dispose();
     game.dispose();
@@ -64,23 +84,23 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
       players: options.players,
       settings: options.settings ?? {},
       mode: options.mode ?? manifest.modes[0]?.id ?? '',
-      seed: randomSeed(),
-      input: { read: (id) => input.read(id) },
+      seed: options.seed,
+      input: { read: (id) => recorder.read(id) },
       mount,
       fx: options.fx,
       end: (matchResult) => {
         if (over) return;
         over = true;
         loop.stop();
-        // Уборка — после текущего кадра, чтобы игра не разбиралась посреди своего update.
+        // Ввод больше не нужен; сцена остаётся для повтора в итогах.
         queueMicrotask(() => {
-          cleanup();
+          input.dispose();
           resolve(matchResult);
         });
       },
     });
   } catch (err) {
-    cleanup();
+    dispose();
     throw err;
   }
 
@@ -89,6 +109,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   return {
     result,
     players: options.players.map((p) => p.id),
+    inputs: recorder.events,
     get paused() {
       return paused;
     },
@@ -107,5 +128,8 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     },
     mainButton: (playerId) => (over ? undefined : game.mainButton?.(playerId)),
     status: () => (over ? undefined : game.status?.()),
+    replay: () => (disposed || !game.replay ? Promise.resolve() : game.replay()),
+    results: () => (disposed ? undefined : game.results?.()),
+    dispose,
   };
 }

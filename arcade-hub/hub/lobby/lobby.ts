@@ -18,6 +18,8 @@ export interface LobbyStart {
   keyboard: ReadonlyMap<string, KeyboardScheme>;
   mode: string;
   settings: MatchSettings;
+  /** Играть по сиду дня (§12): один расклад на день у всех. */
+  daily: boolean;
 }
 
 export interface Lobby {
@@ -26,6 +28,8 @@ export interface Lobby {
   open(game: GameManifest): void;
   /** Показать снова (после матча) с фокусом на «Старт». */
   show(): void;
+  /** Тот же состав и настройки для «Ещё раз»; null — игроков стало меньше минимума. */
+  restart(): LobbyStart | null;
   hide(): void;
   setRoom(room: Room): void;
 }
@@ -38,6 +42,7 @@ const STORE_PREFIX = 'arcade-hub:lobby:';
 interface Saved {
   mode?: string;
   settings?: unknown;
+  daily?: boolean;
 }
 
 function loadSaved(gameId: string): Saved {
@@ -64,6 +69,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
   let bots = 0;
   let mode = '';
   let settings: FieldValues = {};
+  let daily = false;
   const playerFields = new Map<string, FieldValues>();
   /** Фокус ушёл с «Старт» только потому, что он был неактивен, — вернуть, как только станет можно. */
   let startPending = false;
@@ -87,7 +93,26 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
     });
 
   const persist = (): void => {
-    if (game) save(game.id, { mode, settings });
+    if (game) save(game.id, { mode, settings, daily });
+  };
+
+  const makeStart = (): LobbyStart | null => {
+    const now = roster();
+    if (!game || now.missing > 0) return null;
+    return {
+      game,
+      players: now.playing.map((p) => ({
+        id: p.id,
+        nick: p.nick,
+        color: p.color,
+        kind: p.kind,
+        ...(schema().playerFields.length ? { fields: { ...valuesOf(p) } } : {}),
+      })),
+      keyboard: new Map(now.playing.filter((p) => p.scheme).map((p) => [p.id, p.scheme as KeyboardScheme])),
+      mode,
+      settings: { ...settings },
+      daily,
+    };
   };
 
   const valuesOf = (entry: RosterEntry): FieldValues => {
@@ -231,22 +256,14 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
         : null;
 
     const start = btn('start', 'btn btn--play lobby__start', t('lobby.start'), () => {
-      const now = roster();
-      if (now.missing > 0) return;
-      options.onStart({
-        game: current,
-        players: now.playing.map((p) => ({
-          id: p.id,
-          nick: p.nick,
-          color: p.color,
-          kind: p.kind,
-          ...(schema().playerFields.length ? { fields: { ...valuesOf(p) } } : {}),
-        })),
-        keyboard: new Map(now.playing.filter((p) => p.scheme).map((p) => [p.id, p.scheme as KeyboardScheme])),
-        mode,
-        settings: { ...settings },
-      });
+      const config = makeStart();
+      if (config) options.onStart(config);
     }, { 'data-default-focus': true, disabled: r.missing > 0 });
+    const dailyToggle = btn('daily', 'field field--toggle', t('lobby.daily'), () => {
+      daily = !daily;
+      persist();
+      render();
+    }, { role: 'switch', 'aria-checked': String(daily) });
 
     el.style.cssText = `--accent: ${current.accent}`;
     el.replaceChildren(
@@ -296,6 +313,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
           h(
             'div',
             { class: 'lobby__actions' },
+            dailyToggle,
             current.bots &&
               btn('bot', 'btn btn--ghost', t('lobby.addBot'), () => {
                 bots++;
@@ -362,6 +380,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
       const saved = loadSaved(next.id);
       mode = next.modes.some((m) => m.id === saved.mode) ? (saved.mode as string) : (next.modes[0]?.id ?? '');
       settings = sanitize(schema().settings, saved.settings);
+      daily = saved.daily === true;
       el.hidden = false;
       focusStart();
     },
@@ -372,6 +391,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
     hide() {
       el.hidden = true;
     },
+    restart: () => makeStart(),
     setRoom(next) {
       room = next;
       if (!el.hidden) render();

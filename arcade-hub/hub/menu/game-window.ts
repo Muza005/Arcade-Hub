@@ -2,6 +2,8 @@
 // Закрывается по Esc, клику по затемнению, крестику и «Назад к играм»; фокус возвращается на карточку.
 import type { GameControl, GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
+import { dailyBest, readRecords } from '../../shared/records';
+import { isCompatible, listReplays } from '../../shared/replays';
 import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
@@ -31,10 +33,12 @@ function fact(svg: string, text: string): HTMLElement {
   return h('li', { class: 'chip' }, icon(svg, 'chip__icon'), text);
 }
 
-function content(game: GameManifest, onPlay: () => void, onClose: () => void): HTMLElement {
+function content(game: GameManifest, onPlay: () => void, onClose: () => void, onRecords: () => void): HTMLElement {
   const tg = gameText(game);
   const play = h('button', { class: 'btn btn--play', type: 'button', autofocus: true }, t('game.play'));
   const back = h('button', { class: 'btn btn--ghost', type: 'button' }, t('game.back'));
+  const records = h('button', { class: 'link-btn gw__records', type: 'button' }, t('game.records'));
+  records.addEventListener('click', onRecords);
   const close = h(
     'button',
     { class: 'gw__close', type: 'button', 'aria-label': t('game.close') },
@@ -103,8 +107,56 @@ function content(game: GameManifest, onPlay: () => void, onClose: () => void): H
           h('h3', { class: 'gw__label' }, t('game.record')),
           ...recordLines(game).map((line) => h('p', { class: 'gw__record-line' }, line)),
         ),
+        records,
         h('div', { class: 'gw__actions' }, play, back),
       ),
+    ),
+  );
+}
+
+/** Полная таблица рекордов и записи матчей (§7, §12). Воспроизведение записи — дело игры. */
+function recordsView(game: GameManifest, onBack: () => void): HTMLElement {
+  const records = readRecords(game.id);
+  const daily = dailyBest(records);
+  const replays = listReplays(game.id);
+  const back = h('button', { class: 'btn btn--ghost', type: 'button', autofocus: true }, t('lobby.back'));
+  back.addEventListener('click', onBack);
+  const line = (label: string, entry?: { nick: string; score: number; date: string }) =>
+    h('p', { class: 'rec__line' }, h('span', { class: 'rec__label' }, label), entry ? `${entry.nick} · ${entry.score} · ${entry.date}` : t('records.none'));
+  return h(
+    'article',
+    { class: 'gw gw--records', style: accentStyle(game), 'aria-labelledby': 'gw-title' },
+    h(
+      'div',
+      { class: 'rec' },
+      h('h2', { class: 'rec__title', id: 'gw-title' }, `${gameText(game)(game.title)} · ${t('game.records')}`),
+      line(t('records.best'), records.best),
+      line(t('records.daily'), daily),
+      h('h3', { class: 'gw__label' }, t('records.last')),
+      records.last
+        ? h(
+            'ol',
+            { class: 'rec__list' },
+            ...records.last.rows.map((r) => h('li', {}, `${r.place}. ${r.nick} — ${r.score}`)),
+          )
+        : h('p', { class: 'rec__none' }, t('records.none')),
+      h('h3', { class: 'gw__label' }, t('records.replays')),
+      replays.length > 0
+        ? h(
+            'ul',
+            { class: 'rec__list' },
+            ...replays.map((r) =>
+              h(
+                'li',
+                { class: isCompatible(r, game.version) ? '' : 'rec__old' },
+                [r.date, r.players.map((p) => p.nick).join(', '), r.daily && t('records.dailyMark'), !isCompatible(r, game.version) && t('records.incompatible')]
+                  .filter(Boolean)
+                  .join(' · '),
+              ),
+            ),
+          )
+        : h('p', { class: 'rec__none' }, t('records.none')),
+      h('div', { class: 'rec__actions' }, back),
     ),
   );
 }
@@ -140,13 +192,21 @@ export function createGameWindow(onPlay: (game: GameManifest) => void): GameWind
     },
     open(game, returnFocus) {
       current = { game, returnFocus };
-      el.replaceChildren(
-        content(
-          game,
-          () => onPlay(game),
-          () => close(),
-        ),
-      );
+      const showMain = (): void => {
+        el.replaceChildren(
+          content(
+            game,
+            () => onPlay(game),
+            () => close(),
+            () => {
+              el.replaceChildren(recordsView(game, showMain));
+              el.querySelector<HTMLElement>('[autofocus]')?.focus();
+            },
+          ),
+        );
+        el.querySelector<HTMLElement>('[autofocus]')?.focus();
+      };
+      showMain();
       el.showModal();
     },
     close,

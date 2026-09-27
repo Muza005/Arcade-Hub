@@ -116,4 +116,10 @@ export type KeyboardScheme = keyof typeof KEYBOARD_KEYS;
 export const BUNDLE_HUB_KB = 150; // меню без обложек, gzip; мягкий бюджет — поднимается с объяснением в отчёте
 export const BUNDLE_CONTROLLER_KB = 30;
 export const REPLAYS_KEPT = 3; // на каждую игру
+/** Оси ввода округляются до 1/INPUT_QUANT — и в игре, и в записи, чтобы повтор совпадал один в один. */
+export const INPUT_QUANT = 1000;
+
+// Итоги (§12)
+export const RESULTS_AWARD_STEP_MS = 700; // награды появляются по одной
+export const RESULTS_AWARDS_HOLD_MS = 2500; // после последней награды — к таблице
 export const MENU_MUSIC_VOLUME = 0.3; // от громкости игр

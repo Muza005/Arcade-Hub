@@ -1,4 +1,4 @@
-// Точка входа хаба: меню игр → окно игры → лобби → матч → снова лобби.
+// Точка входа хаба: меню игр → окно игры → лобби → матч → итоги → «Ещё раз» / «К игре» / «В меню».
 // «Играть» в окне игры ведёт в лобби: там собираются телефоны, клавиатура и боты.
 import '../shared/ui/fonts';
 import './styles.css';
@@ -8,7 +8,12 @@ import type { GameManifest } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
 import { getLang, t } from '../shared/i18n';
 import { createUiSounds } from './audio';
+import { randomSeed } from '../engine/rng';
+import { dailySeed, today } from '../shared/daily';
+import { recordMatch } from '../shared/records';
+import { saveReplay } from '../shared/replays';
 import { runGame } from './game-runner';
+import { createResults, type ResultsChoice } from './results/results';
 import { createLobby, type LobbyStart } from './lobby/lobby';
 import { createMenu } from './menu/menu';
 import { createPauseOverlay } from './pause-overlay';
@@ -38,6 +43,7 @@ const gameMount = document.createElement('div');
 gameMount.className = 'game-mount';
 gameMount.hidden = true;
 const pause = createPauseOverlay();
+const results = createResults();
 
 const sounds = createUiSounds(soundEnabled());
 const focus = createFocusManager(sounds);
@@ -60,21 +66,57 @@ function inputSources(start: LobbyStart): InputSource[] {
 }
 
 async function play(start: LobbyStart): Promise<void> {
-  const { game, players, mode, settings } = start;
+  const { game, players, mode, settings, daily } = start;
   lobby.hide();
   gameMount.hidden = false;
   rememberLaunch(game.id);
   const sources = inputSources(start);
+  const seed = daily ? dailySeed() : randomSeed();
+  let choice: ResultsChoice | null = null;
   try {
     const match = await runGame(game, gameMount, {
       players,
       sources,
+      seed,
       mode,
       settings,
       fx: (playerId, fx) => room?.send(playerId, { t: 'fx', ...fx }),
     });
     phones?.enterGame(game, match);
-    await match.result;
+    const result = await match.result;
+    // Итоги ведёт ведущий тем же контроллером, что и меню.
+    phones?.enterMenu();
+
+    // В рекорды идут только люди: рекорд бота компании ничего не говорит.
+    const humans = new Map(players.filter((p) => p.kind !== 'bot').map((p) => [p.id, p.nick]));
+    const beaten = recordMatch(
+      game.id,
+      result.rows
+        .filter((r) => humans.has(r.playerId))
+        .map((r) => ({ nick: humans.get(r.playerId) ?? r.playerId, score: r.score, place: r.place })),
+      daily,
+    );
+    saveReplay({
+      gameId: game.id,
+      version: game.version,
+      date: today(),
+      seed,
+      daily,
+      mode,
+      settings: { ...settings },
+      players: players.map(({ id, nick, color, kind }) => ({ id, nick, color, kind })),
+      inputs: [...match.inputs],
+    });
+
+    choice = await results.run({
+      result,
+      players,
+      content: match.results(),
+      replay: () => match.replay(),
+      beaten,
+      accent: game.accent,
+    });
+    match.dispose();
   } catch (err) {
     // Сообщение об ошибке запуска — этап А8.
     console.error(err);
@@ -82,8 +124,18 @@ async function play(start: LobbyStart): Promise<void> {
   }
   gameMount.hidden = true;
   phones?.enterMenu();
-  // Итоги — этап А7; пока после матча — снова лобби, «Старт» запускает следующий.
-  lobby.show();
+
+  if (choice === 'again') {
+    const next = lobby.restart();
+    if (next) return play(next);
+    lobby.show();
+  } else if (choice === 'game') {
+    menu.show(game.id, true);
+  } else if (choice === 'menu') {
+    menu.show(game.id);
+  } else {
+    lobby.show();
+  }
 }
 
 const lobby = createLobby({
@@ -110,7 +162,7 @@ const menu = createMenu({
   },
 });
 
-root.append(menu.el, lobby.el, gameMount, pause.el);
+root.append(menu.el, lobby.el, gameMount, results.el, pause.el);
 
 if (fixtureRoom) {
   menu.setRoom(fixtureRoom);

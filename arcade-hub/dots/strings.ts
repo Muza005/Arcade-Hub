@@ -16,7 +16,12 @@ export type DotsKey =
   | 'dur30'
   | 'dur60'
   | 'dur90'
-  | 'setDash';
+  | 'setDash'
+  | 'awardStars'
+  | 'colStars'
+  | 'metaBest'
+  | 'metaDaily'
+  | 'metaLast';
 
 export const strings: GameStrings<DotsKey> = {
   ru: {
@@ -35,6 +40,11 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 с',
     dur90: '90 с',
     setDash: 'Рывок',
+    awardStars: 'Больше всех звёзд',
+    colStars: 'Звёзды',
+    metaBest: 'Лучший — {nick}, {score} ★',
+    metaDaily: 'Рекорд дня — {nick}, {score} ★',
+    metaLast: 'Последний матч: {nick}, {score} ★',
   },
   en: {
     title: 'Dots',
@@ -52,5 +62,10 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 s',
     dur90: '90 s',
     setDash: 'Dash',
+    awardStars: 'Most stars',
+    colStars: 'Stars',
+    metaBest: 'Best — {nick}, {score} ★',
+    metaDaily: 'Daily best — {nick}, {score} ★',
+    metaLast: 'Last match: {nick}, {score} ★',
   },
 };

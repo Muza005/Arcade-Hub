@@ -1,0 +1,198 @@
+/* Итоги (§12). Размеры — px макета 1920×1080 в rem. */
+.results {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--safe-zone);
+}
+
+.results[data-step='replay'] {
+  justify-content: space-between;
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.results[data-step='replay'] .results__skip {
+  pointer-events: auto;
+  align-self: flex-end;
+}
+
+.results[data-step='awards'],
+.results[data-step='table'] {
+  background: rgb(7 9 18 / 0.86);
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+.results__chip {
+  align-self: flex-start;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-body);
+}
+
+.results__skip {
+  position: absolute;
+  right: var(--safe-zone);
+  bottom: var(--safe-zone);
+  height: calc(64rem / 24);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.results__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-screen-title);
+}
+
+.awards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.award {
+  width: calc(340rem / 24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 0 0 calc(3rem / 24) var(--player);
+  text-align: center;
+  animation: award-in var(--dur-slow) var(--ease);
+}
+
+@keyframes award-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+}
+
+.award__avatar {
+  width: calc(96rem / 24);
+  height: calc(96rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: calc(44rem / 24);
+}
+
+.award__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-body);
+  color: var(--warn);
+}
+
+.award__nick {
+  font-size: var(--fs-card-title);
+}
+
+.award__value {
+  font-size: var(--fs-secondary);
+  color: var(--text-2);
+}
+
+.results__panel {
+  width: min(calc(1100rem / 24), 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border-radius: calc(32rem / 24);
+  background: var(--surface);
+  animation: window-in var(--dur-base) var(--ease);
+}
+
+.results__note {
+  margin: 0;
+  color: var(--warn);
+}
+
+.rtable {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.rtable th {
+  padding: 0 var(--space-2) var(--space-1);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  text-align: left;
+}
+
+.rtable td {
+  padding: var(--space-1) var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-body);
+}
+
+.rtable__place {
+  width: calc(64rem / 24);
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.rtable__player {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.rtable__dot {
+  width: calc(20rem / 24);
+  height: calc(20rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--player);
+}
+
+.rtable tbody tr:first-child td {
+  font-weight: 700;
+}
+
+.results__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.results__actions .btn {
+  flex: 1;
+}
+
+.results__skip:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
+}

@@ -121,6 +121,27 @@ export interface MatchResult {
   rows: MatchResultRow[];
 }
 
+// ─── Итоги (§12): содержимое шагов присылает игра, оболочка — порядок, анимация, кнопки ───
+
+export interface Award {
+  playerId: string;
+  /** Название награды (уже переведённое). */
+  title: string;
+  value?: string;
+}
+
+export interface ResultsTable {
+  /** Заголовки своих колонок игры (место и игрок оболочка рисует сама). */
+  columns: string[];
+  /** Строки в порядке мест. */
+  rows: Array<{ playerId: string; cells: string[] }>;
+}
+
+export interface MatchResults {
+  awards: Award[];
+  table: ResultsTable;
+}
+
 export interface GameContext {
   players: readonly GamePlayer[];
   /** Настройки матча из лобби (этап А6). Чего нет — игра берёт своё значение по умолчанию. */
@@ -152,6 +173,10 @@ export interface GameModule {
   mainButton?(playerId: string): MainButtonState | undefined;
   /** Строка состояния матча для окна паузы («Осталось 0:42»). */
   status?(): string;
+  /** Шаг 1 итогов: короткий повтор конца матча на своей сцене. Вызывается после end, до dispose. */
+  replay?(): Promise<void>;
+  /** Шаги 2–3 итогов: награды и строки таблицы. */
+  results?(): MatchResults;
 }
 
 /** Места по очкам: больше — выше, равные делят место. */
