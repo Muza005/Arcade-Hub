@@ -1,13 +1,16 @@
-// Точка входа хаба. На этапе А1 — временная кнопка запуска «Точек» и последний результат.
-// Меню игр появится на этапе А2.
+// Точка входа хаба: меню игр → окно игры → матч → снова меню.
+// Лобби — этап А6; пока «Играть» запускает матч с двумя клавиатурными игроками.
 import '../shared/ui/fonts';
 import './styles.css';
 import type { KeyboardScheme } from '../engine/input';
 import { PLAYER_COLORS } from '../shared/config';
-import type { GameManifest, GamePlayer, MatchResult } from '../shared/game-manifest';
+import type { GameManifest, GamePlayer } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
-import { createTranslator, getLang, t } from '../shared/i18n';
+import { getLang, t } from '../shared/i18n';
 import { runGame } from './game-runner';
+import { createMenu } from './menu/menu';
+import { emptyRoom, type Room } from './room';
+import { launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
 
 document.documentElement.lang = getLang();
 document.title = t('hub.title');
@@ -15,78 +18,49 @@ document.title = t('hub.title');
 const root = document.getElementById('hub');
 if (!root) throw new Error('#hub not found');
 
-const game = GAMES[0];
-if (!game) throw new Error('no games registered');
+let games: readonly GameManifest[] = GAMES;
+let room: Room = emptyRoom();
+if (import.meta.env.DEV) {
+  const dev = await import('./dev/fixtures');
+  games = dev.devGames(GAMES);
+  room = dev.devRoom();
+}
 
-/** Временные игроки: двое с клавиатуры (лобби — этап А6). */
-const KEYBOARD_PLAYERS: ReadonlyArray<{ scheme: KeyboardScheme }> = [{ scheme: 'wasd' }, { scheme: 'arrows' }];
-
-const players: GamePlayer[] = KEYBOARD_PLAYERS.map(({ scheme }, i) => ({
+/** Временные игроки до лобби (этап А6): двое с клавиатуры. */
+const KEYBOARD_PLAYERS: readonly KeyboardScheme[] = ['wasd', 'arrows'];
+const players: GamePlayer[] = KEYBOARD_PLAYERS.map((scheme, i) => ({
   id: `kb-${scheme}`,
   nick: t('player.keyboard', { n: i + 1 }),
   color: PLAYER_COLORS[i % PLAYER_COLORS.length] as string,
   kind: 'keyboard',
 }));
-const keyboard = new Map(KEYBOARD_PLAYERS.map(({ scheme }) => [`kb-${scheme}`, scheme] as const));
-
-const home = document.createElement('main');
-home.className = 'dev-home';
-const launchButton = document.createElement('button');
-launchButton.className = 'dev-home__launch';
-launchButton.style.setProperty('--accent', game.accent);
-const keysHint = document.createElement('p');
-keysHint.className = 'dev-home__hint';
-keysHint.textContent = t('dev.keysHint');
-const message = document.createElement('section');
-message.className = 'dev-home__results';
-message.setAttribute('aria-live', 'polite');
-home.append(launchButton, keysHint, message);
+const keyboard = new Map(KEYBOARD_PLAYERS.map((scheme) => [`kb-${scheme}`, scheme] as const));
 
 const gameMount = document.createElement('div');
 gameMount.className = 'game-mount';
 gameMount.hidden = true;
 
-root.append(home, gameMount);
-
-function gameTitle(manifest: GameManifest): string {
-  return createTranslator(manifest.strings)(manifest.title);
-}
-
-launchButton.textContent = t('dev.launchGame', { title: gameTitle(game) });
-
-function showResults(result: MatchResult): void {
-  const heading = document.createElement('h2');
-  heading.textContent = t('dev.lastMatch');
-  const list = document.createElement('ol');
-  for (const row of result.rows) {
-    const item = document.createElement('li');
-    const nick = players.find((p) => p.id === row.playerId)?.nick ?? row.playerId;
-    item.textContent = t('dev.resultRow', { place: row.place, nick, score: row.score });
-    list.append(item);
-  }
-  message.replaceChildren(heading, list);
-}
-
-function showHome(): void {
-  gameMount.hidden = true;
-  home.hidden = false;
-  launchButton.focus();
-}
-
-async function launch(): Promise<void> {
-  home.hidden = true;
+async function play(game: GameManifest): Promise<void> {
+  menu.hide();
   gameMount.hidden = false;
+  rememberLaunch(game.id);
   try {
-    const result = await runGame(game as GameManifest, gameMount, { players, keyboard });
-    showResults(result);
+    await runGame(game, gameMount, { players, keyboard });
   } catch (err) {
+    // Сообщение об ошибке запуска — этап А8.
     console.error(err);
-    const failed = document.createElement('p');
-    failed.textContent = t('dev.loadFailed');
-    message.replaceChildren(failed);
   }
-  showHome();
+  gameMount.hidden = true;
+  menu.show(game.id);
 }
 
-launchButton.addEventListener('click', () => void launch());
-showHome();
+const menu = createMenu({
+  games,
+  history: launchHistory,
+  sound: { get: soundEnabled, set: setSoundEnabled },
+  onPlay: (game) => void play(game),
+});
+
+root.append(menu.el, gameMount);
+menu.setRoom(room);
+menu.show();

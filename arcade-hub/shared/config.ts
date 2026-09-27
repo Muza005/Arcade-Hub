@@ -28,6 +28,10 @@ export const PLAYER_COLORS = [
 export const LEADER_HANDOFF_S = 10; // ведущий отключился → роль переходит дальше
 export const ATTRACT_IDLE_S = 60; // витрина при пустой комнате
 
+// Меню игр (§6)
+export const MENU_AVATARS_MAX = 8; // дальше — «+N»
+export const MENU_HISTORY_KEPT = 20; // сколько последних запусков помнить для порядка карточек
+
 // Гироскоп и контроллер
 export const TILT_FULL_DEG = { low: 35, mid: 22, high: 14 } as const; // по умолчанию mid
 export const TILT_DEADZONE_DEG = 3;

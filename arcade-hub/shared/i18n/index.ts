@@ -38,6 +38,17 @@ export function t(key: I18nKey, params?: Params): string {
   return format(dictionaries[current][key], params);
 }
 
+type PluralBase<K> = K extends `${infer B}_other` ? B : never;
+export type PluralKey = PluralBase<I18nKey>;
+
+/** Строка с формой числа: ключ `base_one|few|many|other` выбирается по n (Intl.PluralRules). */
+export function tn(base: PluralKey, n: number, params?: Params): string {
+  const form = new Intl.PluralRules(current).select(n);
+  const key = `${base}_${form}` as I18nKey;
+  const template = dictionaries[current][key] ?? dictionaries[current][`${base}_other` as I18nKey];
+  return format(template, { n, ...params });
+}
+
 /** Переводчик для словаря игры. Неизвестный ключ возвращается как есть — так его видно на экране. */
 export function createTranslator<K extends string>(strings: GameStrings<K>): (key: K, params?: Params) => string {
   return (key, params) => format(strings[current][key] ?? key, params);
