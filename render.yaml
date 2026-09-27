@@ -1,0 +1,10 @@
+# Render: бесплатный вариант хостинга (сервис засыпает без посетителей и просыпается ~за минуту).
+services:
+  - type: web
+    name: arcade-hub
+    runtime: node
+    rootDir: arcade-hub
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health

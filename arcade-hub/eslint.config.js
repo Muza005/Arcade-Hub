@@ -31,7 +31,7 @@ const restrict = (files, dirs, message) =>
       ];
 
 export default defineConfig(
-  { ignores: ['dist/**', 'node_modules/**'] },
+  { ignores: ['dist/**', 'dist-server/**', 'node_modules/**'] },
   js.configs.recommended,
   tseslint.configs.recommended,
   {
