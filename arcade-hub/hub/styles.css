@@ -1,0 +1,58 @@
+@import '../shared/ui/tokens.css';
+
+/* Корневой масштаб от высоты окна: при 1080 это 24 px, всё остальное — в rem (ARCADE_HUB_SPEC §18). */
+html {
+  font-size: calc(100vh / 45);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+}
+
+#hub {
+  position: fixed;
+  inset: 0;
+}
+
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
+.stage canvas {
+  display: block;
+}
+
+.dev-hud {
+  position: absolute;
+  left: var(--safe-zone);
+  bottom: var(--safe-zone);
+  display: flex;
+  gap: var(--space-4);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+.dev-hud__fps {
+  font-variant-numeric: tabular-nums;
+}

@@ -1,0 +1,64 @@
+/* Дизайн-токены платформы (ARCADE_HUB_SPEC §18).
+   Размеры заданы в px макета 1920×1080 и переведены в rem: корень = 100vh / 45 (24 px при 1080). */
+
+:root {
+  /* Цвета оболочки */
+  --bg: #070912;
+  --surface: #0f1322;
+  --surface-2: #171c30;
+  --line: rgba(255, 255, 255, 0.08);
+  --text: #f2f4fa;
+  --text-2: #a6adc4;
+  --text-3: #7a82a0; /* только на --bg и --surface */
+  --focus: #ffffff;
+  --ok: #3ddc97;
+  --warn: #ffc857;
+  --danger: #ff5a6e;
+  --accent: var(--focus); /* переопределяется цветом игры на её карточке и в её окне */
+  --on-accent: #04121a; /* тёмный текст на accent, контраст ≥ 4.5:1 */
+
+  /* Шрифты */
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-ui: 'Golos Text', system-ui, sans-serif;
+
+  /* Шкала размеров (px при высоте 1080) */
+  --fs-hero: calc(96rem / 24); /* Unbounded 800 */
+  --fs-screen-title: calc(56rem / 24); /* Unbounded 700 */
+  --fs-card-title: calc(32rem / 24); /* Unbounded 600 */
+  --fs-body: calc(26rem / 24); /* Golos Text 600 */
+  --fs-secondary: calc(22rem / 24); /* Golos Text 400 */
+  --fs-caption: calc(20rem / 24); /* Golos Text 500, минимум */
+
+  /* Сетка и отступы: шаг 8 px */
+  --space-1: calc(8rem / 24);
+  --space-2: calc(16rem / 24);
+  --space-3: calc(24rem / 24);
+  --space-4: calc(32rem / 24);
+  --space-6: calc(48rem / 24);
+  --space-8: calc(64rem / 24);
+  --safe-zone: calc(64rem / 24); /* ТВ обрезают края */
+
+  /* Скругления */
+  --radius-sm: calc(12rem / 24);
+  --radius-md: calc(20rem / 24);
+  --radius-lg: calc(28rem / 24);
+  --radius-full: 9999px;
+
+  /* Фокус */
+  --focus-width: calc(4rem / 24);
+  --focus-offset: calc(4rem / 24);
+
+  /* Движение */
+  --dur-fast: 120ms; /* фокус, нажатие */
+  --dur-base: 220ms; /* появление панелей, смена карточки */
+  --dur-slow: 400ms; /* новый игрок, переходы между экранами */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}
