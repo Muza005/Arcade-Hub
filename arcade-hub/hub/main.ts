@@ -88,12 +88,15 @@ async function play(start: LobbyStart): Promise<void> {
     phones?.enterMenu();
 
     // В рекорды идут только люди: рекорд бота компании ничего не говорит.
-    const humans = new Map(players.filter((p) => p.kind !== 'bot').map((p) => [p.id, p.nick]));
+    const humans = new Map(players.filter((p) => p.kind !== 'bot').map((p) => [p.id, p]));
     const beaten = recordMatch(
       game.id,
       result.rows
         .filter((r) => humans.has(r.playerId))
-        .map((r) => ({ nick: humans.get(r.playerId) ?? r.playerId, score: r.score, place: r.place })),
+        .map((r) => {
+          const player = humans.get(r.playerId);
+          return { nick: player?.nick ?? r.playerId, color: player?.color ?? '', score: r.score, place: r.place };
+        }),
       daily,
     );
     saveReplay({

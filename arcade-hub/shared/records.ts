@@ -5,6 +5,8 @@ export interface RecordEntry {
   nick: string;
   score: number;
   date: string;
+  /** Цвет игрока (в старых записях его нет). */
+  color?: string;
 }
 
 export interface GameRecords {
@@ -13,13 +15,14 @@ export interface GameRecords {
   /** Лучший результат по сиду дня (действует только в свой день). */
   daily?: RecordEntry;
   /** Последний матч: строки по местам. */
-  last?: { date: string; rows: Array<{ nick: string; score: number; place: number }> };
+  last?: { date: string; rows: MatchRow[] };
 }
 
 export interface MatchRow {
   nick: string;
   score: number;
   place: number;
+  color?: string;
 }
 
 const PREFIX = 'arcade-hub:records:';
@@ -49,7 +52,7 @@ export function recordMatch(
   const top = [...rows].sort((a, b) => a.place - b.place)[0];
   const beaten = { best: false, daily: false };
   if (top) {
-    const entry: RecordEntry = { nick: top.nick, score: top.score, date: day };
+    const entry: RecordEntry = { nick: top.nick, score: top.score, date: day, ...(top.color ? { color: top.color } : {}) };
     if (!records.best || top.score > records.best.score) {
       records.best = entry;
       beaten.best = true;
@@ -60,7 +63,7 @@ export function recordMatch(
       beaten.daily = true;
     }
   }
-  records.last = { date: day, rows: rows.map(({ nick, score, place }) => ({ nick, score, place })) };
+  records.last = { date: day, rows: rows.map((r) => ({ ...r })) };
   try {
     localStorage.setItem(PREFIX + gameId, JSON.stringify(records));
   } catch {

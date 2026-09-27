@@ -2,12 +2,11 @@
 // Закрывается по Esc, клику по затемнению, крестику и «Назад к играм»; фокус возвращается на карточку.
 import type { GameControl, GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
-import { dailyBest, readRecords } from '../../shared/records';
-import { isCompatible, listReplays } from '../../shared/replays';
 import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
 import { accentStyle, gameText, minutesLabel, playersLabel } from './game-card';
+import { recordsView } from './records-view';
 
 export interface GameWindow {
   readonly el: HTMLDialogElement;
@@ -110,53 +109,6 @@ function content(game: GameManifest, onPlay: () => void, onClose: () => void, on
         records,
         h('div', { class: 'gw__actions' }, play, back),
       ),
-    ),
-  );
-}
-
-/** Полная таблица рекордов и записи матчей (§7, §12). Воспроизведение записи — дело игры. */
-function recordsView(game: GameManifest, onBack: () => void): HTMLElement {
-  const records = readRecords(game.id);
-  const daily = dailyBest(records);
-  const replays = listReplays(game.id);
-  const back = h('button', { class: 'btn btn--ghost', type: 'button', autofocus: true }, t('lobby.back'));
-  back.addEventListener('click', onBack);
-  const line = (label: string, entry?: { nick: string; score: number; date: string }) =>
-    h('p', { class: 'rec__line' }, h('span', { class: 'rec__label' }, label), entry ? `${entry.nick} · ${entry.score} · ${entry.date}` : t('records.none'));
-  return h(
-    'article',
-    { class: 'gw gw--records', style: accentStyle(game), 'aria-labelledby': 'gw-title' },
-    h(
-      'div',
-      { class: 'rec' },
-      h('h2', { class: 'rec__title', id: 'gw-title' }, `${gameText(game)(game.title)} · ${t('game.records')}`),
-      line(t('records.best'), records.best),
-      line(t('records.daily'), daily),
-      h('h3', { class: 'gw__label' }, t('records.last')),
-      records.last
-        ? h(
-            'ol',
-            { class: 'rec__list' },
-            ...records.last.rows.map((r) => h('li', {}, `${r.place}. ${r.nick} — ${r.score}`)),
-          )
-        : h('p', { class: 'rec__none' }, t('records.none')),
-      h('h3', { class: 'gw__label' }, t('records.replays')),
-      replays.length > 0
-        ? h(
-            'ul',
-            { class: 'rec__list' },
-            ...replays.map((r) =>
-              h(
-                'li',
-                { class: isCompatible(r, game.version) ? '' : 'rec__old' },
-                [r.date, r.players.map((p) => p.nick).join(', '), r.daily && t('records.dailyMark'), !isCompatible(r, game.version) && t('records.incompatible')]
-                  .filter(Boolean)
-                  .join(' · '),
-              ),
-            ),
-          )
-        : h('p', { class: 'rec__none' }, t('records.none')),
-      h('div', { class: 'rec__actions' }, back),
     ),
   );
 }

@@ -719,62 +719,6 @@
   cursor: pointer;
 }
 
-.gw--records {
-  padding: var(--space-6) calc(56rem / 24);
-  overflow-y: auto;
-}
-
-.rec {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.rec__title {
-  margin: 0 0 var(--space-2);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: var(--fs-screen-title);
-}
-
-.rec__line {
-  margin: 0;
-  display: flex;
-  gap: var(--space-3);
-  font-size: var(--fs-body);
-  font-variant-numeric: tabular-nums;
-}
-
-.rec__label {
-  min-width: calc(320rem / 24);
-  color: var(--text-2);
-}
-
-.rec__list {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  font-size: var(--fs-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.rec__old {
-  color: var(--text-3);
-}
-
-.rec__none {
-  margin: 0;
-  color: var(--text-3);
-  font-size: var(--fs-secondary);
-}
-
-.rec__actions {
-  margin-top: var(--space-3);
-}
-
 .gw__side .link-btn:focus {
   outline: none;
   transform: scale(var(--focus-scale));

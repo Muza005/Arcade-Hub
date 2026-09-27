@@ -1,5 +1,6 @@
 @import '../shared/ui/tokens.css';
 @import './menu/menu.css';
+@import './menu/records-view.css';
 @import './lobby/lobby.css';
 @import './results/results.css';
 
