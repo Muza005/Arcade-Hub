@@ -3,14 +3,15 @@
 import '../shared/ui/fonts';
 import './styles.css';
 import type { KeyboardScheme } from '../engine/input';
-import { PLAYER_COLORS } from '../shared/config';
+import { DEV_TEST_PHONE_KEY, PLAYER_COLORS } from '../shared/config';
 import type { GameManifest, GamePlayer } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
 import { getLang, t } from '../shared/i18n';
 import { createUiSounds } from './audio';
 import { runGame } from './game-runner';
 import { createMenu } from './menu/menu';
-import { emptyRoom, type Room } from './room';
+import type { Room } from './room';
+import { connectRoom } from './room-client';
 import { applyReducedMotion, launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
 import { createFocusManager } from './ui/focus';
 
@@ -22,11 +23,12 @@ const root = document.getElementById('hub');
 if (!root) throw new Error('#hub not found');
 
 let games: readonly GameManifest[] = GAMES;
-let room: Room = emptyRoom();
+/** Нарисованная комната для проверки вёрстки (только dev, ?players=N). */
+let fixtureRoom: Room | null = null;
 if (import.meta.env.DEV) {
   const dev = await import('./dev/fixtures');
   games = dev.devGames(GAMES);
-  room = dev.devRoom();
+  fixtureRoom = dev.devRoom();
 }
 
 /** Временные игроки до лобби (этап А6): двое с клавиатуры. */
@@ -74,5 +76,27 @@ const menu = createMenu({
 });
 
 root.append(menu.el, gameMount);
-menu.setRoom(room);
+
+if (fixtureRoom) {
+  menu.setRoom(fixtureRoom);
+} else {
+  const room = connectRoom();
+  menu.setRoom(room.room);
+  room.onChange((r) => menu.setRoom(r));
+  room.onJoin(() => sounds.play('join'));
+  if (import.meta.env.DEV) await enableTestPhones(() => room.room.code);
+}
 menu.show();
+
+/** Dev: P — добавить тестовый телефон, Shift+P — отключить последний. */
+async function enableTestPhones(code: () => string | null): Promise<void> {
+  const { connectTestPhone } = await import('./dev/test-phone');
+  const phones: Array<{ close(): void }> = [];
+  let count = 0;
+  document.addEventListener('keydown', (e) => {
+    const room = code();
+    if (e.code !== DEV_TEST_PHONE_KEY || !room || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.shiftKey) phones.pop()?.close();
+    else phones.push(connectTestPhone(room, t('dev.testPlayer', { n: ++count })));
+  });
+}

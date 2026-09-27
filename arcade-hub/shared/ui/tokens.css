@@ -49,6 +49,7 @@
   --focus-offset: calc(4rem / 24);
   --focus-scale: 1.04; /* 4–8 % по §8 */
   --enter-scale: 0.96; /* появление окон: масштаб → 1 */
+  --pop-scale: 0.5; /* появление нового игрока */
 
   /* Движение */
   --dur-fast: 120ms; /* фокус, нажатие */
@@ -63,10 +64,12 @@
   :root {
     --focus-scale: 1;
     --enter-scale: 1;
+    --pop-scale: 1;
   }
 }
 
 :root[data-reduced-motion] {
   --focus-scale: 1;
   --enter-scale: 1;
+  --pop-scale: 1;
 }

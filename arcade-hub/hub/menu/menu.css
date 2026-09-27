@@ -290,8 +290,15 @@
   width: calc(92rem / 24);
   height: calc(92rem / 24);
   flex: none;
+  padding: calc(6rem / 24);
   border-radius: var(--radius-sm);
   background: #fff;
+}
+
+.join__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .join__title,
@@ -326,14 +333,14 @@
 
 .avatars {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-1);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .avatar {
-  width: calc(72rem / 24);
+  width: calc(96rem / 24); /* влезает ник из 8 символов */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -386,6 +393,18 @@
   background: var(--danger);
   color: var(--bg);
   font-size: calc(22rem / 24);
+}
+
+/* Новый игрок появляется заметно — вся комната видит, что кто-то зашёл (§6). */
+.avatar--new {
+  animation: avatar-in var(--dur-slow) var(--ease);
+}
+
+@keyframes avatar-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
 }
 
 .avatar--more .avatar__circle {

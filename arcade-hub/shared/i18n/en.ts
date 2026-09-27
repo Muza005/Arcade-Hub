@@ -3,6 +3,19 @@ import type { Dictionary } from './index';
 export const en: Dictionary = {
   'hub.title': 'Arcade Hub',
   'player.keyboard': 'Player {n}',
+  'player.default': 'Player {n}',
+  'dev.testPlayer': 'Test {n}',
+
+  'ctrl.codeTitle': 'Room code',
+  'ctrl.enter': 'Join',
+  'ctrl.connecting': 'Connecting…',
+  'ctrl.noRoom': 'No such room',
+  'ctrl.full': 'The room is full',
+  'ctrl.reconnecting': 'Connection lost — reconnecting',
+  'ctrl.room': 'Room {code}',
+  'ctrl.nick': 'Nickname',
+  'ctrl.color': 'Color',
+  'ctrl.leader': 'You are the host',
 
   'menu.heading': 'What are we playing?',
   'menu.count': '{n} here — pick with arrows or the host’s phone',

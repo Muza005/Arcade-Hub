@@ -23,9 +23,18 @@ export interface InputState {
 
 // ─── Экран → сервер ───────────────────────────────────────────────
 
-/** Открытие хаба; в ответ сервер присылает код комнаты (`room`). */
+/** Открытие хаба; в ответ сервер присылает код комнаты (`room`).
+ *  С `code` — вернуться в свою комнату после перезагрузки хаба, если код свободен или комната без экрана. */
 export interface HostMsg {
   t: 'host';
+  code?: string;
+}
+
+/** Сообщение телефону (или всем телефонам комнаты, to = '*'). Сервер пересылает `msg` как есть. */
+export interface ToMsg {
+  t: 'to';
+  to: string;
+  msg: ScreenToPhone;
 }
 
 // ─── Сервер → экран ───────────────────────────────────────────────
@@ -34,6 +43,19 @@ export interface HostMsg {
 export interface RoomMsg {
   t: 'room';
   code: string;
+}
+
+/** Сообщение от телефона. `from` — id соединения, который выдал сервер. */
+export interface FromMsg {
+  t: 'from';
+  from: string;
+  msg: PhoneToServer | PhoneToScreen;
+}
+
+/** Телефон отключился. */
+export interface GoneMsg {
+  t: 'gone';
+  from: string;
 }
 
 // ─── Телефон → сервер ─────────────────────────────────────────────
@@ -76,15 +98,31 @@ export interface CmdMsg {
 
 // ─── Экран → телефон ──────────────────────────────────────────────
 
-/** Слот игрока после входа. */
+/** Слот игрока после входа и после каждого изменения профиля или комнаты. */
 export interface SlotMsg {
   t: 'slot';
   id: number;
+  nick: string;
   color: string;
   role: Role;
   token: string;
   /** Соотношение сторон игрового поля (ширина / высота). */
   aspect: number;
+  /** Цвета, занятые другими игроками: на телефоне они неактивны. */
+  taken: string[];
+}
+
+export type ErrorCode = 'no-room' | 'full';
+
+/** Отказ во входе: комнаты нет или она заполнена. */
+export interface ErrMsg {
+  t: 'err';
+  code: ErrorCode;
+}
+
+/** Экран хаба переподключился — телефону нужно заново прислать `join` со своим токеном. */
+export interface RejoinMsg {
+  t: 'rejoin';
 }
 
 /** Число и прогресс ободка на главной кнопке, если игра их использует. */
@@ -124,11 +162,15 @@ export interface GameMsg {
 
 // ─── Объединения по направлениям ─────────────────────────────────
 
-export type HostToServer = HostMsg;
-export type ServerToHost = RoomMsg;
+export type HostToServer = HostMsg | ToMsg;
+export type ServerToHost = RoomMsg | FromMsg | GoneMsg;
 export type PhoneToServer = JoinMsg;
 export type PhoneToScreen = InMsg | ProfileMsg | LobbyMsg | CmdMsg | GameMsg;
-export type ScreenToPhone = SlotMsg | StMsg | FxMsg | GameMsg;
+export type ScreenToPhone = SlotMsg | StMsg | FxMsg | GameMsg | ErrMsg;
+export type ServerToPhone = ErrMsg | RejoinMsg;
 
-export type Message = HostToServer | ServerToHost | PhoneToServer | PhoneToScreen | ScreenToPhone;
+/** Типы, которые телефон может слать экрану через сервер. */
+export const PHONE_TO_SCREEN_TYPES: ReadonlySet<string> = new Set(['in', 'profile', 'lobby', 'cmd', 'g']);
+
+export type Message = HostToServer | ServerToHost | PhoneToServer | PhoneToScreen | ScreenToPhone | ServerToPhone;
 export type MessageType = Message['t'];

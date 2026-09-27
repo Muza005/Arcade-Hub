@@ -46,6 +46,13 @@ const sounds = {
     const local = t < 0.06 ? t : t - 0.06;
     return tone(t, f) * Math.exp(-local * 45) * 0.35;
   }),
+  // Звонкий сигнал входа нового игрока: три тона вверх.
+  join: render(0.42, (t) => {
+    const notes = [660, 880, 1320];
+    const i = Math.min(Math.floor(t / 0.09), notes.length - 1);
+    const local = t - i * 0.09;
+    return (tone(t, notes[i]) + tone(t, notes[i] * 2) * 0.3) * Math.exp(-local * 9) * 0.28;
+  }),
   // Мягкий «вжух» при открытии окна игры: шум с плавной огибающей и низкий тон.
   open: render(0.28, (t, d) => {
     const env = Math.sin((Math.PI * t) / d) ** 2;

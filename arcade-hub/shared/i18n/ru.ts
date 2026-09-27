@@ -3,6 +3,19 @@
 export const ru = {
   'hub.title': 'Arcade Hub',
   'player.keyboard': 'Игрок {n}',
+  'player.default': 'Игрок {n}',
+  'dev.testPlayer': 'Тест {n}',
+
+  'ctrl.codeTitle': 'Код комнаты',
+  'ctrl.enter': 'Войти',
+  'ctrl.connecting': 'Подключаемся…',
+  'ctrl.noRoom': 'Такой комнаты нет',
+  'ctrl.full': 'Комната заполнена',
+  'ctrl.reconnecting': 'Связь пропала — подключаемся',
+  'ctrl.room': 'Комната {code}',
+  'ctrl.nick': 'Ник',
+  'ctrl.color': 'Цвет',
+  'ctrl.leader': 'Вы ведущий',
 
   'menu.heading': 'Во что играем?',
   'menu.count': 'Вас {n} — выбирайте стрелками или с телефона ведущего',

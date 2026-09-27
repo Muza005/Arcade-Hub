@@ -3,10 +3,11 @@
 import { Howl, Howler } from 'howler';
 import { UI_SOUND_VOLUME } from '../shared/config';
 import clickUrl from './assets/sounds/click.wav';
+import joinUrl from './assets/sounds/join.wav';
 import openUrl from './assets/sounds/open.wav';
 import selectUrl from './assets/sounds/select.wav';
 
-export type UiSound = 'click' | 'select' | 'open';
+export type UiSound = 'click' | 'select' | 'open' | 'join';
 
 export interface UiSounds {
   play(name: UiSound): void;
@@ -16,7 +17,12 @@ export interface UiSounds {
 
 export function createUiSounds(enabled: boolean): UiSounds {
   const make = (src: string): Howl => new Howl({ src: [src], volume: UI_SOUND_VOLUME, preload: true });
-  const sounds: Record<UiSound, Howl> = { click: make(clickUrl), select: make(selectUrl), open: make(openUrl) };
+  const sounds: Record<UiSound, Howl> = {
+    click: make(clickUrl),
+    select: make(selectUrl),
+    open: make(openUrl),
+    join: make(joinUrl),
+  };
   Howler.mute(!enabled);
 
   return {

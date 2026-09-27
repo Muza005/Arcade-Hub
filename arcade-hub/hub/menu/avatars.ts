@@ -5,8 +5,10 @@ import type { RoomPlayer } from '../room';
 import { h, icon } from '../ui/dom';
 import { ICONS } from '../ui/icons';
 
-export function avatar(player: RoomPlayer): HTMLElement {
-  const classes = ['avatar', player.connected ? '' : 'avatar--offline'].filter(Boolean).join(' ');
+export function avatar(player: RoomPlayer, isNew = false): HTMLElement {
+  const classes = ['avatar', player.connected ? '' : 'avatar--offline', isNew ? 'avatar--new' : '']
+    .filter(Boolean)
+    .join(' ');
   const title = [player.nick, player.leader && t('menu.leader'), !player.connected && t('menu.offline')]
     .filter(Boolean)
     .join(' · ');
@@ -25,10 +27,10 @@ export function avatar(player: RoomPlayer): HTMLElement {
 }
 
 /** Не больше MENU_AVATARS_MAX мест: если людей больше, последнее место — «+N». */
-export function avatarRow(players: readonly RoomPlayer[]): HTMLElement {
+export function avatarRow(players: readonly RoomPlayer[], fresh: ReadonlySet<string> = new Set()): HTMLElement {
   const overflow = players.length > MENU_AVATARS_MAX;
   const shown = overflow ? players.slice(0, MENU_AVATARS_MAX - 1) : players;
-  const row = h('ul', { class: 'avatars' }, ...shown.map(avatar));
+  const row = h('ul', { class: 'avatars' }, ...shown.map((p) => avatar(p, fresh.has(p.id))));
   if (overflow) {
     row.append(
       h(

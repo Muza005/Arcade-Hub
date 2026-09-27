@@ -28,8 +28,27 @@ export const PLAYER_COLORS = [
 export const LEADER_HANDOFF_S = 10; // ведущий отключился → роль переходит дальше
 export const ATTRACT_IDLE_S = 60; // витрина при пустой комнате
 
+// Сервер комнат (§2, §17)
+export const WS_PATH = '/ws';
+export const CONTROLLER_PATH = '/controller/';
+export const ROOM_CODE_LEN = 4;
+/** Без похожих друг на друга знаков (O/0, I/1): код читают с экрана через комнату. */
+export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+export const WS_MAX_PAYLOAD_BYTES = 16 * 1024;
+export const TOKEN_BYTES = 16;
+/** Паузы между попытками переподключения, с. Последняя повторяется. */
+export const RECONNECT_DELAYS_S = [0.5, 1, 2, 4] as const;
+/** Соотношение сторон поля по умолчанию, пока игра не задала своё (16:9). */
+export const DEFAULT_ASPECT = 16 / 9;
+
 // Меню игр (§6)
 export const MENU_AVATARS_MAX = 8; // дальше — «+N»
+export const QR_SIZE_PX = 92;
+
+// Dev: тестовые телефоны с имитацией ввода по протоколу (§2)
+export const DEV_TEST_PHONE_KEY = 'KeyP'; // P — добавить, Shift+P — отключить последнего
+export const DEV_TEST_PHONE_TURN_RAD = 0.35; // насколько резко блуждает направление за отправку
+export const DEV_TEST_PHONE_BTN_CHANCE = 0.03; // вероятность нажатия кнопки за отправку
 export const MENU_HISTORY_KEPT = 20; // сколько последних запусков помнить для порядка карточек
 
 // Навигация (§8): стрелка ведёт к ближайшему элементу в её направлении.

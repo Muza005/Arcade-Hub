@@ -1,5 +1,5 @@
 // Только dev-сборка: игры-заглушки и тестовая комната, чтобы проверять меню с 1–6 играми и 0–10 игроками.
-// Параметры адреса: ?games=1 — только настоящие игры; ?players=N — число тестовых игроков (по умолчанию 6).
+// Параметры адреса: ?games=1 — только настоящие игры; ?players=N — нарисованная комната из N игроков.
 import { MAX_PLAYERS, PLAYER_COLORS } from '../../shared/config';
 import type { GameManifest } from '../../shared/game-manifest';
 import type { GameStrings } from '../../shared/i18n';
@@ -66,7 +66,9 @@ export function devGames(real: readonly GameManifest[]): GameManifest[] {
   return params.get('games') === '1' ? [...real] : [...real, ...STUBS.map(stubManifest)];
 }
 
-export function devRoom(): Room {
+/** Нарисованная комната для проверки вёрстки (?players=N). Без параметра — настоящая комната через сервер. */
+export function devRoom(): Room | null {
+  if (!params.has('players')) return null;
   const requested = Number(params.get('players') ?? DEFAULT_TEST_PLAYERS);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 0), MAX_PLAYERS) : DEFAULT_TEST_PLAYERS;
   return {

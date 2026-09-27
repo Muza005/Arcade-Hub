@@ -1,0 +1,168 @@
+// Связь экрана с сервером комнат. Комната создаётся при открытии хаба и переживает смену игр (§2).
+// При перезагрузке страницы хаб возвращается в ту же комнату: код и слоты лежат в sessionStorage.
+import { IDLE_INPUT, type InputState } from '../engine/input';
+import { DEFAULT_ASPECT, MAX_PLAYERS, PLAYER_COLORS, RECONNECT_DELAYS_S, TOKEN_BYTES, WS_PATH } from '../shared/config';
+import { t } from '../shared/i18n';
+import type { FromMsg, HostToServer, ScreenToPhone, ServerToHost, SlotMsg } from '../shared/protocol';
+import type { Room, RoomPlayer } from './room';
+import { RoomState, type SavedRoom, type Slot } from './room-state';
+
+const SAVE_KEY = 'arcade-hub:room';
+const MS_PER_S = 1000;
+
+export interface RoomClient {
+  readonly room: Room;
+  onChange(cb: (room: Room) => void): void;
+  /** Новый игрок вошёл (не возврат после обрыва) — для анимации и звука. */
+  onJoin(cb: (player: RoomPlayer) => void): void;
+  /** Последний ввод игрока с телефона (этап А5 подключит его к играм). */
+  inputOf(playerId: string): InputState;
+}
+
+function makeToken(): string {
+  return [...crypto.getRandomValues(new Uint8Array(TOKEN_BYTES))].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function load(): SavedRoom | null {
+  try {
+    const raw = sessionStorage.getItem(SAVE_KEY);
+    return raw ? (JSON.parse(raw) as SavedRoom) : null;
+  } catch {
+    return null;
+  }
+}
+
+function save(state: RoomState): void {
+  try {
+    const data = state.save();
+    if (data) sessionStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch {
+    // без хранилища комната просто не переживёт перезагрузку
+  }
+}
+
+export function connectRoom(): RoomClient {
+  const state = new RoomState({
+    palette: PLAYER_COLORS,
+    maxPlayers: MAX_PLAYERS,
+    makeToken,
+    defaultNick: (n) => t('player.default', { n }),
+  });
+  const saved = load();
+  if (saved) state.restore(saved);
+
+  const inputs = new Map<string, InputState>();
+  const changeListeners: Array<(room: Room) => void> = [];
+  const joinListeners: Array<(player: RoomPlayer) => void> = [];
+  let ws: WebSocket | null = null;
+  let attempt = 0;
+
+  const snapshot = (): Room => ({ code: state.code, players: state.players() });
+  const changed = (): void => {
+    save(state);
+    const room = snapshot();
+    for (const cb of changeListeners) cb(room);
+  };
+
+  const send = (msg: HostToServer): void => {
+    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+  };
+  const toPhone = (cid: string, msg: ScreenToPhone): void => send({ t: 'to', to: cid, msg });
+
+  const slotMsg = (slot: Slot): SlotMsg => ({
+    t: 'slot',
+    id: slot.id,
+    nick: slot.nick,
+    color: slot.color,
+    role: state.isLeader(slot) ? 'leader' : 'guest',
+    token: slot.token,
+    aspect: DEFAULT_ASPECT,
+    taken: state.takenBy(slot),
+  });
+  /** Занятые цвета меняются у всех — каждому телефону свой слот заново. */
+  const syncPhones = (): void => {
+    for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, slotMsg(slot));
+  };
+
+  const onPhone = ({ from, msg }: FromMsg): void => {
+    switch (msg.t) {
+      case 'join': {
+        const result = state.join(from, typeof msg.token === 'string' ? msg.token : undefined);
+        if ('error' in result) {
+          toPhone(from, { t: 'err', code: result.error });
+          return;
+        }
+        syncPhones();
+        changed();
+        if (!result.returning) {
+          const player = state.players().find((p) => p.id === String(result.slot.id));
+          if (player) for (const cb of joinListeners) cb(player);
+        }
+        return;
+      }
+      case 'profile':
+        if (typeof msg.nick !== 'string' || typeof msg.color !== 'string') return;
+        if (state.profile(from, msg.nick, msg.color)) {
+          syncPhones();
+          changed();
+        }
+        return;
+      case 'in': {
+        const slot = state.bySid(from);
+        if (slot) inputs.set(String(slot.id), { x: Number(msg.x) || 0, y: Number(msg.y) || 0, btn: msg.btn === true });
+        return;
+      }
+      default:
+        // lobby, cmd, g — следующие этапы.
+        return;
+    }
+  };
+
+  const connect = (): void => {
+    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${protocol}//${location.host}${WS_PATH}`);
+    ws.addEventListener('open', () => {
+      attempt = 0;
+      send(state.code ? { t: 'host', code: state.code } : { t: 'host' });
+    });
+    ws.addEventListener('message', (e) => {
+      let msg: ServerToHost;
+      try {
+        msg = JSON.parse(String(e.data)) as ServerToHost;
+      } catch {
+        return;
+      }
+      if (msg.t === 'room') {
+        // Сервер мог выдать другой код (прошлая комната занята) — тогда это новая комната.
+        if (state.code !== msg.code) state.restore({ code: msg.code, nextId: 1, slots: [] });
+        changed();
+      } else if (msg.t === 'from') {
+        onPhone(msg);
+      } else if (msg.t === 'gone') {
+        const slot = state.leave(msg.from);
+        if (slot) {
+          inputs.delete(String(slot.id));
+          changed();
+        }
+      }
+    });
+    ws.addEventListener('close', () => {
+      // Пока сервера нет, телефоны считаются отключёнными; при возвращении они придут с токенами.
+      for (const slot of state.connected()) if (slot.cid) state.leave(slot.cid);
+      changed();
+      const delay = RECONNECT_DELAYS_S[Math.min(attempt, RECONNECT_DELAYS_S.length - 1)] ?? 1;
+      attempt++;
+      setTimeout(connect, delay * MS_PER_S);
+    });
+  };
+  connect();
+
+  return {
+    get room() {
+      return snapshot();
+    },
+    onChange: (cb) => void changeListeners.push(cb),
+    onJoin: (cb) => void joinListeners.push(cb),
+    inputOf: (id) => inputs.get(id) ?? { ...IDLE_INPUT },
+  };
+}

@@ -48,7 +48,7 @@ export default defineConfig(
       ],
     },
   },
-  { files: ['*.config.{js,ts}', 'scripts/**'], languageOptions: { globals: { ...globals.node } } },
+  { files: ['*.config.{js,ts}', 'scripts/**', 'server/**'], languageOptions: { globals: { ...globals.node } } },
 
   // Игра импортирует только engine/ и shared/: не хаб, не контроллер, не сервер и не другие игры.
   ...GAME_DIRS.flatMap((game) =>

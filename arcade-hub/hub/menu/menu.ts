@@ -1,5 +1,7 @@
 // Меню игр (ARCADE_HUB_SPEC §6): верхняя полоса, заголовок, сетка, нижняя полоса с QR и игроками.
 // В простое ничего не рисуется: движение — только в ответ на действие.
+import QRCode from 'qrcode-svg';
+import { CONTROLLER_PATH, QR_SIZE_PX } from '../../shared/config';
 import type { GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import type { Room } from '../room';
@@ -27,6 +29,9 @@ export interface Menu {
 
 export function createMenu(options: MenuOptions): Menu {
   let room: Room = { code: null, players: [] };
+  /** Игроки, которых уже показывали: анимация входа — только для новых. */
+  let seen: Set<string> | null = null;
+  let qrFor: string | null = null;
 
   const roomCode = h('span', { class: 'room__code' });
   const soundButton = h('button', { class: 'icon-btn', type: 'button' });
@@ -73,6 +78,7 @@ export function createMenu(options: MenuOptions): Menu {
 
   const grid = h('div', { class: 'grid', role: 'list' });
 
+  const qr = h('div', { class: 'join__qr', 'aria-hidden': 'true' });
   const joinCode = h('p', { class: 'join__code' });
   const inRoom = h('p', { class: 'players__count' });
   const avatarsSlot = h('div', { class: 'players__row' });
@@ -82,7 +88,7 @@ export function createMenu(options: MenuOptions): Menu {
     h(
       'div',
       { class: 'join' },
-      h('div', { class: 'join__qr', 'aria-hidden': 'true' }),
+      qr,
       h('div', {}, h('p', { class: 'join__title' }, t('menu.joinTitle')), joinCode),
     ),
     h('div', { class: 'players' }, inRoom, avatarsSlot),
@@ -100,11 +106,27 @@ export function createMenu(options: MenuOptions): Menu {
   const renderRoom = (): void => {
     const code = room.code ?? t('menu.roomPending');
     roomCode.textContent = code;
-    joinCode.textContent = t('menu.joinCode', { url: location.host, code });
+    joinCode.textContent = t('menu.joinCode', { url: `${location.host}${CONTROLLER_PATH}`, code });
+    if (room.code !== qrFor) {
+      qrFor = room.code;
+      qr.innerHTML = room.code
+        ? new QRCode({
+            content: `${location.origin}${CONTROLLER_PATH}?room=${room.code}`,
+            padding: 0,
+            width: QR_SIZE_PX,
+            height: QR_SIZE_PX,
+            ecl: 'M',
+            join: true,
+            container: 'svg-viewbox',
+          }).svg()
+        : '';
+    }
     const people = room.players.length;
     countLine.textContent = people > 0 ? t('menu.count', { n: people }) : t('menu.countEmpty');
     inRoom.textContent = people > 0 ? t('menu.inRoom', { n: people }) : '';
-    avatarsSlot.replaceChildren(avatarRow(room.players));
+    const fresh = new Set(seen ? room.players.map((p) => p.id).filter((id) => !seen?.has(id)) : []);
+    seen = new Set(room.players.map((p) => p.id));
+    avatarsSlot.replaceChildren(avatarRow(room.players, fresh));
   };
 
   const renderGrid = (): void => {
