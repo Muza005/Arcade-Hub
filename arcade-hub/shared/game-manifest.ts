@@ -1,6 +1,6 @@
 // Контракт игры (ARCADE_HUB_SPEC §16). Хаб ничего не знает об играх, кроме манифеста и модуля.
 import type { GameStrings } from './i18n';
-import type { InputState, LobbyValue } from './protocol';
+import type { FxMsg, InputState, LobbyValue, MainButtonState } from './protocol';
 
 export type GameControl = 'keyboard' | 'phone-buttons' | 'phone-gyro' | 'phone-joystick';
 
@@ -42,6 +42,12 @@ export interface GameManifest {
   meta?: () => GameMetaSummary; // строка для карточки и блок меты
   /** Словарь игры: хабу нужны title, tagline, howToPlay, modes до загрузки кода. */
   strings: GameStrings;
+  /** Контроллер на телефоне (§10). Виды управления берутся из `controls`. */
+  controllerLayout: {
+    mainButton: boolean;
+    /** Ключ словаря игры: жёлтая плашка в настройках телефона. */
+    warning?: string;
+  };
 }
 
 // ─── Модуль игры (этап А1) ────────────────────────────────────────
@@ -83,6 +89,8 @@ export interface GameContext {
   mount: HTMLElement;
   /** Сообщить конец матча. После этого платформа вызовет dispose(). */
   end(result: MatchResult): void;
+  /** Вибрация и вспышка на телефоне игрока (клавиатурным игрокам — ничего). */
+  fx(playerId: string, fx: Omit<FxMsg, 't'>): void;
 }
 
 export interface GameModule {
@@ -94,7 +102,13 @@ export interface GameModule {
   /** Игра сама замораживает симуляцию. */
   pause(): void;
   resume(): void;
+  /** «Завершить матч» ведущим: игра сразу вызывает ctx.end с текущим счётом. */
+  finish(): void;
   dispose(): void;
+  /** Число и ободок главной кнопки игрока, если игра их использует. */
+  mainButton?(playerId: string): MainButtonState | undefined;
+  /** Строка состояния матча для окна паузы («Осталось 0:42»). */
+  status?(): string;
 }
 
 /** Места по очкам: больше — выше, равные делят место. */

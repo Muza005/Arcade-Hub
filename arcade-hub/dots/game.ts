@@ -13,6 +13,8 @@ import {
   MATCH_S_DEFAULT,
   NICK_FONT_PX,
   NICK_GAP_PX,
+  PICKUP_VIBRATE_MS,
+  SECONDS_PER_MINUTE,
   SCORE_FONT_PX,
   SCORE_GAP_PX,
   SCORE_SWATCH_RADIUS,
@@ -57,6 +59,18 @@ export function createDotsGame(): GameModule {
   let scoreViews: ScoreView[] = [];
   let lastScores = '';
   let lastTimer = -1;
+
+  const endMatch = (): void => {
+    if (ended) return;
+    ended = true;
+    ctx.end({
+      gameId: dotsManifest.id,
+      mode: ctx.mode,
+      seed: ctx.seed,
+      version: dotsManifest.version,
+      rows: rankByScore(sim.dots.map((d) => ({ playerId: d.id, score: d.score }))),
+    });
+  };
 
   const settingNumber = (key: string, fallback: number): number => {
     const v = ctx.settings[key];
@@ -154,16 +168,8 @@ export function createDotsGame(): GameModule {
     update(dtS) {
       if (paused || ended) return;
       sim.step(dtS, (id) => ctx.input.read(id));
-      if (sim.over) {
-        ended = true;
-        ctx.end({
-          gameId: dotsManifest.id,
-          mode: ctx.mode,
-          seed: ctx.seed,
-          version: dotsManifest.version,
-          rows: rankByScore(sim.dots.map((d) => ({ playerId: d.id, score: d.score }))),
-        });
-      }
+      for (const id of sim.pickups) ctx.fx(id, { vib: PICKUP_VIBRATE_MS, flash: STAR_COLOR });
+      if (sim.over) endMatch();
     },
 
     render(alpha) {
@@ -190,6 +196,21 @@ export function createDotsGame(): GameModule {
 
     resume() {
       paused = false;
+    },
+
+    finish() {
+      sim.stop();
+      endMatch();
+    },
+
+    mainButton(playerId) {
+      return { progress: sim.dashReady(playerId) };
+    },
+
+    status() {
+      const total = Math.ceil(sim.timeLeftS);
+      const time = `${Math.floor(total / SECONDS_PER_MINUTE)}:${String(total % SECONDS_PER_MINUTE).padStart(2, '0')}`;
+      return t('status', { time });
     },
 
     dispose() {

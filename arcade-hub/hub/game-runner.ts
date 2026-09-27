@@ -1,26 +1,51 @@
-// Запуск игры: ленивая загрузка по манифесту, цикл, ввод, конец матча и уборка.
+// Запуск игры: ленивая загрузка по манифесту, цикл, ввод, пауза, конец матча и уборка.
 // Хаб знает об игре только манифест и контракт GameModule.
-import { createKeyboardSource, InputHub, type KeyboardScheme } from '../engine/input';
+import { InputHub, type InputSource } from '../engine/input';
 import { FixedLoop } from '../engine/loop';
 import { randomSeed } from '../engine/rng';
-import type { GameManifest, GamePlayer, MatchResult, MatchSettings } from '../shared/game-manifest';
+import type {
+  GameContext,
+  GameManifest,
+  GamePlayer,
+  GameModule,
+  MatchResult,
+  MatchSettings,
+} from '../shared/game-manifest';
+import type { MainButtonState } from '../shared/protocol';
 
 export interface LaunchOptions {
   players: readonly GamePlayer[];
-  /** Какой раскладкой управляется клавиатурный игрок (по id). */
-  keyboard: ReadonlyMap<string, KeyboardScheme>;
+  /** Источники ввода: клавиатура, телефоны. id источника = id игрока. */
+  sources: readonly InputSource[];
+  fx: GameContext['fx'];
   mode?: string;
   settings?: MatchSettings;
 }
 
-/** Запускает матч и возвращает результаты, когда игра сообщит о конце. */
-export async function runGame(manifest: GameManifest, mount: HTMLElement, options: LaunchOptions): Promise<MatchResult> {
-  const game = await manifest.load();
-  const input = new InputHub();
-  for (const [id, scheme] of options.keyboard) input.add(createKeyboardSource(id, scheme));
+export interface Match {
+  /** Результаты, когда игра сообщит о конце. */
+  readonly result: Promise<MatchResult>;
+  /** Id игроков матча. */
+  readonly players: readonly string[];
+  readonly paused: boolean;
+  pause(): void;
+  resume(): void;
+  /** «Завершить матч»: к итогам, счёт сохраняется. */
+  finish(): void;
+  mainButton(playerId: string): MainButtonState | undefined;
+  status(): string | undefined;
+}
 
-  let finish!: (result: MatchResult) => void;
-  const finished = new Promise<MatchResult>((resolve) => (finish = resolve));
+/** Загружает игру и запускает матч. Ошибка загрузки или init — исключение. */
+export async function runGame(manifest: GameManifest, mount: HTMLElement, options: LaunchOptions): Promise<Match> {
+  const game: GameModule = await manifest.load();
+  const input = new InputHub();
+  for (const source of options.sources) input.add(source);
+
+  let resolve!: (result: MatchResult) => void;
+  const result = new Promise<MatchResult>((r) => (resolve = r));
+  let paused = false;
+  let over = false;
 
   const loop = new FixedLoop({
     update: (dtS, tick) => game.update(dtS, tick),
@@ -42,12 +67,15 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
       seed: randomSeed(),
       input: { read: (id) => input.read(id) },
       mount,
-      end: (result) => {
+      fx: options.fx,
+      end: (matchResult) => {
+        if (over) return;
+        over = true;
         loop.stop();
         // Уборка — после текущего кадра, чтобы игра не разбиралась посреди своего update.
         queueMicrotask(() => {
           cleanup();
-          finish(result);
+          resolve(matchResult);
         });
       },
     });
@@ -57,5 +85,27 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   }
 
   loop.start();
-  return finished;
+
+  return {
+    result,
+    players: options.players.map((p) => p.id),
+    get paused() {
+      return paused;
+    },
+    pause() {
+      if (paused || over) return;
+      paused = true;
+      game.pause();
+    },
+    resume() {
+      if (!paused || over) return;
+      paused = false;
+      game.resume();
+    },
+    finish() {
+      if (!over) game.finish();
+    },
+    mainButton: (playerId) => (over ? undefined : game.mainButton?.(playerId)),
+    status: () => (over ? undefined : game.status?.()),
+  };
 }

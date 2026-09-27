@@ -24,4 +24,5 @@ export const dotsManifest: GameManifest = {
   version: '1',
   load: async () => (await import('./game')).createDotsGame(),
   strings,
+  controllerLayout: { mainButton: true },
 };

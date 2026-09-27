@@ -22,6 +22,7 @@ export interface RoomStateOptions {
 export interface SavedRoom {
   code: string;
   nextId: number;
+  leaderId?: number | null;
   slots: Array<Omit<Slot, 'cid'>>;
 }
 
@@ -36,6 +37,8 @@ export class RoomState {
   code: string | null = null;
   private slots: Slot[] = [];
   private nextId = 1;
+  /** Ведущий — первый вошедший, пока роль не передали. */
+  private leaderId: number | null = null;
 
   constructor(private readonly options: RoomStateOptions) {}
 
@@ -51,9 +54,22 @@ export class RoomState {
     return this.slots.filter((s) => s.cid !== null);
   }
 
-  /** Ведущий — первый по порядку входа. Роль остаётся и при обрыве (передача — этап А8). */
+  /** Роль остаётся у ведущего и при обрыве; автопередача через 10 с — этап А8. */
   isLeader(slot: Slot): boolean {
-    return this.slots[0] === slot;
+    return slot.id === this.leaderId;
+  }
+
+  leader(): Slot | undefined {
+    return this.slots.find((s) => s.id === this.leaderId);
+  }
+
+  /** «Передать ведущего»: только текущий ведущий и только игроку этой комнаты. */
+  handoff(fromCid: string, targetId: number): boolean {
+    const from = this.bySid(fromCid);
+    const target = this.slots.find((s) => s.id === targetId);
+    if (!from || !target || !this.isLeader(from) || target === from) return false;
+    this.leaderId = target.id;
+    return true;
   }
 
   /** Цвета, занятые другими игроками. */
@@ -77,6 +93,7 @@ export class RoomState {
       color: this.nearestFree(0, null),
     };
     this.slots.push(slot);
+    this.leaderId ??= slot.id;
     return { slot, returning: false };
   }
 
@@ -110,7 +127,7 @@ export class RoomState {
   save(): SavedRoom | null {
     if (!this.code) return null;
     const slots = this.slots.map(({ id, token, nick, color }) => ({ id, token, nick, color }));
-    return { code: this.code, nextId: this.nextId, slots };
+    return { code: this.code, nextId: this.nextId, leaderId: this.leaderId, slots };
   }
 
   /** После перезагрузки хаба: все телефоны сначала «не на связи», пока не пришлют join с токеном. */
@@ -118,6 +135,7 @@ export class RoomState {
     this.code = saved.code;
     this.nextId = saved.nextId;
     this.slots = saved.slots.map((s) => ({ ...s, cid: null }));
+    this.leaderId = saved.leaderId ?? this.slots[0]?.id ?? null;
   }
 
   private nearestFree(from: number, self: Slot | null): string {

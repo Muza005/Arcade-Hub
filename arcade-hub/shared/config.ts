@@ -40,6 +40,10 @@ export const TOKEN_BYTES = 16;
 export const RECONNECT_DELAYS_S = [0.5, 1, 2, 4] as const;
 /** Соотношение сторон поля по умолчанию, пока игра не задала своё (16:9). */
 export const DEFAULT_ASPECT = 16 / 9;
+/** Экран шлёт телефонам состояние раз в столько секунд и на событиях (§17). */
+export const ST_INTERVAL_S = 1;
+/** Ободок главной кнопки отправляется, когда прогресс сдвинулся на столько. */
+export const MAIN_BUTTON_STEP = 0.1;
 
 // Меню игр (§6)
 export const MENU_AVATARS_MAX = 8; // дальше — «+N»
@@ -70,6 +74,15 @@ export const INPUT_SEND_HZ = 30; // и только при заметном из
 export const BUTTON_MIN_PX = 96;
 export const BUTTON_PRESS_SCALE = 0.94;
 export const VIBRATE_TAP_MS = 10;
+/** Изменение оси меньше этого не считается «заметным» и не отправляется. */
+export const INPUT_EPSILON = 0.02;
+/** Джойстик: доля радиуса для полного отклонения по чувствительности. */
+export const JOYSTICK_FULL = { low: 1, mid: 0.8, high: 0.6 } as const;
+export const JOYSTICK_DEADZONE = 0.08;
+/** Меню с телефона (§8): порог оси, задержка и шаг автоповтора. */
+export const MENU_NAV_THRESHOLD = 0.5;
+export const MENU_NAV_REPEAT_DELAY_MS = 400;
+export const MENU_NAV_REPEAT_MS = 150;
 
 // Клавиатура (§4, §11): движение и главная кнопка. Коды KeyboardEvent.code — не зависят от раскладки.
 export interface KeyboardKeyMap {

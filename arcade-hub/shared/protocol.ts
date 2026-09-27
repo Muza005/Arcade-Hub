@@ -9,7 +9,21 @@ export type GamePayload = Record<string, unknown>;
 export type Role = 'leader' | 'guest';
 
 /** Команды ведущего. */
-export type LeaderCommand = 'start' | 'pause' | 'resume' | 'end' | 'again' | 'back' | 'select';
+export type LeaderCommand = 'start' | 'pause' | 'resume' | 'end' | 'again' | 'back' | 'select' | 'handoff';
+
+/** Вид управления на телефоне (§10). */
+export type ControlMode = 'arrows' | 'gyro' | 'joystick';
+
+/** Что рисует контроллер: платформа решает экран, игра — виды управления и главную кнопку. */
+export interface ControllerLayout {
+  /** Меню хаба (джойстик ведёт выбор) или матч. */
+  screen: 'menu' | 'game';
+  /** Доступные виды управления; в меню — всегда только джойстик. */
+  modes: ControlMode[];
+  mainButton: boolean;
+  /** Жёлтая плашка в настройках телефона (уже переведённая строка игры). */
+  warning?: string;
+}
 
 /** Значение поля лобби, объявленного игрой (переключатель, ползунок, выбор из списка). */
 export type LobbyValue = string | number | boolean;
@@ -90,10 +104,11 @@ export interface LobbyMsg {
 
 // ─── Ведущий → экран ──────────────────────────────────────────────
 
-/** Кнопки ведущего. */
+/** Кнопки ведущего. `target` — id слота для `handoff` (передать ведущего). */
 export interface CmdMsg {
   t: 'cmd';
   cmd: LeaderCommand;
+  target?: number;
 }
 
 // ─── Экран → телефон ──────────────────────────────────────────────
@@ -110,6 +125,15 @@ export interface SlotMsg {
   aspect: number;
   /** Цвета, занятые другими игроками: на телефоне они неактивны. */
   taken: string[];
+  /** Все игроки комнаты — для «Передать ведущего». */
+  roster: RosterEntry[];
+}
+
+export interface RosterEntry {
+  id: number;
+  nick: string;
+  color: string;
+  online: boolean;
 }
 
 export type ErrorCode = 'no-room' | 'full';
@@ -137,9 +161,12 @@ export interface StMsg {
   t: 'st';
   alive: boolean;
   paused: boolean;
-  /** Раскладка контроллера, заказанная игрой (controllerLayout, этап А5). */
-  layout: string;
+  layout: ControllerLayout;
   mainButton?: MainButtonState;
+  /** Ник того, кто поставил паузу. */
+  pausedBy?: string;
+  /** Строка состояния матча от игры для окна паузы у ведущего. */
+  status?: string;
   game?: GamePayload;
 }
 

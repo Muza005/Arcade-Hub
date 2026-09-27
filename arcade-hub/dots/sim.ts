@@ -43,6 +43,10 @@ export interface Sim {
   readonly stars: readonly Vec[];
   readonly timeLeftS: number;
   readonly over: boolean;
+  /** Кто собрал звезду на последнем шаге — для обратной связи на телефоне. */
+  readonly pickups: readonly string[];
+  /** Досрочный конец матча («Завершить матч» у ведущего). */
+  stop(): void;
   /** Прогресс перезарядки рывка 0…1 (1 — готов). Для ободка главной кнопки (st.mainButton, этап А5). */
   dashReady(id: string): number;
   step(dtS: number, read: (id: string) => InputState): void;
@@ -75,6 +79,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
 
   let timeLeftS = options.durationS;
   let over = false;
+  const pickups: string[] = [];
 
   const moveDot = (dot: Dot, input: InputState, dtS: number): void => {
     dot.prev.x = dot.pos.x;
@@ -115,6 +120,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       if (Math.hypot(star.x - dot.pos.x, star.y - dot.pos.y) < reach) {
         dot.score += STAR_POINTS_SCORE;
         stars[i] = randomStar(rng);
+        pickups.push(dot.id);
       }
     }
   };
@@ -128,11 +134,16 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
     get over() {
       return over;
     },
+    pickups,
+    stop() {
+      over = true;
+    },
     dashReady(id) {
       const dot = dots.find((d) => d.id === id);
       return dot ? 1 - dot.cooldownS / DASH_COOLDOWN_S : 0;
     },
     step(dtS, read) {
+      pickups.length = 0;
       if (over) return;
       for (const dot of dots) moveDot(dot, read(dot.id), dtS);
       // Звёзды собираются по порядку игроков — порядок фиксирован, результат детерминирован.

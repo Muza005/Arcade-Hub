@@ -1,29 +1,58 @@
-// Страница телефона (ARCADE_HUB_SPEC §10). Этап А4: вход в комнату по коду, слот, токен, профиль.
-// Геймпад (джойстик, кнопки, гироскоп) — этап А5. Только DOM, без canvas и постоянного rAF.
+// Страница телефона (ARCADE_HUB_SPEC §8, §10): вход в комнату → «Готов играть» → контроллер.
+// Один контроллер на всё: в меню хаба джойстик ведущего ведёт выбор, в матче — управление игрой.
+// Только DOM, без canvas/WebGL и постоянного rAF; ввод — не чаще 30 Гц и только при изменении.
 import '@fontsource/golos-text/500.css';
 import '@fontsource/golos-text/600.css';
 import '@fontsource/unbounded/700.css';
 import './styles.css';
-import { PLAYER_COLORS, RECONNECT_DELAYS_S, ROOM_CODE_ALPHABET, ROOM_CODE_LEN, NICK_MAX_LEN, WS_PATH } from '../shared/config';
+import {
+  RECONNECT_DELAYS_S,
+  ROOM_CODE_ALPHABET,
+  ROOM_CODE_LEN,
+  TILT_FULL_DEG,
+  VIBRATE_TAP_MS,
+  WS_PATH,
+} from '../shared/config';
 import { getLang, t } from '../shared/i18n';
-import type { JoinMsg, PhoneToScreen, ScreenToPhone, ServerToPhone, SlotMsg } from '../shared/protocol';
+import type {
+  ControlMode,
+  ControllerLayout,
+  JoinMsg,
+  PhoneToScreen,
+  ScreenToPhone,
+  ServerToPhone,
+  SlotMsg,
+  StMsg,
+} from '../shared/protocol';
+import { createGyro, requestGyroPermission } from './gyro';
+import { createPad } from './pad';
+import { loadPrefs, savePrefs, type Prefs } from './prefs';
+import { createInputSender } from './sender';
+import { createSettings } from './settings';
 import { loadProfile, saveProfile, saveSession, tokenFor } from './storage';
+import { button, el } from './ui';
 
 const MS_PER_S = 1000;
+const MENU_LAYOUT: ControllerLayout = { screen: 'menu', modes: ['joystick'], mainButton: true };
+const ALL_MODES: ControlMode[] = ['arrows', 'gyro', 'joystick'];
 
 document.documentElement.lang = getLang();
-
 const app = document.getElementById('app');
 if (!app) throw new Error('#app not found');
 
-type Screen = 'code' | 'connecting' | 'profile' | 'error';
+// ─── Состояние ───────────────────────────────────────────────────
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
+let room = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
+let ws: WebSocket | null = null;
+let slot: SlotMsg | null = null;
+let st: StMsg = { t: 'st', alive: true, paused: false, layout: MENU_LAYOUT };
+let prefs: Prefs = loadPrefs();
+let ready = false;
+let attempt = 0;
+/** Первый слот после входа без токена: тогда отдаём экрану сохранённый профиль. */
+let freshJoin = false;
+let stopped = false;
+const input = { x: 0, y: 0, btn: false };
 
 // ─── Экраны ──────────────────────────────────────────────────────
 
@@ -37,63 +66,174 @@ codeInput.setAttribute('aria-label', t('ctrl.codeTitle'));
 const codeError = el('p', 'code__error');
 codeForm.append(el('h1', 'title', t('ctrl.codeTitle')), codeInput, codeError, el('button', 'btn', t('ctrl.enter')));
 
-const connectingScreen = el('div', 'screen connecting');
+const connectingScreen = el('div', 'screen');
 connectingScreen.append(el('p', 'muted', t('ctrl.connecting')));
 
-const errorScreen = el('div', 'screen error');
+const errorScreen = el('div', 'screen');
 const errorText = el('p', 'title');
 errorScreen.append(errorText);
 
-const profileScreen = el('div', 'screen profile');
-const avatar = el('div', 'avatar');
-const avatarLetter = el('span', 'avatar__letter');
-const crown = el('span', 'avatar__crown');
-crown.title = t('ctrl.leader');
-avatar.append(avatarLetter, crown);
-const nickInput = el('input', 'nick');
-nickInput.maxLength = NICK_MAX_LEN;
-nickInput.autocomplete = 'off';
-nickInput.enterKeyHint = 'done';
-nickInput.setAttribute('aria-label', t('ctrl.nick'));
-const colorGrid = el('div', 'colors');
-colorGrid.setAttribute('role', 'radiogroup');
-colorGrid.setAttribute('aria-label', t('ctrl.color'));
-const colorButtons = PLAYER_COLORS.map((color) => {
-  const b = el('button', 'color');
-  b.type = 'button';
-  b.style.setProperty('--c', color);
-  b.setAttribute('role', 'radio');
-  b.setAttribute('aria-label', color);
-  colorGrid.append(b);
-  return b;
-});
-const roomLabel = el('p', 'muted');
-profileScreen.append(avatar, nickInput, colorGrid, roomLabel);
+const readyScreen = el('div', 'screen ready');
+const readyBtn = button('ready__btn', t('ctrl.ready'));
+readyScreen.append(readyBtn);
 
+const sender = createInputSender((state) => send({ t: 'in', ...state }));
+
+const pad = createPad({
+  axes(x, y) {
+    input.x = x;
+    input.y = y;
+    pushInput();
+  },
+  button(pressed) {
+    input.btn = pressed;
+    if (pressed) vibrate(VIBRATE_TAP_MS);
+    pushInput();
+  },
+  pause() {
+    send({ t: 'cmd', cmd: st.layout.screen === 'menu' ? 'back' : 'pause' });
+  },
+  settings() {
+    pad.release();
+    settings.show(settingsContext());
+    render();
+  },
+  recalibrate: () => gyro.calibrate(),
+});
+
+const settings = createSettings({
+  prefs(next) {
+    prefs = next;
+    savePrefs(prefs);
+    applyPrefs();
+  },
+  profile: (nick, color) => send({ t: 'profile', nick, color }),
+  recalibrate: () => gyro.calibrate(),
+  handoff: (target) => send({ t: 'cmd', cmd: 'handoff', target }),
+  close() {
+    settings.hide();
+    render();
+  },
+});
+
+// Окно паузы у ведущего
+const pauseModal = el('div', 'pause-modal');
+const pauseStatus = el('p', 'muted');
+const resumeBtn = button('btn btn--player', t('ctrl.pause.resume'));
+const endBtn = button('btn btn--danger', t('ctrl.pause.end'));
+pauseModal.append(
+  el('span', 'pause-modal__icon'),
+  el('h1', 'title', t('ctrl.pause')),
+  el('p', '', t('ctrl.pause.stopped')),
+  pauseStatus,
+  resumeBtn,
+  endBtn,
+  el('p', 'muted', t('ctrl.pause.endNote')),
+);
+resumeBtn.addEventListener('click', () => send({ t: 'cmd', cmd: 'resume' }));
+endBtn.addEventListener('click', () => send({ t: 'cmd', cmd: 'end' }));
+
+const flash = el('div', 'flash');
 const banner = el('div', 'banner', t('ctrl.reconnecting'));
 banner.hidden = true;
 
+type Screen = 'code' | 'connecting' | 'ready' | 'pad' | 'error';
 const screens: Record<Screen, HTMLElement> = {
   code: codeForm,
   connecting: connectingScreen,
-  profile: profileScreen,
+  ready: readyScreen,
+  pad: pad.el,
   error: errorScreen,
 };
-app.append(...Object.values(screens), banner);
+app.append(...Object.values(screens), pauseModal, settings.el, flash, banner);
+let screen: Screen = 'connecting';
 
-function show(screen: Screen): void {
+function show(next: Screen): void {
+  screen = next;
+  render();
+}
+
+// ─── Управление ──────────────────────────────────────────────────
+
+const gyro = createGyro(
+  (x, y) => {
+    pad.setTilt(x, y);
+    if (activeMode() !== 'gyro') return;
+    input.x = x;
+    input.y = y;
+    pushInput();
+  },
+  () => render(),
+);
+
+function isLeader(): boolean {
+  return slot?.role === 'leader';
+}
+
+/** В меню — всегда джойстик; в игре — выбранный вид, если игра его поддерживает. */
+function activeMode(): ControlMode {
+  const { layout } = st;
+  if (layout.screen === 'menu') return 'joystick';
+  const usable = layout.modes.filter((m) => m !== 'gyro' || gyro.available);
+  return usable.includes(prefs.mode) ? prefs.mode : (usable[0] ?? 'joystick');
+}
+
+/** Можно ли сейчас управлять: гость в меню и все на паузе — нельзя. */
+function controlsLive(): boolean {
+  if (screen !== 'pad' || settings.open || st.paused) return false;
+  return st.layout.screen === 'game' || isLeader();
+}
+
+function pushInput(): void {
+  if (controlsLive()) sender.update({ ...input });
+  else sender.release();
+}
+
+function vibrate(ms: number): void {
+  if (prefs.vibration && 'vibrate' in navigator) navigator.vibrate(ms);
+}
+
+function applyPrefs(): void {
+  app?.setAttribute('data-hand', prefs.hand);
+  gyro.configure({ fullDeg: TILT_FULL_DEG[prefs.sensitivity.gyro], invertX: prefs.invertX, invertY: prefs.invertY });
+  render();
+}
+
+function settingsContext() {
+  if (!slot) throw new Error('no slot');
+  return {
+    slot,
+    modes: st.layout.screen === 'menu' ? ALL_MODES : st.layout.modes,
+    gyroAvailable: gyro.available,
+    prefs,
+    ...(st.layout.warning ? { warning: st.layout.warning } : {}),
+  };
+}
+
+function render(): void {
   for (const [name, node] of Object.entries(screens)) node.hidden = name !== screen;
+  const leader = isLeader();
+  const inMenu = st.layout.screen === 'menu';
+  const mode = activeMode();
+  pad.setView({
+    mode,
+    sensitivity: prefs.sensitivity[mode],
+    mainButton: st.layout.mainButton,
+    leader,
+    muted: inMenu && !leader,
+    paused: st.paused,
+  });
+  pad.setMainButton(inMenu ? undefined : st.mainButton);
+  // Пауза: у ведущего — окно, у остальных — карточка сверху и серые кнопки.
+  pauseModal.hidden = !(screen === 'pad' && st.paused && leader && !settings.open);
+  pauseStatus.textContent = st.status ?? '';
+  pad.notice.hidden = !(st.paused && !leader);
+  pad.notice.textContent = st.pausedBy ? t('ctrl.pause.guest', { nick: st.pausedBy }) : '';
+  if (settings.open && slot) settings.update(settingsContext());
+  if (!controlsLive()) sender.release();
 }
 
 // ─── Связь ───────────────────────────────────────────────────────
-
-let room = new URLSearchParams(location.search).get('room')?.toUpperCase() ?? '';
-let ws: WebSocket | null = null;
-let slot: SlotMsg | null = null;
-let attempt = 0;
-/** Первый слот после входа без токена: тогда отдаём экрану сохранённый профиль. */
-let freshJoin = false;
-let stopped = false;
 
 function send(msg: JoinMsg | PhoneToScreen): void {
   if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
@@ -105,22 +245,11 @@ function join(): void {
   send(token ? { t: 'join', room, token } : { t: 'join', room });
 }
 
-function renderProfile(s: SlotMsg): void {
-  profileScreen.style.setProperty('--player', s.color);
-  avatarLetter.textContent = s.nick.slice(0, 1).toUpperCase();
-  crown.hidden = s.role !== 'leader';
-  if (document.activeElement !== nickInput) nickInput.value = s.nick;
-  const taken = new Set(s.taken);
-  colorButtons.forEach((b, i) => {
-    const color = PLAYER_COLORS[i] as string;
-    b.disabled = taken.has(color);
-    b.setAttribute('aria-checked', String(color === s.color));
-  });
-  roomLabel.textContent = t('ctrl.room', { code: room });
-}
-
-function sendProfile(nick: string, color: string): void {
-  send({ t: 'profile', nick, color });
+function playFlash(color: string): void {
+  flash.style.setProperty('--flash', color);
+  flash.classList.remove('is-on');
+  void flash.offsetWidth;
+  flash.classList.add('is-on');
 }
 
 function onMessage(msg: ScreenToPhone | ServerToPhone): void {
@@ -130,16 +259,25 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       saveSession({ room, token: msg.token });
       const stored = loadProfile();
       if (freshJoin && stored && (stored.nick !== msg.nick || stored.color !== msg.color)) {
-        freshJoin = false;
-        sendProfile(stored.nick, stored.color);
+        send({ t: 'profile', nick: stored.nick, color: stored.color });
       } else {
-        freshJoin = false;
         saveProfile({ nick: msg.nick, color: msg.color });
       }
-      renderProfile(msg);
-      show('profile');
+      freshJoin = false;
+      pad.setProfile(msg.nick, msg.color);
+      app?.style.setProperty('--player', msg.color);
+      if (screen === 'connecting') show(ready ? 'pad' : 'ready');
+      else render();
       return;
     }
+    case 'st':
+      st = msg;
+      render();
+      return;
+    case 'fx':
+      if (typeof msg.vib === 'number') vibrate(msg.vib);
+      if (typeof msg.flash === 'string') playFlash(msg.flash);
+      return;
     case 'err':
       stopped = true;
       if (msg.code === 'no-room') {
@@ -154,7 +292,6 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       join();
       return;
     default:
-      // st, fx, g — этап А5.
       return;
   }
 }
@@ -191,7 +328,40 @@ function start(code: string): void {
   connect();
 }
 
-// ─── Действия ────────────────────────────────────────────────────
+// ─── «Готов играть»: разрешение гироскопа (iOS), Wake Lock, первая калибровка ───
+
+let wakeLock: { release(): Promise<void> } | null = null;
+async function keepAwake(): Promise<void> {
+  try {
+    const nav = navigator as Navigator & { wakeLock?: { request(type: 'screen'): Promise<{ release(): Promise<void> }> } };
+    wakeLock = (await nav.wakeLock?.request('screen')) ?? null;
+  } catch {
+    wakeLock = null;
+  }
+}
+
+readyBtn.addEventListener('click', () => {
+  ready = true;
+  void requestGyroPermission().then((granted) => {
+    if (granted) {
+      gyro.start();
+      gyro.calibrate();
+    }
+    render();
+  });
+  void keepAwake();
+  show('pad');
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && ready && !wakeLock) void keepAwake();
+  if (document.visibilityState === 'hidden') {
+    wakeLock = null;
+    pad.release();
+  }
+});
+
+// ─── Ввод кода ───────────────────────────────────────────────────
 
 codeInput.addEventListener('input', () => {
   codeInput.value = [...codeInput.value.toUpperCase()].filter((ch) => ROOM_CODE_ALPHABET.includes(ch)).join('');
@@ -202,17 +372,6 @@ codeForm.addEventListener('submit', (e) => {
   if (codeInput.value.length === ROOM_CODE_LEN) start(codeInput.value);
 });
 
-nickInput.addEventListener('change', () => {
-  if (slot) sendProfile(nickInput.value, slot.color);
-});
-nickInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') nickInput.blur();
-});
-colorButtons.forEach((b, i) =>
-  b.addEventListener('click', () => {
-    if (slot) sendProfile(nickInput.value || slot.nick, PLAYER_COLORS[i] as string);
-  }),
-);
-
+applyPrefs();
 if (room.length === ROOM_CODE_LEN) start(room);
 else show('code');

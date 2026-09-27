@@ -41,3 +41,49 @@ body {
 .game-mount canvas {
   display: block;
 }
+
+/* Пауза на большом экране: затемнение 74 % поверх замершей игры. */
+.pause {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: rgb(7 9 18 / 0.74);
+  text-align: center;
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+.pause p {
+  margin: 0;
+}
+
+.pause__icon {
+  width: calc(96rem / 24);
+  height: calc(96rem / 24);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(var(--text), var(--text)) calc(30rem / 24) 50% / calc(12rem / 24) 45% no-repeat,
+    linear-gradient(var(--text), var(--text)) calc(54rem / 24) 50% / calc(12rem / 24) 45% no-repeat,
+    var(--surface-2);
+}
+
+.pause__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-hero);
+  letter-spacing: 0.08em;
+}
+
+.pause__by {
+  font-size: var(--fs-body);
+}
+
+.pause__hint {
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  color: var(--text-2);
+}

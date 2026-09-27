@@ -3,7 +3,14 @@
 import { IDLE_INPUT, type InputState } from '../engine/input';
 import { DEFAULT_ASPECT, MAX_PLAYERS, PLAYER_COLORS, RECONNECT_DELAYS_S, TOKEN_BYTES, WS_PATH } from '../shared/config';
 import { t } from '../shared/i18n';
-import type { FromMsg, HostToServer, ScreenToPhone, ServerToHost, SlotMsg } from '../shared/protocol';
+import type {
+  CmdMsg,
+  FromMsg,
+  HostToServer,
+  ScreenToPhone,
+  ServerToHost,
+  SlotMsg,
+} from '../shared/protocol';
 import type { Room, RoomPlayer } from './room';
 import { RoomState, type SavedRoom, type Slot } from './room-state';
 
@@ -15,8 +22,16 @@ export interface RoomClient {
   onChange(cb: (room: Room) => void): void;
   /** Новый игрок вошёл (не возврат после обрыва) — для анимации и звука. */
   onJoin(cb: (player: RoomPlayer) => void): void;
-  /** Последний ввод игрока с телефона (этап А5 подключит его к играм). */
+  /** Ввод с телефона пришёл (id игрока = id слота строкой). */
+  onInput(cb: (playerId: string, input: InputState) => void): void;
+  /** Команда с телефона (pause, back, …); `leader` — прислал ли её ведущий. */
+  onCmd(cb: (playerId: string, msg: CmdMsg, leader: boolean) => void): void;
+  /** Последний ввод игрока с телефона. */
   inputOf(playerId: string): InputState;
+  leaderId(): string | null;
+  send(playerId: string, msg: ScreenToPhone): void;
+  /** Каждому подключённому телефону — своё сообщение. */
+  sendEach(make: (playerId: string) => ScreenToPhone): void;
 }
 
 function makeToken(): string {
@@ -54,6 +69,8 @@ export function connectRoom(): RoomClient {
   const inputs = new Map<string, InputState>();
   const changeListeners: Array<(room: Room) => void> = [];
   const joinListeners: Array<(player: RoomPlayer) => void> = [];
+  const inputListeners: Array<(playerId: string, input: InputState) => void> = [];
+  const cmdListeners: Array<(playerId: string, msg: CmdMsg, leader: boolean) => void> = [];
   let ws: WebSocket | null = null;
   let attempt = 0;
 
@@ -68,6 +85,8 @@ export function connectRoom(): RoomClient {
     if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   };
   const toPhone = (cid: string, msg: ScreenToPhone): void => send({ t: 'to', to: cid, msg });
+  const slotById = (playerId: string): Slot | undefined =>
+    state.connected().find((s) => String(s.id) === playerId);
 
   const slotMsg = (slot: Slot): SlotMsg => ({
     t: 'slot',
@@ -78,8 +97,9 @@ export function connectRoom(): RoomClient {
     token: slot.token,
     aspect: DEFAULT_ASPECT,
     taken: state.takenBy(slot),
+    roster: state.players().map((p) => ({ id: Number(p.id), nick: p.nick, color: p.color, online: p.connected })),
   });
-  /** Занятые цвета меняются у всех — каждому телефону свой слот заново. */
+  /** Цвета, роли и список игроков меняются у всех — каждому телефону свой слот заново. */
   const syncPhones = (): void => {
     for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, slotMsg(slot));
   };
@@ -109,11 +129,28 @@ export function connectRoom(): RoomClient {
         return;
       case 'in': {
         const slot = state.bySid(from);
-        if (slot) inputs.set(String(slot.id), { x: Number(msg.x) || 0, y: Number(msg.y) || 0, btn: msg.btn === true });
+        if (!slot) return;
+        const input = { x: Number(msg.x) || 0, y: Number(msg.y) || 0, btn: msg.btn === true };
+        const id = String(slot.id);
+        inputs.set(id, input);
+        for (const cb of inputListeners) cb(id, input);
+        return;
+      }
+      case 'cmd': {
+        const slot = state.bySid(from);
+        if (!slot) return;
+        if (msg.cmd === 'handoff') {
+          if (typeof msg.target === 'number' && state.handoff(from, msg.target)) {
+            syncPhones();
+            changed();
+          }
+          return;
+        }
+        for (const cb of cmdListeners) cb(String(slot.id), msg, state.isLeader(slot));
         return;
       }
       default:
-        // lobby, cmd, g — следующие этапы.
+        // lobby, g — следующие этапы.
         return;
     }
   };
@@ -142,6 +179,7 @@ export function connectRoom(): RoomClient {
         const slot = state.leave(msg.from);
         if (slot) {
           inputs.delete(String(slot.id));
+          syncPhones();
           changed();
         }
       }
@@ -149,6 +187,7 @@ export function connectRoom(): RoomClient {
     ws.addEventListener('close', () => {
       // Пока сервера нет, телефоны считаются отключёнными; при возвращении они придут с токенами.
       for (const slot of state.connected()) if (slot.cid) state.leave(slot.cid);
+      inputs.clear();
       changed();
       const delay = RECONNECT_DELAYS_S[Math.min(attempt, RECONNECT_DELAYS_S.length - 1)] ?? 1;
       attempt++;
@@ -163,6 +202,19 @@ export function connectRoom(): RoomClient {
     },
     onChange: (cb) => void changeListeners.push(cb),
     onJoin: (cb) => void joinListeners.push(cb),
+    onInput: (cb) => void inputListeners.push(cb),
+    onCmd: (cb) => void cmdListeners.push(cb),
     inputOf: (id) => inputs.get(id) ?? { ...IDLE_INPUT },
+    leaderId: () => {
+      const leader = state.leader();
+      return leader ? String(leader.id) : null;
+    },
+    send: (playerId, msg) => {
+      const cid = slotById(playerId)?.cid;
+      if (cid) toPhone(cid, msg);
+    },
+    sendEach: (make) => {
+      for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, make(String(slot.id)));
+    },
   };
 }

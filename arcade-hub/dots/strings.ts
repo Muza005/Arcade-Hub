@@ -10,7 +10,8 @@ export type DotsKey =
   | 'modeFfa'
   | 'modeFfaDesc'
   | 'timer'
-  | 'score';
+  | 'score'
+  | 'status';
 
 export const strings: GameStrings<DotsKey> = {
   ru: {
@@ -23,6 +24,7 @@ export const strings: GameStrings<DotsKey> = {
     modeFfaDesc: 'Больше звёзд — победа',
     timer: '{s}',
     score: '{nick}: {score}',
+    status: 'Осталось {time}',
   },
   en: {
     title: 'Dots',
@@ -34,5 +36,6 @@ export const strings: GameStrings<DotsKey> = {
     modeFfaDesc: 'Most stars wins',
     timer: '{s}',
     score: '{nick}: {score}',
+    status: '{time} left',
   },
 };

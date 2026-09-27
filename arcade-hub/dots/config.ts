@@ -26,6 +26,10 @@ export const STARS_BASE = 3;
 export const STARS_PER_PLAYER = 1;
 export const STAR_POINTS_SCORE = 1;
 
+// Обратная связь на телефоне при сборе звезды
+export const PICKUP_VIBRATE_MS = 25;
+export const SECONDS_PER_MINUTE = 60;
+
 // Графика
 export const ACCENT = '#3DDC97';
 export const STAR_COLOR = '#FFD84D';

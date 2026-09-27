@@ -57,6 +57,7 @@ function stubManifest(stub: Stub): GameManifest {
     version: '0',
     load: () => Promise.reject(new Error(`${stub.id}: заглушка для проверки меню`)),
     strings,
+    controllerLayout: { mainButton: true },
   };
 }
 

@@ -59,6 +59,19 @@ describe('RoomState', () => {
   });
 });
 
+describe('handoff', () => {
+  it('ведущий передаёт роль, гость — не может', () => {
+    const room = make();
+    const a = room.join('c1');
+    const b = room.join('c2');
+    if ('error' in a || 'error' in b) throw new Error();
+    expect(room.handoff('c2', a.slot.id)).toBe(false);
+    expect(room.handoff('c1', b.slot.id)).toBe(true);
+    expect(room.isLeader(b.slot)).toBe(true);
+    expect(room.isLeader(a.slot)).toBe(false);
+  });
+});
+
 it('cleanNick', () => {
   expect(cleanNick('  Очень  длинный ник ')).toBe('Очень дл');
   expect(cleanNick('   ')).toBe('');

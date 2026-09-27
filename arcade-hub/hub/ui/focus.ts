@@ -52,7 +52,17 @@ function toggleFullscreen(): void {
   else void document.documentElement.requestFullscreen().catch(() => undefined);
 }
 
-export function createFocusManager(sounds: UiSounds): { dispose(): void } {
+export interface FocusManager {
+  /** Сдвинуть фокус (стрелки, WASD, джойстик ведущего). */
+  move(dir: Direction): void;
+  /** Нажать выбранный элемент (Enter, главная кнопка ведущего). */
+  select(): void;
+  /** «Назад» (Esc, Backspace, пауза ведущего в меню). */
+  back(): void;
+  dispose(): void;
+}
+
+export function createFocusManager(sounds: UiSounds): FocusManager {
   let tabbing = false;
 
   const moveTo = (el: HTMLElement): void => {
@@ -61,13 +71,50 @@ export function createFocusManager(sounds: UiSounds): { dispose(): void } {
     sounds.play('click');
   };
 
+  const activeIn = (scope: HTMLElement): HTMLElement | null =>
+    document.activeElement instanceof HTMLElement && scope.contains(document.activeElement)
+      ? document.activeElement
+      : null;
+
+  const move = (dir: Direction): void => {
+    const scope = currentScope();
+    if (!scope) return;
+    const active = activeIn(scope);
+    if (!active) {
+      const target = defaultFocus(scope);
+      if (target) moveTo(target);
+      return;
+    }
+    const candidates = focusables(scope).filter((el) => el !== active);
+    const next = pickNext(
+      active.getBoundingClientRect(),
+      candidates.map((el) => el.getBoundingClientRect()),
+      dir,
+    );
+    const target = candidates[next];
+    if (target) moveTo(target);
+  };
+
+  const select = (): void => {
+    const scope = currentScope();
+    if (!scope) return;
+    const active = activeIn(scope);
+    if (active) active.click();
+    else {
+      const target = defaultFocus(scope);
+      if (target) moveTo(target);
+    }
+  };
+
+  const back = (): void => {
+    currentScope()?.dispatchEvent(new CustomEvent(BACK_EVENT));
+  };
+
   const onKeyDown = (e: KeyboardEvent): void => {
     if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
     const scope = currentScope();
     if (!scope) return;
-    const active = document.activeElement instanceof HTMLElement && scope.contains(document.activeElement)
-      ? document.activeElement
-      : null;
+    const active = activeIn(scope);
 
     if (e.code === 'Tab') {
       tabbing = true;
@@ -80,7 +127,7 @@ export function createFocusManager(sounds: UiSounds): { dispose(): void } {
     }
     if (BACK_KEYS.has(e.code)) {
       e.preventDefault();
-      scope.dispatchEvent(new CustomEvent(BACK_EVENT));
+      back();
       return;
     }
     if (SELECT_KEYS.has(e.code)) {
@@ -96,19 +143,7 @@ export function createFocusManager(sounds: UiSounds): { dispose(): void } {
     const dir = DIRECTIONS[e.code];
     if (!dir) return;
     e.preventDefault();
-    if (!active) {
-      const target = defaultFocus(scope);
-      if (target) moveTo(target);
-      return;
-    }
-    const candidates = focusables(scope).filter((el) => el !== active);
-    const next = pickNext(
-      active.getBoundingClientRect(),
-      candidates.map((el) => el.getBoundingClientRect()),
-      dir,
-    );
-    const target = candidates[next];
-    if (target) moveTo(target);
+    move(dir);
   };
 
   const onFocusIn = (): void => {
@@ -146,6 +181,9 @@ export function createFocusManager(sounds: UiSounds): { dispose(): void } {
   document.addEventListener('click', onClick, true);
 
   return {
+    move,
+    select,
+    back,
     dispose() {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('focusin', onFocusIn);
