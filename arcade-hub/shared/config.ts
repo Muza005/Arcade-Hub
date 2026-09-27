@@ -32,6 +32,17 @@ export const ATTRACT_IDLE_S = 60; // витрина при пустой комн
 export const MENU_AVATARS_MAX = 8; // дальше — «+N»
 export const MENU_HISTORY_KEPT = 20; // сколько последних запусков помнить для порядка карточек
 
+// Навигация (§8): стрелка ведёт к ближайшему элементу в её направлении.
+/** Во сколько раз смещение поперёк направления «дороже» расстояния вдоль него. */
+export const NAV_CROSS_WEIGHT = 2;
+/** Допуск в px: элемент считается лежащим в направлении, если сдвинут хотя бы на столько. */
+export const NAV_EPSILON_PX = 1;
+/** Вес расстояния между центрами — только чтобы развести равных кандидатов. */
+export const NAV_TIE_WEIGHT = 0.001;
+
+// Звуки меню (§19)
+export const UI_SOUND_VOLUME = 0.5;
+
 // Гироскоп и контроллер
 export const TILT_FULL_DEG = { low: 35, mid: 22, high: 14 } as const; // по умолчанию mid
 export const TILT_DEADZONE_DEG = 3;

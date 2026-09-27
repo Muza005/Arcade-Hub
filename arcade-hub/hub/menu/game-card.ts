@@ -54,11 +54,11 @@ export function gameCard(game: GameManifest, badge: Badge | null): HTMLButtonEle
   );
 }
 
-/** Последняя карточка: без названий и обещаний. */
+/** Последняя карточка: без названий и обещаний. Фокусируется, чтобы стрелками можно было докрутить сетку до конца. */
 export function soonCard(): HTMLElement {
   return h(
     'div',
-    { class: 'card card--soon' },
+    { class: 'card card--soon', tabindex: '0', 'data-focusable': true },
     icon(ICONS.plus, 'card__plus'),
     h('span', { class: 'card__soon-label' }, t('menu.soon')),
   );

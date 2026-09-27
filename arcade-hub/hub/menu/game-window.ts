@@ -3,6 +3,7 @@
 import type { GameControl, GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import { h, icon } from '../ui/dom';
+import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
 import { accentStyle, gameText, minutesLabel, playersLabel } from './game-card';
 
@@ -126,6 +127,7 @@ export function createGameWindow(onPlay: (game: GameManifest) => void): GameWind
     e.preventDefault();
     close();
   });
+  el.addEventListener(BACK_EVENT, () => close());
   // Клик мимо окна: диалог растянут на весь экран, само окно — внутри.
   el.addEventListener('click', (e) => {
     if (e.target === el) close();

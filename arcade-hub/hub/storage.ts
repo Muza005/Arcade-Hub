@@ -3,6 +3,7 @@ import { MENU_HISTORY_KEPT } from '../shared/config';
 
 const KEY_HISTORY = 'arcade-hub:launched';
 const KEY_SOUND = 'arcade-hub:sound';
+const KEY_REDUCED_MOTION = 'arcade-hub:reduced-motion';
 
 function read<T>(key: string, fallback: T): T {
   try {
@@ -38,4 +39,19 @@ export function soundEnabled(): boolean {
 
 export function setSoundEnabled(on: boolean): void {
   write(KEY_SOUND, on);
+}
+
+/** Настройка «Уменьшить движение» (переключатель — в настройках хаба, этап А8). */
+export function reducedMotion(): boolean {
+  return read<unknown>(KEY_REDUCED_MOTION, false) === true;
+}
+
+export function setReducedMotion(on: boolean): void {
+  write(KEY_REDUCED_MOTION, on);
+  applyReducedMotion();
+}
+
+/** Системный prefers-reduced-motion работает через CSS сам; здесь — настройка хаба. */
+export function applyReducedMotion(): void {
+  document.documentElement.toggleAttribute('data-reduced-motion', reducedMotion());
 }

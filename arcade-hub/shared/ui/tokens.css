@@ -48,6 +48,7 @@
   --focus-width: calc(4rem / 24);
   --focus-offset: calc(4rem / 24);
   --focus-scale: 1.04; /* 4–8 % по §8 */
+  --enter-scale: 0.96; /* появление окон: масштаб → 1 */
 
   /* Движение */
   --dur-fast: 120ms; /* фокус, нажатие */
@@ -56,11 +57,16 @@
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
+/* «Уменьшить движение» (§18): без масштаба и параллакса, смена прозрачности остаётся.
+   Работает и по системной настройке, и по настройке хаба (атрибут data-reduced-motion). */
 @media (prefers-reduced-motion: reduce) {
   :root {
-    --dur-fast: 0ms;
-    --dur-base: 0ms;
-    --dur-slow: 0ms;
     --focus-scale: 1;
+    --enter-scale: 1;
   }
+}
+
+:root[data-reduced-motion] {
+  --focus-scale: 1;
+  --enter-scale: 1;
 }

@@ -7,13 +7,16 @@ import { PLAYER_COLORS } from '../shared/config';
 import type { GameManifest, GamePlayer } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
 import { getLang, t } from '../shared/i18n';
+import { createUiSounds } from './audio';
 import { runGame } from './game-runner';
 import { createMenu } from './menu/menu';
 import { emptyRoom, type Room } from './room';
-import { launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
+import { applyReducedMotion, launchHistory, rememberLaunch, setSoundEnabled, soundEnabled } from './storage';
+import { createFocusManager } from './ui/focus';
 
 document.documentElement.lang = getLang();
 document.title = t('hub.title');
+applyReducedMotion();
 
 const root = document.getElementById('hub');
 if (!root) throw new Error('#hub not found');
@@ -54,10 +57,19 @@ async function play(game: GameManifest): Promise<void> {
   menu.show(game.id);
 }
 
+const sounds = createUiSounds(soundEnabled());
+createFocusManager(sounds);
+
 const menu = createMenu({
   games,
   history: launchHistory,
-  sound: { get: soundEnabled, set: setSoundEnabled },
+  sound: {
+    get: soundEnabled,
+    set: (on) => {
+      setSoundEnabled(on);
+      sounds.setEnabled(on);
+    },
+  },
   onPlay: (game) => void play(game),
 });
 

@@ -93,7 +93,7 @@ export function createMenu(options: MenuOptions): Menu {
     options.onPlay(game);
   });
 
-  const el = h('main', { class: 'menu' }, topBar, heading, grid, bottomBar, gameWindow.el);
+  const el = h('main', { class: 'menu', 'data-focus-scope': true }, topBar, heading, grid, bottomBar, gameWindow.el);
 
   const title = (g: GameManifest): string => gameText(g)(g.title);
 
@@ -113,8 +113,7 @@ export function createMenu(options: MenuOptions): Menu {
     const cards = orderGames(options.games, history, title).map((game) => {
       const card = gameCard(game, badgeFor(game, people, history.includes(game.id)));
       card.setAttribute('role', 'listitem');
-      // Наведение мышью выбирает карточку, клик открывает окно.
-      card.addEventListener('mouseenter', () => card.focus());
+      card.dataset.sound = 'open';
       card.addEventListener('click', () => gameWindow.open(game, card));
       return card;
     });
