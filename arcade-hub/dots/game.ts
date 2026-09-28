@@ -2,6 +2,7 @@
 // Шаблон для новой игры: симуляция — sim.ts, отрисовка — здесь, числа — config.ts, строки — strings.ts.
 import { Container, Graphics, Text } from 'pixi.js';
 import { FixedLoop } from '../engine/loop';
+import { createNotice, type Notice } from '../engine/notice';
 import { createStage, cssVar, loadFonts, type Stage } from '../engine/stage';
 import { FIXED_STEP_HZ } from '../shared/config';
 import { createTranslator } from '../shared/i18n';
@@ -12,9 +13,17 @@ import {
   FIELD,
   FIELD_LINE_PX,
   FIELD_RADIUS,
+  HUD_ALPHA,
+  HUD_PAD_PX,
   MATCH_S_DEFAULT,
   NICK_FONT_PX,
   NICK_GAP_PX,
+  NOTICE_FONT_PX,
+  NOTICE_LEFT_AT_S,
+  NOTICE_PAD_X,
+  NOTICE_PAD_Y,
+  NOTICE_PLATE_ALPHA,
+  NOTICE_Y,
   PICKUP_VIBRATE_MS,
   REPLAY_FRAME_HZ,
   REPLAY_TAIL_S,
@@ -27,7 +36,6 @@ import {
   STAR_POINTS,
   STAR_RADIUS,
   TIMER_FONT_PX,
-  TIMER_Y,
   WORLD_H,
   WORLD_W,
 } from './config';
@@ -77,6 +85,11 @@ export function createDotsGame(): GameModule {
   let scoreViews: ScoreView[] = [];
   let lastScores = '';
   let lastTimer = -1;
+  let notice: Notice;
+  /** Отметки «осталось N с», которые ещё не показаны. */
+  let pendingLeft: number[] = [];
+  /** Середина строки HUD по высоте. */
+  const HUD_Y = FIELD.top + HUD_PAD_PX;
 
   const endMatch = (): void => {
     if (ended) return;
@@ -118,13 +131,13 @@ export function createDotsGame(): GameModule {
     const key = sim.dots.map((d) => d.score).join(',');
     if (key === lastScores) return;
     lastScores = key;
-    let x = FIELD.left;
+    let x = FIELD.left + HUD_PAD_PX;
     ctx.players.forEach((player, i) => {
       const view = scoreViews[i];
       if (!view) return;
       view.text.text = t('score', { nick: player.nick, score: sim.dots[i]?.score ?? 0 });
-      view.swatch.position.set(x + SCORE_SWATCH_RADIUS, TIMER_Y);
-      view.text.position.set(x + SCORE_SWATCH_RADIUS * 2 + NICK_GAP_PX, TIMER_Y);
+      view.swatch.position.set(x + SCORE_SWATCH_RADIUS, HUD_Y);
+      view.text.position.set(x + SCORE_SWATCH_RADIUS * 2 + NICK_GAP_PX, HUD_Y);
       x = view.text.x + view.text.width + SCORE_GAP_PX;
     });
   };
@@ -143,19 +156,21 @@ export function createDotsGame(): GameModule {
       );
 
       await loadFonts([`600 ${NICK_FONT_PX}px "${FONT_UI}"`, `700 ${TIMER_FONT_PX}px "${FONT_DISPLAY}"`]);
-      stage = await createStage(ctx.mount, WORLD_W, WORLD_H);
+      // Экран целиком цвета поля: на любом соотношении сторон поле уходит в край.
+      stage = await createStage(ctx.mount, WORLD_W, WORLD_H, { background: cssVar('--surface') });
       const { world } = stage;
       const textColor = cssVar('--text');
 
       world.addChild(drawField(), starsLayer);
 
       const hud = new Container();
+      hud.alpha = HUD_ALPHA;
       timerText = new Text({
         text: '',
         style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: TIMER_FONT_PX, fill: textColor },
       });
       timerText.anchor.set(1, 0.5);
-      timerText.position.set(FIELD.right, TIMER_Y);
+      timerText.position.set(FIELD.right - HUD_PAD_PX, HUD_Y);
       hud.addChild(timerText);
 
       scoreViews = ctx.players.map((player) => {
@@ -183,6 +198,21 @@ export function createDotsGame(): GameModule {
         world.addChild(node);
         dotViews.set(player.id, { node });
       }
+
+      notice = createNotice(
+        {
+          text: { fontFamily: [FONT_UI, FONT_FALLBACK], fontWeight: '600', fontSize: NOTICE_FONT_PX, fill: textColor },
+          fill: cssVar('--bg'),
+          fillAlpha: NOTICE_PLATE_ALPHA,
+          padX: NOTICE_PAD_X,
+          padY: NOTICE_PAD_Y,
+        },
+        WORLD_W / 2,
+        NOTICE_Y,
+      );
+      world.addChild(notice.view);
+      notice.show(t('noticeStart'));
+      pendingLeft = NOTICE_LEFT_AT_S.filter((s) => s < sim.timeLeftS);
     },
 
     update(dtS) {
@@ -195,12 +225,19 @@ export function createDotsGame(): GameModule {
         timeLeftS: sim.timeLeftS,
       });
       if (tail.length > TAIL_FRAMES) tail.shift();
+      notice.update(dtS);
+      const due = pendingLeft.find((s) => sim.timeLeftS <= s);
+      if (due !== undefined) {
+        pendingLeft = pendingLeft.filter((s) => s < due);
+        notice.show(t('noticeLeft', { s: due }));
+      }
       if (sim.over) endMatch();
     },
 
     replay() {
       // Проигрываем сохранённые кадры с частотой REPLAY_FRAME_HZ — на той же сцене, без симуляции.
       const frames = [...tail];
+      notice.hide();
       if (frames.length === 0) return Promise.resolve();
       return new Promise<void>((done) => {
         let i = 0;

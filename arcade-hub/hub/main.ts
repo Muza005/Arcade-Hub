@@ -195,6 +195,7 @@ const menu = createMenu({
     menu.hide();
     settingsScreen.show();
   },
+  onRemovePlayer: (id) => room?.remove(id),
 });
 
 const settingsScreen = createSettingsScreen({
@@ -251,7 +252,7 @@ if (fixtureRoom) {
   phones = connectPhones({
     room: client,
     nav: focus,
-    showPause: (nick) => pause.show(nick),
+    showPause: (nick) => pause.show(nick, client.room.code),
     nickOf: (id) => client.room.players.find((p) => p.id === id)?.nick ?? '',
   });
   if (import.meta.env.DEV) await enableTestPhones(() => client.room.code);

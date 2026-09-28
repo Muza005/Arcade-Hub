@@ -3,8 +3,9 @@
 export const WORLD_W = 1920;
 export const WORLD_H = 1080;
 
-/** Поле внутри мира: сверху место под таймер и счёт, по краям безопасная зона. */
-export const FIELD = { left: 64, top: 144, right: 1856, bottom: 1016 } as const;
+/** Поле — весь экран с тонким отступом; таймер и счёт лежат поверх, полупрозрачно. */
+export const FIELD_INSET = 16;
+export const FIELD = { left: FIELD_INSET, top: FIELD_INSET, right: WORLD_W - FIELD_INSET, bottom: WORLD_H - FIELD_INSET } as const;
 export const FIELD_RADIUS = 28;
 
 export const MATCH_S_DEFAULT = 60;
@@ -40,8 +41,19 @@ export const STAR_COLOR = '#FFD84D';
 export const FIELD_LINE_PX = 2;
 export const NICK_FONT_PX = 22;
 export const NICK_GAP_PX = 10;
-export const TIMER_FONT_PX = 56;
-export const TIMER_Y = 72;
-export const SCORE_FONT_PX = 26;
-export const SCORE_GAP_PX = 40;
-export const SCORE_SWATCH_RADIUS = 10;
+// Интерфейс поверх поля: мелко, по краям, не мешает игре
+export const HUD_ALPHA = 0.55;
+export const HUD_PAD_PX = 28; // от края поля
+export const TIMER_FONT_PX = 30;
+export const SCORE_FONT_PX = 20;
+export const SCORE_GAP_PX = 28;
+export const SCORE_SWATCH_RADIUS = 7;
+
+// Уведомления в игре (сами уходят через NOTICE_S платформы)
+export const NOTICE_FONT_PX = 34;
+export const NOTICE_Y = 140;
+export const NOTICE_PAD_X = 32;
+export const NOTICE_PAD_Y = 14;
+export const NOTICE_PLATE_ALPHA = 0.7;
+/** На скольких секундах до конца предупредить. */
+export const NOTICE_LEFT_AT_S = [10] as const;

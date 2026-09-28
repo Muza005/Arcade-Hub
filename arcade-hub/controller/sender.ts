@@ -1,4 +1,4 @@
-// Отправка ввода (§10): не чаще INPUT_SEND_HZ и только при заметном изменении.
+// Отправка ввода (§10): не чаще INPUT_SEND_HZ и только при заметном изменении; нажатие и отпускание — сразу.
 import { INPUT_EPSILON, INPUT_SEND_HZ } from '../shared/config';
 import type { InputState } from '../shared/protocol';
 
@@ -33,7 +33,16 @@ export function createInputSender(
   };
 
   const update = (next: InputState): void => {
+    const pressChanged = next.btn !== current.btn;
+    const released = next.x === 0 && next.y === 0 && (current.x !== 0 || current.y !== 0);
     current = next;
+    // Нажатие кнопки и отпускание джойстика уходят сразу — их задержку чувствуешь сильнее всего.
+    if ((pressChanged || released) && changed()) {
+      if (timer) clearTimeout(timer);
+      timer = null;
+      flush();
+      return;
+    }
     if (timer || !changed()) return;
     const wait = lastAt + interval - now();
     if (wait <= 0) flush();

@@ -18,6 +18,8 @@ export interface MenuOptions {
   sound: { get(): boolean; set(on: boolean): void };
   onPlay(game: GameManifest): void;
   onSettings(): void;
+  /** Убрать отключённого игрока из комнаты. */
+  onRemovePlayer(id: string): void;
 }
 
 export interface Menu {
@@ -136,7 +138,7 @@ export function createMenu(options: MenuOptions): Menu {
     inRoom.textContent = people > 0 ? t('menu.inRoom', { n: people }) : '';
     const fresh = new Set(seen ? room.players.map((p) => p.id).filter((id) => !seen?.has(id)) : []);
     seen = new Set(room.players.map((p) => p.id));
-    avatarsSlot.replaceChildren(avatarRow(room.players, fresh));
+    avatarsSlot.replaceChildren(avatarRow(room.players, fresh, options.onRemovePlayer));
   };
 
   const renderGrid = (): void => {

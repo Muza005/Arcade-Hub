@@ -25,11 +25,16 @@ export async function loadFonts(fonts: readonly string[], sample: string = FONT_
   await Promise.all(fonts.map((font) => document.fonts.load(font, sample)));
 }
 
-export async function createStage(mount: HTMLElement, width: number, height: number): Promise<Stage> {
+export interface StageOptions {
+  /** Цвет всего экрана, включая поля вокруг мира: поле игры тогда уходит в край без видимой рамки. */
+  background?: string;
+}
+
+export async function createStage(mount: HTMLElement, width: number, height: number, options: StageOptions = {}): Promise<Stage> {
   const app = new Application();
   await app.init({
     resizeTo: mount,
-    backgroundAlpha: 0,
+    ...(options.background ? { background: options.background } : { backgroundAlpha: 0 }),
     antialias: true,
     autoStart: false,
     autoDensity: true,

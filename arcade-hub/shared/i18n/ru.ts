@@ -13,6 +13,8 @@ export const ru = {
   'ctrl.full': 'Комната заполнена',
   'ctrl.removed': 'Вас убрали из комнаты — войдите снова по QR',
   'ctrl.unsupported': 'Откройте ссылку в Safari или Chrome',
+  'ctrl.claimTitle': 'Вы уже играли?',
+  'ctrl.claimNew': 'Я новый игрок',
   'ctrl.reconnecting': 'Связь пропала — подключаемся',
   'ctrl.room': 'Комната {code}',
   'ctrl.nick': 'Ник',
@@ -61,6 +63,7 @@ export const ru = {
   'menu.inRoom': 'В комнате {n}',
   'menu.leader': 'Ведущий',
   'menu.offline': 'Нет связи',
+  'menu.remove': 'Убрать {nick}',
 
   'badge.daily': 'Рекорд дня',
   'badge.needMore': 'Нужно ещё {n}',
@@ -87,6 +90,7 @@ export const ru = {
   'pause.title': 'ПАУЗА',
   'pause.by': 'Пауза · {nick}',
   'pause.hint': 'Продолжить или завершить матч — с телефона ведущего',
+  'pause.rejoin': 'Выпали из игры? Сканируйте, чтобы вернуться',
 
   'lobby.back': 'Назад',
   'lobby.start': 'Старт',

@@ -773,3 +773,34 @@
   color: var(--bg);
   font-size: calc(22rem / 24);
 }
+
+/* Убрать отключившегося: кнопка на его аватаре, видна всегда — он и так полупрозрачный. */
+.avatar {
+  position: relative;
+}
+
+.avatar__remove {
+  position: absolute;
+  top: calc(-8rem / 24);
+  right: calc(4rem / 24);
+  width: calc(32rem / 24);
+  height: calc(32rem / 24);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: var(--bg);
+  font-size: calc(18rem / 24);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.avatar__remove:focus {
+  outline: none;
+  transform: scale(1.2);
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
+}

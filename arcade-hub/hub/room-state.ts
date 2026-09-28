@@ -74,6 +74,31 @@ export class RoomState {
     return next;
   }
 
+  /**
+   * «Это я»: телефон вошёл как новый (потерял токен — другой браузер, чистая история)
+   * и забирает своё старое место. Место должно быть свободно; новый слот исчезает.
+   */
+  claim(cid: string, targetId: number): Slot | undefined {
+    const current = this.bySid(cid);
+    const target = this.slots.find((s) => s.id === targetId);
+    if (!current || !target || target.cid !== null || target === current) return undefined;
+    target.cid = cid;
+    if (current.unsupported) target.unsupported = true;
+    else delete target.unsupported;
+    this.slots = this.slots.filter((s) => s !== current);
+    if (this.leaderId === current.id) this.leaderId = target.id;
+    return target;
+  }
+
+  /** Убрать отключённого игрока из комнаты (кнопка у его аватара). Подключённых не трогаем. */
+  remove(id: number): boolean {
+    const slot = this.slots.find((s) => s.id === id);
+    if (!slot || slot.cid !== null) return false;
+    this.slots = this.slots.filter((s) => s !== slot);
+    if (this.leaderId === id) this.leaderId = (this.slots.find((s) => s.cid !== null) ?? this.slots[0])?.id ?? null;
+    return true;
+  }
+
   /** «Передать ведущего»: только текущий ведущий и только игроку этой комнаты. */
   handoff(fromCid: string, targetId: number): boolean {
     const from = this.bySid(fromCid);

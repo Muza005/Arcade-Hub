@@ -22,7 +22,7 @@ describe('createInputSender', () => {
     expect(sent).toEqual([{ x: 0.5, y: 0, btn: false }]);
   });
 
-  it('не чаще 30 Гц: поток изменений сжимается', () => {
+  it('не чаще INPUT_SEND_HZ: поток изменений сжимается', () => {
     const s = make();
     for (let i = 1; i <= 10; i++) {
       s.update({ x: i / 10, y: 0, btn: false });
@@ -31,9 +31,17 @@ describe('createInputSender', () => {
     }
     t += 100;
     vi.runAllTimers();
-    // 50 мс изменений → первое сразу, затем одно через ~33 мс и последнее значение
-    expect(sent.length).toBeLessThanOrEqual(3);
+    // 50 мс изменений → первое сразу, дальше не чаще раза в ~17 мс
+    expect(sent.length).toBeLessThanOrEqual(5);
     expect(sent.at(-1)?.x).toBe(1);
+  });
+
+  it('нажатие кнопки уходит сразу, без ожидания интервала', () => {
+    const s = make();
+    s.update({ x: 0.5, y: 0, btn: false });
+    t += 1;
+    s.update({ x: 0.5, y: 0, btn: true });
+    expect(sent.at(-1)).toEqual({ x: 0.5, y: 0, btn: true });
   });
 
   it('отпускание до нуля всегда доходит', () => {

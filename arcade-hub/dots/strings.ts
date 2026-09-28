@@ -12,6 +12,8 @@ export type DotsKey =
   | 'timer'
   | 'score'
   | 'status'
+  | 'noticeStart'
+  | 'noticeLeft'
   | 'setDuration'
   | 'dur30'
   | 'dur60'
@@ -35,6 +37,8 @@ export const strings: GameStrings<DotsKey> = {
     timer: '{s}',
     score: '{nick}: {score}',
     status: 'Осталось {time}',
+    noticeStart: 'Собирай звёзды!',
+    noticeLeft: 'Осталось {s} с',
     setDuration: 'Длительность',
     dur30: '30 с',
     dur60: '60 с',
@@ -57,6 +61,8 @@ export const strings: GameStrings<DotsKey> = {
     timer: '{s}',
     score: '{nick}: {score}',
     status: '{time} left',
+    noticeStart: 'Grab the stars!',
+    noticeLeft: '{s} s left',
     setDuration: 'Duration',
     dur30: '30 s',
     dur60: '60 s',

@@ -50,6 +50,8 @@ export const ROOM_CODE_LEN = 4;
 export const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const WS_MAX_PAYLOAD_BYTES = 16 * 1024;
 export const TOKEN_BYTES = 16;
+/** Сервер проверяет соединения: не ответил на ping за столько — отключён (закрытая вкладка телефона). */
+export const HEARTBEAT_S = 5;
 /** Паузы между попытками переподключения, с. Последняя повторяется. */
 export const RECONNECT_DELAYS_S = [0.5, 1, 2, 4] as const;
 /** Соотношение сторон поля по умолчанию, пока игра не задала своё (16:9). */
@@ -84,7 +86,7 @@ export const UI_SOUND_VOLUME = 0.5;
 export const TILT_FULL_DEG = { low: 35, mid: 22, high: 14 } as const; // по умолчанию mid
 export const TILT_DEADZONE_DEG = 3;
 export const TILT_LOWPASS_K = 0.18; // s = s + K * (raw - s)
-export const INPUT_SEND_HZ = 30; // и только при заметном изменении
+export const INPUT_SEND_HZ = 60; // и только при заметном изменении (было 30 — заказчик: задержка джойстика)
 export const BUTTON_MIN_PX = 96;
 export const BUTTON_PRESS_SCALE = 0.94;
 export const VIBRATE_TAP_MS = 10;
@@ -138,3 +140,7 @@ export const LOADING_CAPTION_S = 3; // дольше — подпись «Заг�
 // Ошибки и связь (§15)
 export const SERVER_DOWN_AFTER_S = 3; // столько без связи — «Телефоны сейчас недоступны»
 export const TOAST_MS = 3500;
+
+// Игровой интерфейс (§16, «Интерфейс матча»): уведомление в игре появляется и само уходит
+export const NOTICE_S = 2.5; // столько видно целиком
+export const NOTICE_FADE_S = 0.3; // появление и исчезновение

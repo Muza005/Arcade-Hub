@@ -46,6 +46,8 @@ export interface RoomClient {
   inputOf(playerId: string): InputState;
   leaderId(): string | null;
   send(playerId: string, msg: ScreenToPhone): void;
+  /** Убрать отключённого игрока (id = id слота строкой). */
+  remove(playerId: string): void;
   /** Убрать всех игроков: телефоны получают «вас убрали», места освобождаются. */
   removeAll(): void;
   /** Новая комната с новым кодом; старые телефоны получают «вас убрали». */
@@ -193,6 +195,13 @@ export function connectRoom(): RoomClient {
       case 'cmd': {
         const slot = state.bySid(from);
         if (!slot) return;
+        if (msg.cmd === 'claim') {
+          if (typeof msg.target === 'number' && state.claim(from, msg.target)) {
+            syncPhones();
+            changed();
+          }
+          return;
+        }
         if (msg.cmd === 'handoff') {
           if (typeof msg.target === 'number' && state.handoff(from, msg.target)) {
             syncPhones();
@@ -290,6 +299,12 @@ export function connectRoom(): RoomClient {
     },
     sendEach: (make) => {
       for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, make(String(slot.id)));
+    },
+    remove(playerId) {
+      if (state.remove(Number(playerId))) {
+        syncPhones();
+        changed();
+      }
     },
     removeAll() {
       send({ t: 'to', to: '*', msg: { t: 'err', code: 'removed' } });

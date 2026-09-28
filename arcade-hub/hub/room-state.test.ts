@@ -86,6 +86,42 @@ describe('autoHandoff', () => {
   });
 });
 
+describe('повторный вход без токена', () => {
+  it('«Это я»: новый слот исчезает, телефон возвращается на старое место', () => {
+    const room = make();
+    const a = room.join('c1');
+    if ('error' in a) throw new Error();
+    room.profile('c1', 'Мурад', 'yellow');
+    room.leave('c1');
+    const fresh = room.join('c2'); // потерял токен — вошёл как новый
+    if ('error' in fresh) throw new Error();
+    const back = room.claim('c2', a.slot.id);
+    expect(back).toMatchObject({ id: a.slot.id, nick: 'Мурад', cid: 'c2' });
+    expect(room.size).toBe(1);
+    expect(room.isLeader(back!)).toBe(true);
+  });
+
+  it('занять место, где кто-то на связи, нельзя', () => {
+    const room = make();
+    const a = room.join('c1');
+    room.join('c2');
+    if ('error' in a) throw new Error();
+    expect(room.claim('c2', a.slot.id)).toBeUndefined();
+  });
+
+  it('убрать можно только отключённого', () => {
+    const room = make();
+    const a = room.join('c1');
+    const b = room.join('c2');
+    if ('error' in a || 'error' in b) throw new Error();
+    expect(room.remove(a.slot.id)).toBe(false);
+    room.leave('c1');
+    expect(room.remove(a.slot.id)).toBe(true);
+    expect(room.size).toBe(1);
+    expect(room.isLeader(b.slot)).toBe(true);
+  });
+});
+
 it('cleanNick', () => {
   expect(cleanNick('  Очень  длинный ник ')).toBe('Очень дл');
   expect(cleanNick('   ')).toBe('');

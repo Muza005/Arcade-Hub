@@ -13,6 +13,8 @@ export const en: Dictionary = {
   'ctrl.full': 'The room is full',
   'ctrl.removed': 'You were removed from the room — join again with the QR code',
   'ctrl.unsupported': 'Open the link in Safari or Chrome',
+  'ctrl.claimTitle': 'Played already?',
+  'ctrl.claimNew': 'I’m a new player',
   'ctrl.reconnecting': 'Connection lost — reconnecting',
   'ctrl.room': 'Room {code}',
   'ctrl.nick': 'Nickname',
@@ -61,6 +63,7 @@ export const en: Dictionary = {
   'menu.inRoom': '{n} in the room',
   'menu.leader': 'Host',
   'menu.offline': 'Disconnected',
+  'menu.remove': 'Remove {nick}',
 
   'badge.daily': 'Daily best',
   'badge.needMore': '{n} more needed',
@@ -87,6 +90,7 @@ export const en: Dictionary = {
   'pause.title': 'PAUSED',
   'pause.by': 'Paused · {nick}',
   'pause.hint': 'Resume or end the match from the host’s phone',
+  'pause.rejoin': 'Dropped out? Scan to get back in',
 
   'lobby.back': 'Back',
   'lobby.start': 'Start',

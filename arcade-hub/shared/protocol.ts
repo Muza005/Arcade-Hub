@@ -9,7 +9,7 @@ export type GamePayload = Record<string, unknown>;
 export type Role = 'leader' | 'guest';
 
 /** Команды ведущего. */
-export type LeaderCommand = 'start' | 'pause' | 'resume' | 'end' | 'again' | 'back' | 'select' | 'handoff';
+export type LeaderCommand = 'start' | 'pause' | 'resume' | 'end' | 'again' | 'back' | 'select' | 'handoff' | 'claim';
 
 /** Вид управления на телефоне (§10). */
 export type ControlMode = 'arrows' | 'gyro' | 'joystick';
@@ -106,7 +106,8 @@ export interface LobbyMsg {
 
 // ─── Ведущий → экран ──────────────────────────────────────────────
 
-/** Кнопки ведущего. `target` — id слота для `handoff` (передать ведущего). */
+/** Кнопки ведущего. `target` — id слота для `handoff` (передать ведущего).
+ *  `claim` + `target` (любой игрок): «Это я» — вернуться на своё старое место, если телефон вошёл как новый. */
 export interface CmdMsg {
   t: 'cmd';
   cmd: LeaderCommand;

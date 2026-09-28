@@ -73,6 +73,12 @@ const errorScreen = el('div', 'screen');
 const errorText = el('p', 'title');
 errorScreen.append(errorText);
 
+// «Вы уже играли?»: телефон вошёл без токена, а в комнате есть отключённые — можно вернуться на своё место.
+const claimScreen = el('div', 'screen claim');
+const claimList = el('div', 'claim__list');
+const claimNew = button('btn btn--ghost', t('ctrl.claimNew'));
+claimScreen.append(el('h1', 'title', t('ctrl.claimTitle')), claimList, claimNew);
+
 const readyScreen = el('div', 'screen ready');
 const readyBtn = button('ready__btn', t('ctrl.ready'));
 readyScreen.append(readyBtn);
@@ -137,10 +143,11 @@ const flash = el('div', 'flash');
 const banner = el('div', 'banner', t('ctrl.reconnecting'));
 banner.hidden = true;
 
-type Screen = 'code' | 'connecting' | 'ready' | 'pad' | 'error';
+type Screen = 'code' | 'connecting' | 'claim' | 'ready' | 'pad' | 'error';
 const screens: Record<Screen, HTMLElement> = {
   code: codeForm,
   connecting: connectingScreen,
+  claim: claimScreen,
   ready: readyScreen,
   pad: pad.el,
   error: errorScreen,
@@ -250,6 +257,30 @@ function join(): void {
   send(unsupported ? { ...base, unsupported: true } : base);
 }
 
+function showClaim(offline: SlotMsg['roster'], stored: ReturnType<typeof loadProfile>): void {
+  claimList.replaceChildren(
+    ...offline.map((p) => {
+      const b = button('claim__player');
+      const avatar = el('span', 'plate__avatar', p.nick.slice(0, 1).toUpperCase());
+      avatar.style.background = p.color;
+      b.append(avatar, el('span', '', p.nick));
+      b.addEventListener('click', () => {
+        // Экран пришлёт слот старого места — с ним и продолжим.
+        send({ t: 'cmd', cmd: 'claim', target: p.id });
+        show('connecting');
+      });
+      return b;
+    }),
+  );
+  claimNew.onclick = () => {
+    if (stored && slot && (stored.nick !== slot.nick || stored.color !== slot.color)) {
+      send({ t: 'profile', nick: stored.nick, color: stored.color });
+    }
+    show(ready ? 'pad' : 'ready');
+  };
+  show('claim');
+}
+
 function playFlash(color: string): void {
   flash.style.setProperty('--flash', color);
   flash.classList.remove('is-on');
@@ -263,6 +294,12 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       slot = msg;
       saveSession({ room, token: msg.token });
       const stored = loadProfile();
+      const offline = msg.roster.filter((p) => !p.online && p.id !== msg.id);
+      if (freshJoin && offline.length > 0 && !unsupported) {
+        freshJoin = false;
+        showClaim(offline, stored);
+        return;
+      }
       if (freshJoin && stored && (stored.nick !== msg.nick || stored.color !== msg.color)) {
         send({ t: 'profile', nick: stored.nick, color: stored.color });
       } else {
@@ -275,6 +312,8 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
         // В комнате виден (значок на экране), но играть просим из нормального браузера.
         errorText.textContent = t('ctrl.unsupported');
         show('error');
+      } else if (screen === 'claim') {
+        // Ждём выбора «Это я» / «Я новый игрок»; обновления комнаты его не сбивают.
       } else if (screen === 'connecting') show(ready ? 'pad' : 'ready');
       else render();
       return;
