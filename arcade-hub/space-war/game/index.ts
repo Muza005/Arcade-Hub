@@ -1,8 +1,9 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
-// Этап Б0: пустое поле на весь экран и счётчик FPS в углу. Корабли, камни и волны — следующие этапы.
+// Б0: поле на весь экран и счётчик FPS. Б1: корабли. Камни, стрельба и волны — следующие этапы.
 import { Graphics, Text } from 'pixi.js';
+import { IDLE_INPUT } from '../../engine/input';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
-import { rankByScore, type GameContext, type GameModule } from '../../shared/game-manifest';
+import { rankByScore, type GameContext, type GameModule, type GamePlayer } from '../../shared/game-manifest';
 import { createTranslator } from '../../shared/i18n';
 import {
   ACCENT,
@@ -14,15 +15,20 @@ import {
   FPS_FONT_PX,
   FPS_PAD_PX,
   FPS_SAMPLE_S,
+  NICK_FONT_PX,
   WORLD_H,
   worldWidth,
 } from '../config';
 import { spaceWarManifest } from '../manifest';
 import { strings } from '../i18n/strings';
+import { createShipView, type ShipView } from '../render/ship-view';
+import { angleDelta } from './ship';
+import { createSim, type Sim } from './sim';
 
 const t = createTranslator(strings);
 
 const FONT_DISPLAY = 'Unbounded';
+const FONT_UI = 'Golos Text';
 const FONT_FALLBACK = 'sans-serif';
 const MS_PER_S = 1000;
 
@@ -30,6 +36,11 @@ export function createSpaceWarGame(): GameModule {
   let ctx: GameContext;
   let stage: Stage;
   let ended = false;
+  let paused = false;
+  let sim: Sim;
+  /** Боты — этап Б6; до тех пор без ввода. */
+  let bots = new Set<string>();
+  const views = new Map<string, ShipView>();
   let fpsText: Text;
   /** FPS считается по кадрам отрисовки: это замер производительности, не симуляция. */
   let frames = 0;
@@ -51,7 +62,12 @@ export function createSpaceWarGame(): GameModule {
     async init(context) {
       ctx = context;
       const worldW = worldWidth(ctx.aspect);
-      await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`]);
+      bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
+      sim = createSim(
+        ctx.players.map((p) => p.id),
+        worldW,
+      );
+      await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`, `600 ${NICK_FONT_PX}px "${FONT_UI}"`]);
       stage = await createStage(ctx.mount, worldW, WORLD_H, { background: cssVar('--bg') });
 
       const field = new Graphics()
@@ -66,15 +82,33 @@ export function createSpaceWarGame(): GameModule {
       fpsText.anchor.set(1, 0);
       fpsText.position.set(worldW - FIELD_INSET - FPS_PAD_PX, FIELD_INSET + FPS_PAD_PX);
 
-      stage.world.addChild(field, fpsText);
+      stage.world.addChild(field);
+      const textColor = cssVar('--text');
+      for (const player of ctx.players) {
+        const view = createShipView(textColor);
+        view.paint(player.color, player.nick);
+        view.setBounds(sim.bounds);
+        views.set(player.id, view);
+        stage.world.addChild(view.node);
+      }
+      stage.world.addChild(fpsText);
       sampleStart = performance.now();
     },
 
-    update() {
-      // Симуляции пока нет (этап Б1 — корабль).
+    update(dtS) {
+      if (paused || ended) return;
+      sim.step(dtS, (id) => (bots.has(id) ? IDLE_INPUT : ctx.input.read(id)));
     },
 
-    render() {
+    render(alpha) {
+      for (const ship of sim.ships) {
+        views.get(ship.id)?.set(
+          ship.prev.x + (ship.pos.x - ship.prev.x) * alpha,
+          ship.prev.y + (ship.pos.y - ship.prev.y) * alpha,
+          ship.prevAngle + angleDelta(ship.prevAngle, ship.angle) * alpha,
+          ship.thrust,
+        );
+      }
       frames++;
       const now = performance.now();
       const elapsedS = (now - sampleStart) / MS_PER_S;
@@ -87,10 +121,11 @@ export function createSpaceWarGame(): GameModule {
     },
 
     pause() {
-      // Замирать пока нечему.
+      paused = true;
     },
 
     resume() {
+      paused = false;
       frames = 0;
       sampleStart = performance.now();
     },
@@ -99,8 +134,13 @@ export function createSpaceWarGame(): GameModule {
       endMatch();
     },
 
+    updatePlayer(player: GamePlayer) {
+      views.get(player.id)?.paint(player.color, player.nick);
+    },
+
     dispose() {
       stage?.destroy();
+      views.clear();
     },
   };
 }

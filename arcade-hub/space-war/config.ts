@@ -31,9 +31,29 @@ export const SHIP_DRAG = 3; // TUNE: 1/с — отпустил управлен�
 export const SHIP_MAX_SPEED = 620; // TUNE: px/с
 /** Хитбокс — окружность, одинаковая у всех форм корпуса. */
 export const SHIP_HITBOX_RADIUS = 22; // TUNE
+/** От стены корабль держится на длину корпуса: нос не заходит за рамку поля. */
+export const SHIP_WALL_MARGIN = 36; // корпус (SHIP_SIZE) + свечение
+/** Корабль поворачивается носом по скорости: не быстрее этого и только когда реально летит. */
+export const SHIP_TURN_RATE = 10; // TUNE: рад/с
+export const SHIP_FACE_MIN_SPEED = 40; // TUNE: px/с
+/** Старт: корабли по кругу вокруг центра поля. */
+export const SPAWN_RING_RADIUS = 240;
 export const SHIP_LIVES = 5;
 export const DISCONNECT_INVULN_S = 2;
 export const KEYBOARD_MAX = 2;
+
+// Вид корабля: неоновый контур в цвет игрока, ник над ним, язычок тяги
+export const SHIP_SIZE = 28; // от центра до носа, px
+export const SHIP_TAIL_K = 0.7; // корма уже носа
+export const SHIP_LINE_PX = 3;
+export const SHIP_GLOW_PX = 10; // широкий полупрозрачный контур под основным — мягкое свечение
+export const SHIP_GLOW_ALPHA = 0.22;
+export const FLAME_LENGTH = 22; // при полной тяге
+export const FLAME_WIDTH_K = 0.45;
+export const FLAME_ALPHA = 0.8;
+export const NICK_FONT_PX = 20;
+export const NICK_GAP_PX = 16;
+export const NICK_ALPHA = 0.85;
 
 // ─── Обратная связь на телефон ───────────────────────────────────
 export const VIBRATE_HIT_MS = 40;
@@ -53,7 +73,7 @@ export const MULT_MAX = 5;
 export const MULT_STEPS = [3, 5, 8, 12] as const; // сближений до ×2, ×3, ×4, ×5 (всего 28)
 export const NEAR_MISS_COOLDOWN_S = 0.5;
 export const NEAR_MISS_DISTANCE = 60; // TUNE: зазор между хитбоксами, px
-export const MULT_IDLE_RESET_S = 3; // TUNE: SPACE_WAR_SPEC §14 п. 3 — уточнить до Б3
+export const MULT_IDLE_RESET_S = 3; // заказчик: 3 с, проверить в игре (SPACE_WAR_SPEC §14 п. 3)
 
 // ─── Очки ────────────────────────────────────────────────────────
 export const SCORE_WAVE = 100; // × номер волны, без множителя
