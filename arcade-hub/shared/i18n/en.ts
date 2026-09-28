@@ -159,6 +159,7 @@ export const en: Dictionary = {
   'set.resetSure': 'Reset everything?',
   'set.yes': 'Yes',
   'set.no': 'No',
+  'set.version': 'Version {v}',
   'set.percent': '{n}%',
   'lang.ru': 'Русский',
   'lang.en': 'English',

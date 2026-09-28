@@ -17,9 +17,9 @@ const TYPES: Record<string, string> = {
   '.woff2': 'font/woff2',
 };
 
-/** Файлы в assets/ с хешем в имени — кешируются навсегда; html — всегда свежий. */
+/** Файлы в assets/ с хешем в имени — кешируются навсегда; html не хранится вовсе — после деплоя всегда новый. */
 const IMMUTABLE = 'public, max-age=31536000, immutable';
-const NO_CACHE = 'no-cache';
+const NO_CACHE = 'no-store';
 const HTTP_OK = 200;
 const HTTP_NOT_FOUND = 404;
 const HTTP_BAD_METHOD = 405;

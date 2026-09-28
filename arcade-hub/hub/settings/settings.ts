@@ -5,6 +5,7 @@ import { LANGS, t, type I18nKey, type Lang } from '../../shared/i18n';
 import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
+import { APP_VERSION } from '../../shared/version';
 
 export interface SettingsScreenOptions {
   get(): HubSettings;
@@ -189,6 +190,7 @@ export function createSettingsScreen(options: SettingsScreenOptions): SettingsSc
         ),
         section(ICONS.refresh, 'set.reset', reset),
       ),
+      h('p', { class: 'hs__version' }, t('set.version', { v: APP_VERSION })),
     );
     const again = focusKey ? el.querySelector<HTMLElement>(`[data-focus-key="${CSS.escape(focusKey)}"]`) : null;
     (again ?? el.querySelector<HTMLElement>('[data-focus-key="back"]'))?.focus();

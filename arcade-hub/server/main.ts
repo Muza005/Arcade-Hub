@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { attachRelay } from './vite-plugin';
 import { createStatic } from './static';
+import { APP_VERSION } from '../shared/version';
 
 const DEFAULT_PORT = 8080;
 const HTTP_OK = 200;
@@ -15,7 +16,7 @@ const serveStatic = createStatic(siteRoot);
 
 const server = createServer((req, res) => {
   if (req.url === '/health') {
-    res.writeHead(HTTP_OK, { 'content-type': 'text/plain' }).end('ok');
+    res.writeHead(HTTP_OK, { 'content-type': 'text/plain', 'cache-control': 'no-store' }).end(`ok ${APP_VERSION}`);
     return;
   }
   serveStatic(req, res).catch(() => res.destroy());

@@ -17,6 +17,12 @@
   gap: var(--space-4);
 }
 
+.hs__version {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+
 .hs__head .rv__back {
   background: var(--surface);
 }

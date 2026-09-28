@@ -160,6 +160,7 @@ export const ru = {
   'set.yes': 'Да',
   'set.no': 'Нет',
   'set.percent': '{n} %',
+  'set.version': 'Версия {v}',
   'lang.ru': 'Русский',
   'lang.en': 'English',
 
