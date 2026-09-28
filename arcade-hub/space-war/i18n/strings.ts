@@ -16,6 +16,7 @@ export type SpaceWarKey =
   | 'warning'
   | 'fps'
   | 'colTime'
+  | 'colScore'
   | 'time';
 
 export const strings: GameStrings<SpaceWarKey> = {
@@ -34,6 +35,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     warning: 'Корабль в игре — его могут сбить',
     fps: '{n} FPS',
     colTime: 'Продержался',
+    colScore: 'Очки',
     time: '{m}:{s}',
   },
   en: {
@@ -51,6 +53,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     warning: 'Your ship is in play — it can be shot down',
     fps: '{n} FPS',
     colTime: 'Survived',
+    colScore: 'Score',
     time: '{m}:{s}',
   },
 };

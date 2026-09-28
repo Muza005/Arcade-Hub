@@ -145,6 +145,7 @@ export function createPad(cb: PadCallbacks): Pad {
 
   // ─── Главная кнопка ───
   let mainPointer: number | null = null;
+  let lastValue: number | undefined;
   main.addEventListener('pointerdown', (e) => {
     mainPointer = e.pointerId;
     main.setPointerCapture(e.pointerId);
@@ -202,7 +203,16 @@ export function createPad(cb: PadCallbacks): Pad {
       plateNick.textContent = nick;
     },
     setMainButton(state) {
-      mainValue.textContent = state?.value === undefined ? '' : String(state.value);
+      const value = state?.value;
+      // Число выросло (например, добавился патрон) — короткая вспышка кольца; на нуле кнопка серая.
+      if (value !== undefined && lastValue !== undefined && value > lastValue) {
+        main.classList.remove('is-flash');
+        void main.offsetWidth;
+        main.classList.add('is-flash');
+      }
+      lastValue = value;
+      main.classList.toggle('is-empty', value === 0);
+      mainValue.textContent = value === undefined ? '' : String(value);
       const progress = state?.progress;
       main.classList.toggle('has-ring', progress !== undefined);
       main.style.setProperty('--progress', String(progress ?? 1));

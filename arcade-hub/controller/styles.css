@@ -438,6 +438,12 @@ button {
   transition: opacity var(--dur-fast) var(--ease);
 }
 
+/* Число на кнопке дошло до нуля (например, патроны кончились) — кнопка серая. */
+.main-btn.is-empty {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
 /* Три сигнала нажатия: заливка белеет, кнопка сжимается, вспыхивает кольцо. */
 .main-btn.is-pressed {
   background: var(--text);

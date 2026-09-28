@@ -96,6 +96,24 @@ export const DEBRIS_LINE_PX = 2;
 export const DEBRIS_VFX_SEED = 0xdeb415; // осколки — только вид, своя случайность
 export const INVULN_ALPHA = 0.3; // мигание неуязвимого корабля
 export const DEBRIS_MAX = 200;
+// Три состояния камня по урону: целый, трещины, светящиеся разломы на последнем попадании
+export const CRACK_COLOR = '#6E62B8';
+export const CRACK_GLOW = '#FFB84D';
+export const CRACK_LINES = [2, 4] as const;
+export const CRACK_LINE_PX = 2;
+export const CRACK_GLOW_PX = 3;
+export const CHIP_COUNT = 3; // искры от попадания без раскола
+// Счёт в углу: кружок цвета игрока и число, по местам (как в «Точках»)
+export const HUD_ALPHA = 0.55;
+export const HUD_PAD_PX = 28;
+export const SCORE_FONT_PX = 26;
+export const SCORE_DOT_RADIUS = 11;
+export const SCORE_DOT_GAP_PX = 10;
+export const SCORE_GAP_PX = 26;
+export const HUD_POP_S = 0.45;
+export const HUD_POP_SCALE = 0.3;
+export const HUD_SLIDE_RATE = 10;
+
 // Жизни под кораблём
 export const LIVES_PIP_RADIUS = 4;
 export const LIVES_PIP_GAP = 5;
@@ -116,6 +134,14 @@ export const AMMO_MAX = 10;
 export const AMMO_BASE_S = 3;
 export const AMMO_MULT_K = 0.4;
 export const ASTEROID_HP = { small: 2, medium: [4, 5], large: 8 } as const;
+export const AMMO_START = 10; // TUNE: с чем начинается матч
+// Выстрел Power: снаряд летит с упреждением в ближайший камень на поле
+export const BULLET_SPEED = 1500; // TUNE: px/с
+export const BULLET_RADIUS = 5;
+export const BULLET_LIFE_S = 1.2;
+export const BULLETS_MAX = 120;
+export const BULLET_LENGTH = 18; // вид: чёрточка по направлению полёта
+export const BULLET_LINE_PX = 4;
 
 // ─── Множитель ───────────────────────────────────────────────────
 export const MULT_MAX = 5;
@@ -123,6 +149,20 @@ export const MULT_STEPS = [3, 5, 8, 12] as const; // сближений до ×2
 export const NEAR_MISS_COOLDOWN_S = 0.5;
 export const NEAR_MISS_DISTANCE = 60; // TUNE: зазор между хитбоксами, px
 export const MULT_IDLE_RESET_S = 3; // заказчик: 3 с, проверить в игре (SPACE_WAR_SPEC §14 п. 3)
+// Показ множителя (только большой экран): индекс — ступень ×1…×5
+export const MULT_HULL_ALPHA = [0.7, 0.85, 1, 1, 1] as const; // ×2 чуть ярче, ×3 заметно
+export const MULT_GLOW_ALPHA = [0.18, 0.2, 0.4, 0.5, 0.65] as const; // ×3 — мягкое свечение
+export const MULT_GLOW_PX = [10, 10, 14, 16, 20] as const;
+export const MULT_TRAIL_S = [0, 0, 0, 0.35, 0.6] as const; // ×4 — след, ×5 — длиннее
+export const MULT_SPARK_S = [0, 0, 0, 1, 1.75] as const; // искры гаснут ~1 с и 1,5–2 с
+export const MULT_SPARK_PER_S = [0, 0, 0, 22, 36] as const;
+export const SPARKS_MAX = 150; // общий лимит: при толпе лидеров следы короче, но не пропадают
+export const SPARK_SPEED = 40;
+export const SPARK_RADIUS = 2;
+export const TRAIL_LINE_PX = 6;
+export const TRAIL_ALPHA = 0.5;
+export const MULT_FONT_PX = 20;
+export const MULT_GAP_PX = 6;
 
 // ─── Очки ────────────────────────────────────────────────────────
 export const SCORE_WAVE = 100; // × номер волны, без множителя

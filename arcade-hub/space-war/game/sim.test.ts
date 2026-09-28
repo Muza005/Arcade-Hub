@@ -104,3 +104,41 @@ describe('жизни', () => {
     expect(sim.asteroids.some((a) => a.radius === ASTEROID_RADIUS[a.size])).toBe(true);
   });
 });
+
+describe('стрельба', () => {
+  const PRESS = { x: 0, y: 0, btn: true };
+
+  it('Power попадает в ближайший камень, патрон тратится, за разбитый — очки', () => {
+    const sim = createSim(['p'], W, 9);
+    const pilot = sim.pilots.get('p')!;
+    // Ставим один мелкий камень рядом и стреляем, пока не разобьём.
+    while (sim.asteroids.length === 0) sim.step(DT, () => IDLE);
+    const rock = sim.asteroids[0]!;
+    rock.pos.x = pilot.ship.pos.x + 300;
+    rock.pos.y = pilot.ship.pos.y;
+    rock.vel.x = rock.vel.y = 0;
+    rock.hp = 1;
+    const ammo = pilot.ammo;
+    sim.step(DT, () => PRESS);
+    expect(pilot.ammo).toBe(ammo - 1);
+    expect(sim.bullets).toHaveLength(1);
+    // Удерживание кнопки — не очередь: второй выстрел только по новому нажатию.
+    for (let i = 0; i < FIXED_STEP_HZ / 2; i++) sim.step(DT, () => PRESS);
+    expect(pilot.ammo).toBe(ammo - 1);
+    expect(sim.asteroids.some((a) => a.id === rock.id)).toBe(false);
+    expect(pilot.score).toBeGreaterThan(0);
+  });
+
+  it('патроны не бесконечны', () => {
+    const sim = createSim(['p'], W, 9);
+    const pilot = sim.pilots.get('p')!;
+    let shots = 0;
+    for (let i = 0; i < 10 * FIXED_STEP_HZ; i++) {
+      sim.step(DT, () => ({ x: 0, y: 0, btn: i % 2 === 0 }));
+      shots += sim.events.shots.length;
+      if (!pilot.alive) break;
+    }
+    // За 10 с: стартовые 10 и не больше ~4 накопленных.
+    expect(shots).toBeLessThanOrEqual(14);
+  });
+});
