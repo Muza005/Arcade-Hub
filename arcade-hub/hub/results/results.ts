@@ -14,8 +14,8 @@ export interface ResultsInput {
   result: MatchResult;
   players: readonly GamePlayer[];
   content: MatchResults | undefined;
-  /** Шаг 1: повтор на сцене игры. */
-  replay(): Promise<void>;
+  /** Шаг 1: повтор на сцене игры. Нет — итоги начинаются с наград (повтор выключен в настройках хаба). */
+  replay?: () => Promise<void>;
   beaten: { best: boolean; daily: boolean };
   accent: string;
 }
@@ -47,10 +47,12 @@ export function createResults(): Results {
         Promise.race([work, new Promise<void>((r) => (skip = r))]);
 
       // 1. Повтор конца матча — на сцене игры, под плашкой.
-      el.dataset.step = 'replay';
-      el.replaceChildren(h('span', { class: 'results__chip' }, t('results.replay')), skipButton);
-      skipButton.focus();
-      await skippable(input.replay());
+      if (input.replay) {
+        el.dataset.step = 'replay';
+        el.replaceChildren(h('span', { class: 'results__chip' }, t('results.replay')), skipButton);
+        skipButton.focus();
+        await skippable(input.replay());
+      }
 
       // 2. Именные награды — по одной.
       const awards = content?.awards ?? [];

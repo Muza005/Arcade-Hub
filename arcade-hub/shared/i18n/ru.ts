@@ -150,6 +150,7 @@ export const ru = {
   'set.shake': 'Тряска',
   'set.bloom': 'Свечение',
   'set.reducedMotion': 'Уменьшить движение',
+  'set.replay': 'Повтор конца матча',
   'set.language': 'Язык',
   'set.room': 'Комната',
   'set.changeCode': 'Сменить код комнаты',

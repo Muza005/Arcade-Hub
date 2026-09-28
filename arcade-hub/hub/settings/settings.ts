@@ -167,6 +167,7 @@ export function createSettingsScreen(options: SettingsScreenOptions): SettingsSc
           percentSlider('shake', 'set.shake'),
           percentSlider('bloom', 'set.bloom'),
           toggle('reducedMotion', 'set.reducedMotion', s.reducedMotion, () => patch({ reducedMotion: !s.reducedMotion })),
+          toggle('replay', 'set.replay', s.replay, () => patch({ replay: !s.replay })),
         ),
         section(
           ICONS.globe,

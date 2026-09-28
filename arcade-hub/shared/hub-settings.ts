@@ -20,6 +20,8 @@ export interface HubSettings {
   shake: number;
   bloom: number;
   reducedMotion: boolean;
+  /** Итоги начинаются с повтора последних секунд матча (§12). */
+  replay: boolean;
   lang: Lang;
 }
 
@@ -38,6 +40,7 @@ export const defaultHubSettings = (): HubSettings => ({
   shake: FULL,
   bloom: FULL,
   reducedMotion: false,
+  replay: true,
   lang: DEFAULT_LANG,
 });
 
@@ -60,6 +63,7 @@ export function sanitizeHubSettings(raw: unknown): HubSettings {
     shake: percent(s.shake, d.shake),
     bloom: percent(s.bloom, d.bloom),
     reducedMotion: typeof s.reducedMotion === 'boolean' ? s.reducedMotion : d.reducedMotion,
+    replay: typeof s.replay === 'boolean' ? s.replay : d.replay,
     lang: LANGS.includes(s.lang as Lang) ? (s.lang as Lang) : d.lang,
   };
 }

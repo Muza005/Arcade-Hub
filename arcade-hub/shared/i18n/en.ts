@@ -150,6 +150,7 @@ export const en: Dictionary = {
   'set.shake': 'Screen shake',
   'set.bloom': 'Glow',
   'set.reducedMotion': 'Reduce motion',
+  'set.replay': 'End-of-match replay',
   'set.language': 'Language',
   'set.room': 'Room',
   'set.changeCode': 'Change room code',

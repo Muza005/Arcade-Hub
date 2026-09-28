@@ -164,7 +164,7 @@ async function play(start: LobbyStart): Promise<void> {
       result,
       players,
       content: match.results(),
-      replay: () => match.replay(),
+      ...(hubSettings.replay ? { replay: () => match.replay() } : {}),
       beaten,
       accent: game.accent,
     });
