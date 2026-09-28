@@ -46,20 +46,26 @@ export function axisToDirection(x: number, y: number): Direction | null {
 export interface PhonesOptions {
   room: RoomClient;
   nav: { move(dir: Direction): void; select(): void; back(): void };
-  /** Пауза на большом экране: показать (ник поставившего) или убрать (null). */
-  showPause(nick: string | null): void;
+  /** Пауза на большом экране: показать (by — ник поставившего, пусто — с клавиатуры) или убрать. */
+  showPause(paused: boolean, by: string): void;
   nickOf(playerId: string): string;
 }
 
 export interface Phones {
   enterMenu(): void;
   enterGame(game: GameManifest, match: Match): void;
+  /** Пауза матча с клавиатуры или мыши (у ведущего телефона — своя кнопка). */
+  pause(by?: string): void;
+  resume(): void;
+  end(): void;
 }
 
 export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): Phones {
   let layout: ControllerLayout = MENU_LAYOUT;
   let match: Match | null = null;
-  let pausedBy: string | null = null;
+  let paused = false;
+  /** Кто поставил паузу; пусто — с клавиатуры. */
+  let pausedBy = '';
   /** Последний отправленный ободок по игрокам — шлём только заметные изменения. */
   const sentButton = new Map<string, string>();
 
@@ -69,7 +75,7 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
     return {
       t: 'st',
       alive: true,
-      paused: pausedBy !== null,
+      paused,
       layout,
       ...(mainButton ? { mainButton } : {}),
       ...(pausedBy ? { pausedBy } : {}),
@@ -109,26 +115,40 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
     prevBtn = input.btn;
   });
 
+  const pause = (by = ''): void => {
+    if (!match || match.paused) return;
+    match.pause();
+    paused = true;
+    pausedBy = by;
+    showPause(true, by);
+    broadcast();
+  };
+  const resume = (): void => {
+    if (!match?.paused) return;
+    match.resume();
+    paused = false;
+    pausedBy = '';
+    showPause(false, '');
+    broadcast();
+  };
+  const end = (): void => {
+    if (!match) return;
+    // Итоги открываются поверх: пауза с экрана уходит, счёт сохраняется.
+    paused = false;
+    pausedBy = '';
+    showPause(false, '');
+    match.finish();
+  };
+
   room.onCmd((playerId, msg, leader) => {
     if (!leader) return;
     if (layout.screen === 'menu') {
       if (msg.cmd === 'back' || msg.cmd === 'pause') nav.back();
       return;
     }
-    if (!match) return;
-    if (msg.cmd === 'pause' && !match.paused) {
-      match.pause();
-      pausedBy = nickOf(playerId);
-      showPause(pausedBy);
-      broadcast();
-    } else if (msg.cmd === 'resume' && match.paused) {
-      match.resume();
-      pausedBy = null;
-      showPause(null);
-      broadcast();
-    } else if (msg.cmd === 'end') {
-      match.finish();
-    }
+    if (msg.cmd === 'pause') pause(nickOf(playerId));
+    else if (msg.cmd === 'resume') resume();
+    else if (msg.cmd === 'end') end();
   });
 
   // Раз в секунду — всем; чаще — только тем, у кого заметно сдвинулся ободок главной кнопки.
@@ -151,8 +171,9 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
     enterMenu() {
       layout = MENU_LAYOUT;
       match = null;
-      pausedBy = null;
-      showPause(null);
+      paused = false;
+      pausedBy = '';
+      showPause(false, '');
       sentButton.clear();
       broadcast();
     },
@@ -163,6 +184,9 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
       stopRepeat();
       broadcast();
     },
+    pause,
+    resume,
+    end,
   };
 }
 

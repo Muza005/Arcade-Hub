@@ -13,6 +13,8 @@ export interface Replay {
   daily: boolean;
   mode: string;
   settings: Record<string, LobbyValue>;
+  /** Соотношение сторон мира матча (ctx.aspect); в старых записях нет — 16:9. */
+  aspect?: number;
   players: Array<{ id: string; nick: string; color: string; kind: string }>;
   inputs: InputEvent[];
 }

@@ -151,6 +151,9 @@ export interface GameContext {
   input: { read(playerId: string): InputState };
   /** Элемент, внутри которого игра рисует. Занимает весь экран. */
   mount: HTMLElement;
+  /** Соотношение сторон экрана на старте матча (ширина / высота, в пределах ASPECT_RANGE).
+   *  Игра может растянуть мир по ширине под экран; в записи матча оно сохраняется. */
+  aspect: number;
   /** Сообщить конец матча. После этого платформа вызовет dispose(). */
   end(result: MatchResult): void;
   /** Вибрация и вспышка на телефоне игрока (клавиатурным игрокам — ничего). */
@@ -173,6 +176,8 @@ export interface GameModule {
   mainButton?(playerId: string): MainButtonState | undefined;
   /** Строка состояния матча для окна паузы («Осталось 0:42»). */
   status?(): string;
+  /** Игрок сменил ник или цвет посреди матча (настройки телефона) — перерисовать его. */
+  updatePlayer?(player: GamePlayer): void;
   /** Шаг 1 итогов: короткий повтор конца матча на своей сцене. Вызывается после end, до dispose. */
   replay?(): Promise<void>;
   /** Шаги 2–3 итогов: награды и строки таблицы. */

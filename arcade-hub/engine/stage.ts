@@ -1,6 +1,8 @@
 // Сцена игры на PixiJS: мир фиксированного размера, вписанный в экран с полями.
 // Игра рисует в координатах мира и не думает о размере окна.
 import { Application, Container } from 'pixi.js';
+import { QUALITY_MAX_RESOLUTION } from '../shared/config';
+import { readHubSettings } from '../shared/hub-settings';
 
 export interface Stage {
   readonly app: Application;
@@ -32,13 +34,15 @@ export interface StageOptions {
 
 export async function createStage(mount: HTMLElement, width: number, height: number, options: StageOptions = {}): Promise<Stage> {
   const app = new Application();
+  // «Качество графики» из настроек хаба: чёткость и сглаживание сцены.
+  const { quality } = readHubSettings();
   await app.init({
     resizeTo: mount,
     ...(options.background ? { background: options.background } : { backgroundAlpha: 0 }),
-    antialias: true,
+    antialias: quality !== 'low',
     autoStart: false,
     autoDensity: true,
-    resolution: window.devicePixelRatio,
+    resolution: Math.min(window.devicePixelRatio, QUALITY_MAX_RESOLUTION[quality]),
   });
   app.ticker.stop();
   mount.append(app.canvas);

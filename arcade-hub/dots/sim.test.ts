@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { InputState } from '../engine/input';
 import { createRng } from '../engine/rng';
-import { DASH_COOLDOWN_S, DOT_SPEED, FIELD } from './config';
+import { DASH_COOLDOWN_S, DOT_SPEED, FIELD, fieldFor, worldWidth } from './config';
 import { createSim } from './sim';
 
 const STEP = 1 / 60;
@@ -43,6 +43,16 @@ describe('Точки: симуляция', () => {
     const dot = sim.dots[0]!;
     expect(dot.pos.x).toBeGreaterThan(FIELD.left);
     expect(dot.pos.y).toBeGreaterThan(FIELD.top);
+  });
+
+  it('поле под широкий экран: точка доезжает до правого края шире 16:9', () => {
+    const field = fieldFor(worldWidth(21 / 9));
+    const sim = createSim(['a'], 1, { durationS: 5, dashEnabled: true, field });
+    for (let i = 0; i < 400; i++) sim.step(STEP, () => ({ x: 1, y: 0, btn: false }));
+    const dot = sim.dots[0]!;
+    expect(dot.pos.x).toBeGreaterThan(FIELD.right);
+    expect(dot.pos.x).toBeLessThanOrEqual(field.right);
+    for (const star of sim.stars) expect(star.x).toBeLessThanOrEqual(field.right);
   });
 
   it('рывок быстрее обычного движения и уходит на перезарядку', () => {

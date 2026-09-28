@@ -8,6 +8,7 @@ import {
   DOT_RADIUS,
   DOT_SPEED,
   FIELD,
+  type Field,
   SPAWN_RING_RADIUS,
   STAR_POINTS_SCORE,
   STAR_RADIUS,
@@ -36,9 +37,12 @@ export interface Dot {
 export interface SimOptions {
   durationS: number;
   dashEnabled: boolean;
+  /** Поле под экран матча; без него — FIELD (16:9). */
+  field?: Field;
 }
 
 export interface Sim {
+  readonly field: Field;
   readonly dots: readonly Dot[];
   readonly stars: readonly Vec[];
   readonly timeLeftS: number;
@@ -52,10 +56,10 @@ export interface Sim {
   step(dtS: number, read: (id: string) => InputState): void;
 }
 
-function randomStar(rng: Rng): Vec {
+function randomStar(rng: Rng, field: Field): Vec {
   return {
-    x: rng.range(FIELD.left + STAR_RADIUS, FIELD.right - STAR_RADIUS),
-    y: rng.range(FIELD.top + STAR_RADIUS, FIELD.bottom - STAR_RADIUS),
+    x: rng.range(field.left + STAR_RADIUS, field.right - STAR_RADIUS),
+    y: rng.range(field.top + STAR_RADIUS, field.bottom - STAR_RADIUS),
   };
 }
 
@@ -65,7 +69,8 @@ function clamp(v: number, min: number, max: number): number {
 
 export function createSim(playerIds: readonly string[], seed: number, options: SimOptions): Sim {
   const rng = createRng(seed);
-  const center = { x: (FIELD.left + FIELD.right) / 2, y: (FIELD.top + FIELD.bottom) / 2 };
+  const field = options.field ?? FIELD;
+  const center = { x: (field.left + field.right) / 2, y: (field.top + field.bottom) / 2 };
 
   const dots: Dot[] = playerIds.map((id, i) => {
     const angle = (i / playerIds.length) * Math.PI * 2 - Math.PI / 2;
@@ -75,7 +80,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
   });
 
   const starCount = STARS_BASE + STARS_PER_PLAYER * playerIds.length;
-  const stars: Vec[] = Array.from({ length: starCount }, () => randomStar(rng));
+  const stars: Vec[] = Array.from({ length: starCount }, () => randomStar(rng, field));
 
   let timeLeftS = options.durationS;
   let over = false;
@@ -109,8 +114,8 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       vy = input.y * DOT_SPEED;
     }
 
-    dot.pos.x = clamp(dot.pos.x + vx * dtS, FIELD.left + DOT_RADIUS, FIELD.right - DOT_RADIUS);
-    dot.pos.y = clamp(dot.pos.y + vy * dtS, FIELD.top + DOT_RADIUS, FIELD.bottom - DOT_RADIUS);
+    dot.pos.x = clamp(dot.pos.x + vx * dtS, field.left + DOT_RADIUS, field.right - DOT_RADIUS);
+    dot.pos.y = clamp(dot.pos.y + vy * dtS, field.top + DOT_RADIUS, field.bottom - DOT_RADIUS);
   };
 
   const collect = (dot: Dot): void => {
@@ -119,13 +124,14 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       const star = stars[i] as Vec;
       if (Math.hypot(star.x - dot.pos.x, star.y - dot.pos.y) < reach) {
         dot.score += STAR_POINTS_SCORE;
-        stars[i] = randomStar(rng);
+        stars[i] = randomStar(rng, field);
         pickups.push(dot.id);
       }
     }
   };
 
   return {
+    field,
     dots,
     stars,
     get timeLeftS() {

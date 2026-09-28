@@ -4,7 +4,7 @@ import '../shared/ui/fonts';
 import './styles.css';
 import { createKeyboardSource, type InputSource } from '../engine/input';
 import { DEV_TEST_PHONE_KEY, SPLASH_MS } from '../shared/config';
-import type { GameManifest } from '../shared/game-manifest';
+import type { GameManifest, GamePlayer } from '../shared/game-manifest';
 import { GAMES } from '../shared/games';
 import { readHubSettings, writeHubSettings, type HubSettings } from '../shared/hub-settings';
 import { getLang, setLang, t } from '../shared/i18n';
@@ -13,7 +13,7 @@ import { randomSeed } from '../engine/rng';
 import { dailySeed, today } from '../shared/daily';
 import { recordMatch } from '../shared/records';
 import { saveReplay } from '../shared/replays';
-import { runGame } from './game-runner';
+import { runGame, type Match } from './game-runner';
 import { createResults, type ResultsChoice } from './results/results';
 import { createLobby, type LobbyStart } from './lobby/lobby';
 import { createMenu } from './menu/menu';
@@ -59,7 +59,7 @@ if (import.meta.env.DEV) {
 const gameMount = document.createElement('div');
 gameMount.className = 'game-mount';
 gameMount.hidden = true;
-const pause = createPauseOverlay();
+const pause = createPauseOverlay({ resume: () => phones?.resume(), end: () => phones?.end() });
 const results = createResults();
 
 const sounds = createUiSounds(soundEnabled());
@@ -69,6 +69,28 @@ applyHubSettings(hubSettings);
 
 let room: RoomClient | null = null;
 let phones: Phones | null = null;
+/** Идущий матч (до итогов) и его игроки: ник и цвет можно поменять с телефона прямо в игре. */
+let live: { match: Match; players: GamePlayer[] } | null = null;
+
+/** Телефон поменял профиль посреди матча — игра перерисовывает игрока, итоги и рекорды берут новое. */
+function syncLivePlayers(r: Room): void {
+  if (!live) return;
+  const current = live;
+  current.players = current.players.map((p) => {
+    const now = p.kind === 'phone' ? r.players.find((rp) => rp.id === p.id) : undefined;
+    if (!now || (now.nick === p.nick && now.color === p.color)) return p;
+    const next = { ...p, nick: now.nick, color: now.color };
+    current.match.updatePlayer(next);
+    return next;
+  });
+}
+
+// Esc в матче — пауза (игроки с клавиатуры без телефона ведущего). Продолжить — Esc или кнопка на экране.
+document.addEventListener('keydown', (e) => {
+  if (e.code !== 'Escape' || e.defaultPrevented || !live || live.match.paused) return;
+  e.preventDefault();
+  phones?.pause();
+});
 
 /** Источники ввода матча: телефоны — из комнаты, клавиатура — своя раскладка. Ботов ведёт сама игра. */
 function inputSources(start: LobbyStart): InputSource[] {
@@ -85,7 +107,8 @@ function inputSources(start: LobbyStart): InputSource[] {
 }
 
 async function play(start: LobbyStart): Promise<void> {
-  const { game, players, mode, settings, daily } = start;
+  const { game, mode, settings, daily } = start;
+  let players = start.players;
   lobby.hide();
   gameMount.hidden = false;
   sounds.music(false);
@@ -103,8 +126,12 @@ async function play(start: LobbyStart): Promise<void> {
       settings,
       fx: (playerId, fx) => room?.send(playerId, { t: 'fx', ...fx }),
     });
+    live = { match, players: [...players] };
+    if (room) syncLivePlayers(room.room);
     phones?.enterGame(game, match);
     const result = await match.result;
+    players = live.players;
+    live = null;
     // Итоги ведёт ведущий тем же контроллером, что и меню.
     phones?.enterMenu();
 
@@ -128,6 +155,7 @@ async function play(start: LobbyStart): Promise<void> {
       daily,
       mode,
       settings: { ...settings },
+      aspect: match.aspect,
       players: players.map(({ id, nick, color, kind }) => ({ id, nick, color, kind })),
       inputs: [...match.inputs],
     });
@@ -144,6 +172,7 @@ async function play(start: LobbyStart): Promise<void> {
   } catch (err) {
     // Игра не загрузилась (§15): окно игры с сообщением и «Повторить».
     console.error(err);
+    live = null;
     failed = true;
     for (const source of sources) source.dispose();
   }
@@ -241,6 +270,7 @@ if (fixtureRoom) {
   client.onChange((r) => {
     menu.setRoom(r);
     lobby.setRoom(r);
+    syncLivePlayers(r);
   });
   client.onJoin(() => {
     attract.poke();
@@ -252,7 +282,7 @@ if (fixtureRoom) {
   phones = connectPhones({
     room: client,
     nav: focus,
-    showPause: (nick) => pause.show(nick, client.room.code),
+    showPause: (paused, by) => pause.show(paused, by, client.room.code),
     nickOf: (id) => client.room.players.find((p) => p.id === id)?.nick ?? '',
   });
   if (import.meta.env.DEV) await enableTestPhones(() => client.room.code);

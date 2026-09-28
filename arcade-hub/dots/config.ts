@@ -5,7 +5,24 @@ export const WORLD_H = 1080;
 
 /** Поле — весь экран с тонким отступом; таймер и счёт лежат поверх, полупрозрачно. */
 export const FIELD_INSET = 16;
-export const FIELD = { left: FIELD_INSET, top: FIELD_INSET, right: WORLD_W - FIELD_INSET, bottom: WORLD_H - FIELD_INSET } as const;
+
+export interface Field {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+/** Мир по высоте всегда WORLD_H, по ширине — под экран (ctx.aspect): поле тянется до краёв. */
+export const worldWidth = (aspect: number): number => Math.round(WORLD_H * aspect);
+export const fieldFor = (worldW: number): Field => ({
+  left: FIELD_INSET,
+  top: FIELD_INSET,
+  right: worldW - FIELD_INSET,
+  bottom: WORLD_H - FIELD_INSET,
+});
+/** Поле экрана 16:9 — по умолчанию (тесты, записи без aspect). */
+export const FIELD = fieldFor(WORLD_W);
 export const FIELD_RADIUS = 28;
 
 export const MATCH_S_DEFAULT = 60;
@@ -42,12 +59,24 @@ export const FIELD_LINE_PX = 2;
 export const NICK_FONT_PX = 22;
 export const NICK_GAP_PX = 10;
 // Интерфейс поверх поля: мелко, по краям, не мешает игре
-export const HUD_ALPHA = 0.55;
+export const HUD_ALPHA = 0.55; // в покое; при событии — полностью видно
 export const HUD_PAD_PX = 28; // от края поля
 export const TIMER_FONT_PX = 30;
-export const SCORE_FONT_PX = 20;
-export const SCORE_GAP_PX = 28;
-export const SCORE_SWATCH_RADIUS = 7;
+export const TIMER_URGENT_S = 10; // последние секунды: таймер яркий и пульсирует
+// Счёт: кружок цвета игрока и число, по местам; лидер — в золотом ободке
+export const SCORE_FONT_PX = 28;
+export const SCORE_DOT_RADIUS = 12;
+export const SCORE_DOT_GAP_PX = 10;
+export const SCORE_GAP_PX = 26;
+export const LEADER_RING_GAP_PX = 4;
+export const LEADER_RING_PX = 3;
+export const HUD_POP_SCALE = 0.3; // +30 % в момент очка
+export const HUD_POP_S = 0.45;
+export const HUD_SLIDE_RATE = 10; // 1/с: как быстро фишки меняются местами
+// «+1» над игроком, собравшим звезду
+export const PLUS_FONT_PX = 30;
+export const PLUS_RISE_PX = 70;
+export const PLUS_S = 0.8;
 
 // Уведомления в игре (сами уходят через NOTICE_S платформы)
 export const NOTICE_FONT_PX = 34;

@@ -20,6 +20,7 @@ import type {
   ServerToHost,
   SlotMsg,
 } from '../shared/protocol';
+import { createDirectLinks } from './direct';
 import type { Room, RoomPlayer } from './room';
 import { RoomState, type SavedRoom, type Slot } from './room-state';
 
@@ -97,6 +98,8 @@ export function connectRoom(): RoomClient {
   if (saved) state.restore(saved);
 
   const inputs = new Map<string, InputState>();
+  /** Последний номер ввода по соединению: прямой канал может принести старый кадр позже нового. */
+  const lastSeq = new Map<string, number>();
   const changeListeners: Array<(room: Room) => void> = [];
   const joinListeners: Array<(player: RoomPlayer) => void> = [];
   const inputListeners: Array<(playerId: string, input: InputState) => void> = [];
@@ -160,8 +163,16 @@ export function connectRoom(): RoomClient {
     for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, slotMsg(slot));
   };
 
+  const direct = createDirectLinks({
+    signal: (cid, msg) => toPhone(cid, msg),
+    receive: (cid, msg) => onPhone({ t: 'from', from: cid, msg }),
+  });
+
   const onPhone = ({ from, msg }: FromMsg): void => {
     switch (msg.t) {
+      case 'rtc':
+        if (state.bySid(from)) direct.signal(from, msg);
+        return;
       case 'join': {
         const result = state.join(from, typeof msg.token === 'string' ? msg.token : undefined, msg.unsupported === true);
         if ('error' in result) {
@@ -186,6 +197,10 @@ export function connectRoom(): RoomClient {
       case 'in': {
         const slot = state.bySid(from);
         if (!slot) return;
+        if (typeof msg.n === 'number') {
+          if (msg.n <= (lastSeq.get(from) ?? -1)) return;
+          lastSeq.set(from, msg.n);
+        }
         const input = { x: Number(msg.x) || 0, y: Number(msg.y) || 0, btn: msg.btn === true };
         const id = String(slot.id);
         inputs.set(id, input);
@@ -242,6 +257,8 @@ export function connectRoom(): RoomClient {
       } else if (msg.t === 'from') {
         onPhone(msg);
       } else if (msg.t === 'gone') {
+        direct.close(msg.from);
+        lastSeq.delete(msg.from);
         const slot = state.leave(msg.from);
         if (slot) {
           inputs.delete(String(slot.id));
@@ -255,6 +272,8 @@ export function connectRoom(): RoomClient {
       // Пока сервера нет, телефоны считаются отключёнными; при возвращении они придут с токенами.
       for (const slot of state.connected()) if (slot.cid) state.leave(slot.cid);
       inputs.clear();
+      direct.closeAll();
+      lastSeq.clear();
       changed();
       // Короткий обрыв (перезапуск сервера) не пугаем: «недоступен» — только после SERVER_DOWN_AFTER_S.
       downTimer ??= setTimeout(() => setOnline(false), SERVER_DOWN_AFTER_S * MS_PER_S);
@@ -295,7 +314,8 @@ export function connectRoom(): RoomClient {
     },
     send: (playerId, msg) => {
       const cid = slotById(playerId)?.cid;
-      if (cid) toPhone(cid, msg);
+      // Вибрация и вспышка — напрямую, если есть канал: их задержку тоже чувствуешь.
+      if (cid && !(msg.t === 'fx' && direct.send(cid, msg))) toPhone(cid, msg);
     },
     sendEach: (make) => {
       for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, make(String(slot.id)));
@@ -309,12 +329,14 @@ export function connectRoom(): RoomClient {
     removeAll() {
       send({ t: 'to', to: '*', msg: { t: 'err', code: 'removed' } });
       inputs.clear();
+      direct.closeAll();
       state.restore({ code: state.code ?? '', nextId: 1, slots: [] });
       changed();
     },
     changeCode() {
       send({ t: 'to', to: '*', msg: { t: 'err', code: 'removed' } });
       inputs.clear();
+      direct.closeAll();
       state.restore({ code: '', nextId: 1, slots: [] });
       state.code = null;
       clearSaved();

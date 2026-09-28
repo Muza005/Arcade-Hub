@@ -27,7 +27,7 @@ export const dotsManifest: GameManifest = {
   controls: ['keyboard', 'phone-joystick', 'phone-gyro', 'phone-buttons'],
   modes: [{ id: 'ffa', title: 'modeFfa', description: 'modeFfaDesc', icon: modeFfaIcon }],
   status: 'available',
-  version: '1',
+  version: '2', // 2 — поле под ширину экрана
   load: async () => (await import('./game')).createDotsGame(),
   strings,
   controllerLayout: { mainButton: true },

@@ -56,6 +56,8 @@ export const HEARTBEAT_S = 5;
 export const RECONNECT_DELAYS_S = [0.5, 1, 2, 4] as const;
 /** Соотношение сторон поля по умолчанию, пока игра не задала своё (16:9). */
 export const DEFAULT_ASPECT = 16 / 9;
+/** Пределы соотношения сторон мира игры (ctx.aspect): уже 4:3 и шире 21:9 — поля по краям. */
+export const ASPECT_RANGE = { min: 4 / 3, max: 21 / 9 } as const;
 /** Экран шлёт телефонам состояние раз в столько секунд и на событиях (§17). */
 export const ST_INTERVAL_S = 1;
 /** Ободок главной кнопки отправляется, когда прогресс сдвинулся на столько. */
@@ -92,6 +94,10 @@ export const BUTTON_PRESS_SCALE = 0.94;
 export const VIBRATE_TAP_MS = 10;
 /** Изменение оси меньше этого не считается «заметным» и не отправляется. */
 export const INPUT_EPSILON = 0.02;
+// Прямой канал телефон ↔ экран (WebRTC): в одной сети ввод идёт мимо сервера — это и убирает задержку.
+// STUN нужен, чтобы найти путь, когда телефон и ноутбук за разными роутерами; не нашли — остаётся сервер.
+export const RTC_ICE_SERVERS: ReadonlyArray<{ urls: string }> = [{ urls: 'stun:stun.l.google.com:19302' }];
+export const INPUT_REFRESH_S = 0.1; // по прямому каналу текущее состояние повторяется: потерянное отпускание не залипнет
 /** Джойстик: доля радиуса для полного отклонения по чувствительности. */
 export const JOYSTICK_FULL = { low: 1, mid: 0.8, high: 0.6 } as const;
 export const JOYSTICK_DEADZONE = 0.08;
@@ -129,6 +135,9 @@ export const MENU_MUSIC_VOLUME = 0.3; // от громкости игр
 // Настройки хаба (§13)
 export const UI_SCALE_RANGE = { min: 90, max: 130, step: 10 } as const; // масштаб интерфейса, %
 export const PERCENT_STEP = 10; // шаг ползунков 0–100 %
+/** Качество графики (§13): предел чёткости сцены игры (доля от плотности пикселей экрана).
+ *  Низкое — ещё и без сглаживания: для слабых ноутбуков и больших телевизоров. */
+export const QUALITY_MAX_RESOLUTION = { auto: 2, low: 1, mid: 1.5, high: Number.POSITIVE_INFINITY } as const;
 export const MUSIC_FADE_MS = 600; // музыка меню уходит при запуске игры
 
 // Витрина и заставка (§5, §14)

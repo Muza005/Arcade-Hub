@@ -1,5 +1,6 @@
 // Единый менеджер фокуса хаба (ARCADE_HUB_SPEC §8).
-// Клавиатура, мышь и (позже) телефон ведущего ведут к одному фокусу. В каждый момент выделен ровно один элемент.
+// Клавиатура, мышь и телефон ведущего ведут к одному фокусу. Выделен не больше одного элемента:
+// выделение клавиатуры и джойстика стоит, пока его не сдвинут; выделение мыши уходит вместе с курсором.
 //
 // Область фокуса — открытое модальное окно, а если его нет — видимый экран с атрибутом data-focus-scope.
 // Во время матча области нет, и менеджер клавиши не трогает: они принадлежат игре.
@@ -64,6 +65,18 @@ export interface FocusManager {
 
 export function createFocusManager(sounds: UiSounds): FocusManager {
   let tabbing = false;
+  /** Элемент, выделенный наведением мыши: курсор ушёл в пустоту — выделение снимается. */
+  let mouseFocus: HTMLElement | null = null;
+  /** С него продолжит клавиатура или джойстик, если выделение сняла мышь. */
+  let resumeFrom: HTMLElement | null = null;
+
+  /** Куда встать, когда ничего не выделено: туда, где была мышь, иначе главное действие экрана. */
+  const startFocus = (scope: HTMLElement): HTMLElement | undefined => {
+    const last = resumeFrom;
+    resumeFrom = null;
+    if (last && scope.contains(last) && focusables(scope).includes(last)) return last;
+    return defaultFocus(scope);
+  };
 
   const moveTo = (el: HTMLElement): void => {
     if (el === document.activeElement) return;
@@ -79,9 +92,10 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
   const move = (dir: Direction): void => {
     const scope = currentScope();
     if (!scope) return;
+    mouseFocus = null;
     const active = activeIn(scope);
     if (!active) {
-      const target = defaultFocus(scope);
+      const target = startFocus(scope);
       if (target) moveTo(target);
       return;
     }
@@ -98,10 +112,11 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
   const select = (): void => {
     const scope = currentScope();
     if (!scope) return;
+    mouseFocus = null;
     const active = activeIn(scope);
     if (active) active.click();
     else {
-      const target = defaultFocus(scope);
+      const target = startFocus(scope);
       if (target) moveTo(target);
     }
   };
@@ -132,9 +147,10 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
     }
     if (SELECT_KEYS.has(e.code)) {
       // Кнопки нажимаются сами (родное поведение); без фокуса — сначала встаём на главное действие.
+      mouseFocus = null;
       if (!active) {
         e.preventDefault();
-        const target = defaultFocus(scope);
+        const target = startFocus(scope);
         if (target) moveTo(target);
       }
       return;
@@ -158,7 +174,22 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
     if (e.pointerType !== 'mouse' || (e.movementX === 0 && e.movementY === 0)) return;
     const scope = currentScope();
     const target = e.target instanceof Element ? e.target.closest<HTMLElement>(FOCUSABLE) : null;
-    if (scope && target && scope.contains(target)) moveTo(target);
+    if (scope && target && scope.contains(target)) {
+      moveTo(target);
+      mouseFocus = target;
+    }
+  };
+
+  // Мышь ушла с выделенного ею элемента в пустое место — элемент возвращается в покой.
+  // Клавиатура и джойстик выделяют статично: их выделение курсор не трогает.
+  const onPointerOut = (e: PointerEvent): void => {
+    const from = mouseFocus;
+    if (e.pointerType !== 'mouse' || !from || document.activeElement !== from) return;
+    const to = e.relatedTarget instanceof Element ? e.relatedTarget : null;
+    if (to && (from.contains(to) || to.closest(FOCUSABLE))) return;
+    mouseFocus = null;
+    resumeFrom = from;
+    from.blur();
   };
 
   // Клик по пустому месту не снимает фокус: выделен всегда ровно один элемент.
@@ -177,6 +208,7 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
   document.addEventListener('keydown', onKeyDown);
   document.addEventListener('focusin', onFocusIn);
   document.addEventListener('pointermove', onPointerMove);
+  document.addEventListener('pointerout', onPointerOut);
   document.addEventListener('mousedown', onMouseDown);
   document.addEventListener('click', onClick, true);
 
@@ -188,6 +220,7 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('focusin', onFocusIn);
       document.removeEventListener('pointermove', onPointerMove);
+      document.removeEventListener('pointerout', onPointerOut);
       document.removeEventListener('mousedown', onMouseDown);
       document.removeEventListener('click', onClick, true);
     },

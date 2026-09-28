@@ -89,7 +89,6 @@ export const en: Dictionary = {
 
   'pause.title': 'PAUSED',
   'pause.by': 'Paused · {nick}',
-  'pause.hint': 'Resume or end the match from the host’s phone',
   'pause.rejoin': 'Dropped out? Scan to get back in',
 
   'lobby.back': 'Back',

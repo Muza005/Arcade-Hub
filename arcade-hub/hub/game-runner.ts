@@ -13,6 +13,7 @@ import type {
   MatchSettings,
 } from '../shared/game-manifest';
 import type { MainButtonState } from '../shared/protocol';
+import { ASPECT_RANGE, DEFAULT_ASPECT } from '../shared/config';
 
 export interface LaunchOptions {
   players: readonly GamePlayer[];
@@ -22,6 +23,8 @@ export interface LaunchOptions {
   seed: number;
   mode?: string;
   settings?: MatchSettings;
+  /** Соотношение сторон мира; без него — по размеру mount. */
+  aspect?: number;
 }
 
 export interface Match {
@@ -30,6 +33,8 @@ export interface Match {
   /** Id игроков матча. */
   readonly players: readonly string[];
   readonly paused: boolean;
+  /** Соотношение сторон мира матча — для записи. */
+  readonly aspect: number;
   /** Записанный поток ввода (для записи матча). */
   readonly inputs: readonly InputEvent[];
   pause(): void;
@@ -38,6 +43,8 @@ export interface Match {
   finish(): void;
   mainButton(playerId: string): MainButtonState | undefined;
   status(): string | undefined;
+  /** Ник или цвет игрока поменялся посреди матча. */
+  updatePlayer(player: GamePlayer): void;
   /** Повтор конца матча (после конца, до dispose). Без повтора у игры — сразу. */
   replay(): Promise<void>;
   results(): MatchResults | undefined;
@@ -48,6 +55,8 @@ export interface Match {
 /** Загружает игру и запускает матч. Ошибка загрузки или init — исключение. */
 export async function runGame(manifest: GameManifest, mount: HTMLElement, options: LaunchOptions): Promise<Match> {
   const game: GameModule = await manifest.load();
+  const measured = mount.clientHeight > 0 ? mount.clientWidth / mount.clientHeight : DEFAULT_ASPECT;
+  const aspect = Math.min(ASPECT_RANGE.max, Math.max(ASPECT_RANGE.min, options.aspect ?? measured));
   const input = new InputHub();
   for (const source of options.sources) input.add(source);
   // Игра видит тот же округлённый ввод, что пишется в запись, — повтор совпадёт один в один.
@@ -87,6 +96,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
       seed: options.seed,
       input: { read: (id) => recorder.read(id) },
       mount,
+      aspect,
       fx: options.fx,
       end: (matchResult) => {
         if (over) return;
@@ -113,6 +123,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     get paused() {
       return paused;
     },
+    aspect,
     pause() {
       if (paused || over) return;
       paused = true;
@@ -128,6 +139,9 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     },
     mainButton: (playerId) => (over ? undefined : game.mainButton?.(playerId)),
     status: () => (over ? undefined : game.status?.()),
+    updatePlayer: (player) => {
+      if (!disposed) game.updatePlayer?.(player);
+    },
     replay: () => (disposed || !game.replay ? Promise.resolve() : game.replay()),
     results: () => (disposed ? undefined : game.results?.()),
     dispose,

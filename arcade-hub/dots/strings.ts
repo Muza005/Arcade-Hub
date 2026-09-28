@@ -10,10 +10,10 @@ export type DotsKey =
   | 'modeFfa'
   | 'modeFfaDesc'
   | 'timer'
-  | 'score'
   | 'status'
   | 'noticeStart'
   | 'noticeLeft'
+  | 'plus'
   | 'setDuration'
   | 'dur30'
   | 'dur60'
@@ -35,10 +35,10 @@ export const strings: GameStrings<DotsKey> = {
     modeFfa: 'Каждый за себя',
     modeFfaDesc: 'Больше звёзд — победа',
     timer: '{s}',
-    score: '{nick}: {score}',
     status: 'Осталось {time}',
     noticeStart: 'Собирай звёзды!',
     noticeLeft: 'Осталось {s} с',
+    plus: '+1',
     setDuration: 'Длительность',
     dur30: '30 с',
     dur60: '60 с',
@@ -59,10 +59,10 @@ export const strings: GameStrings<DotsKey> = {
     modeFfa: 'Free for all',
     modeFfaDesc: 'Most stars wins',
     timer: '{s}',
-    score: '{nick}: {score}',
     status: '{time} left',
     noticeStart: 'Grab the stars!',
     noticeLeft: '{s} s left',
+    plus: '+1',
     setDuration: 'Duration',
     dur30: '30 s',
     dur60: '60 s',

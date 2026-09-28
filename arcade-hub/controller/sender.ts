@@ -8,6 +8,8 @@ export interface InputSender {
   update(next: InputState): void;
   /** Отпустить всё (открыли настройки, пауза, потеря фокуса). */
   release(): void;
+  /** Повторить последнее отправленное состояние (канал без гарантии доставки). */
+  resend(): void;
 }
 
 export function createInputSender(
@@ -49,5 +51,11 @@ export function createInputSender(
     else timer = setTimeout(flush, wait);
   };
 
-  return { update, release: () => update({ x: 0, y: 0, btn: false }) };
+  return {
+    update,
+    release: () => update({ x: 0, y: 0, btn: false }),
+    resend: () => {
+      if (!timer) send({ ...sent });
+    },
+  };
 }

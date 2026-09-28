@@ -52,4 +52,13 @@ describe('createInputSender', () => {
     vi.runAllTimers();
     expect(sent.at(-1)).toEqual({ x: 0, y: 0, btn: false });
   });
+
+  it('повтор шлёт последнее отправленное состояние', () => {
+    const s = make();
+    s.update({ x: 0, y: 0, btn: true });
+    const before = sent.length;
+    s.resend();
+    expect(sent.length).toBe(before + 1);
+    expect(sent.at(-1)).toEqual({ x: 0, y: 0, btn: true });
+  });
 });

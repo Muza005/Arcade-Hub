@@ -85,9 +85,11 @@ export interface JoinMsg {
 
 // ─── Телефон → экран ──────────────────────────────────────────────
 
-/** Ввод, ~30 Гц. Не буферизуется и не пересылается повторно. */
+/** Ввод, ~60 Гц. Не буферизуется. По прямому каналу может потеряться или прийти не по порядку:
+ *  `n` — номер по возрастанию, экран отбрасывает устаревшие; телефон повторяет текущее состояние. */
 export interface InMsg extends InputState {
   t: 'in';
+  n?: number;
 }
 
 /** Изменение профиля игрока. */
@@ -184,6 +186,22 @@ export interface FxMsg {
 
 // ─── В обе стороны ────────────────────────────────────────────────
 
+/** Кандидат ICE — то же, что RTCIceCandidateInit, без зависимости от DOM. */
+export interface RtcIce {
+  candidate: string;
+  sdpMid?: string | null;
+  sdpMLineIndex?: number | null;
+  usernameFragment?: string | null;
+}
+
+/** Сигналинг прямого канала телефон ↔ экран (WebRTC) через сервер: предложение телефона, ответ экрана, кандидаты.
+ *  Прямой канал везёт только `in` и `fx`; всё остальное и запасной путь — через сервер. */
+export interface RtcMsg {
+  t: 'rtc';
+  sdp?: { type: 'offer' | 'answer'; sdp: string };
+  ice?: RtcIce;
+}
+
 /** Особые действия игры. */
 export interface GameMsg {
   t: 'g';
@@ -195,12 +213,12 @@ export interface GameMsg {
 export type HostToServer = HostMsg | ToMsg;
 export type ServerToHost = RoomMsg | FromMsg | GoneMsg;
 export type PhoneToServer = JoinMsg;
-export type PhoneToScreen = InMsg | ProfileMsg | LobbyMsg | CmdMsg | GameMsg;
-export type ScreenToPhone = SlotMsg | StMsg | FxMsg | GameMsg | ErrMsg;
+export type PhoneToScreen = InMsg | ProfileMsg | LobbyMsg | CmdMsg | GameMsg | RtcMsg;
+export type ScreenToPhone = SlotMsg | StMsg | FxMsg | GameMsg | ErrMsg | RtcMsg;
 export type ServerToPhone = ErrMsg | RejoinMsg;
 
 /** Типы, которые телефон может слать экрану через сервер. */
-export const PHONE_TO_SCREEN_TYPES: ReadonlySet<string> = new Set(['in', 'profile', 'lobby', 'cmd', 'g']);
+export const PHONE_TO_SCREEN_TYPES: ReadonlySet<string> = new Set(['in', 'profile', 'lobby', 'cmd', 'g', 'rtc']);
 
 export type Message = HostToServer | ServerToHost | PhoneToServer | PhoneToScreen | ScreenToPhone | ServerToPhone;
 export type MessageType = Message['t'];

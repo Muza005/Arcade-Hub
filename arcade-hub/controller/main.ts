@@ -1,11 +1,13 @@
 // Страница телефона (ARCADE_HUB_SPEC §8, §10): вход в комнату → «Готов играть» → контроллер.
 // Один контроллер на всё: в меню хаба джойстик ведущего ведёт выбор, в матче — управление игрой.
-// Только DOM, без canvas/WebGL и постоянного rAF; ввод — не чаще 30 Гц и только при изменении.
+// Только DOM, без canvas/WebGL и постоянного rAF; ввод — не чаще 60 Гц и только при изменении.
+// Ввод идёт прямым каналом к экрану (WebRTC), если он открылся; иначе — через сервер.
 import '@fontsource/golos-text/500.css';
 import '@fontsource/golos-text/600.css';
 import '@fontsource/unbounded/700.css';
 import './styles.css';
 import {
+  INPUT_REFRESH_S,
   RECONNECT_DELAYS_S,
   ROOM_CODE_ALPHABET,
   ROOM_CODE_LEN,
@@ -24,6 +26,7 @@ import type {
   SlotMsg,
   StMsg,
 } from '../shared/protocol';
+import { createDirectLink } from './direct';
 import { createGyro, requestGyroPermission } from './gyro';
 import { createPad } from './pad';
 import { loadPrefs, savePrefs, type Prefs } from './prefs';
@@ -83,7 +86,21 @@ const readyScreen = el('div', 'screen ready');
 const readyBtn = button('ready__btn', t('ctrl.ready'));
 readyScreen.append(readyBtn);
 
-const sender = createInputSender((state) => send({ t: 'in', ...state }));
+/** Прямой канал к экрану открывается заново на каждое соединение с сервером (у экрана новый id телефона). */
+const direct = createDirectLink({ signal: (msg) => send(msg), receive: (msg) => onMessage(msg) });
+let directFor: WebSocket | null = null;
+let inputSeq = 0;
+const sender = createInputSender((state) => {
+  const msg = { t: 'in' as const, ...state, n: inputSeq++ };
+  if (!direct.send(msg)) send(msg);
+});
+// Прямой канал без повторов: текущее состояние повторяем, чтобы потерянное отпускание не залипло.
+setInterval(() => {
+  const live = direct.live;
+  if (live) sender.resend();
+  // Путь ввода — для отладки и проверок: direct — напрямую к экрану, server — через сервер.
+  app.dataset.link = live ? 'direct' : 'server';
+}, INPUT_REFRESH_S * MS_PER_S);
 
 const pad = createPad({
   axes(x, y) {
@@ -292,6 +309,10 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
   switch (msg.t) {
     case 'slot': {
       slot = msg;
+      if (ws && directFor !== ws && !unsupported) {
+        directFor = ws;
+        direct.start();
+      }
       saveSession({ room, token: msg.token });
       const stored = loadProfile();
       const offline = msg.roster.filter((p) => !p.online && p.id !== msg.id);
@@ -337,7 +358,13 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
         show('error');
       }
       return;
+    case 'rtc':
+      direct.signal(msg);
+      return;
     case 'rejoin':
+      // Экран перезапустился — прямой канал к нему тоже заново.
+      directFor = null;
+      direct.close();
       join();
       return;
     default:
@@ -362,6 +389,8 @@ function connect(): void {
     }
   });
   ws.addEventListener('close', () => {
+    directFor = null;
+    direct.close();
     if (stopped) return;
     banner.hidden = slot === null;
     const delay = RECONNECT_DELAYS_S[Math.min(attempt, RECONNECT_DELAYS_S.length - 1)] ?? 1;
