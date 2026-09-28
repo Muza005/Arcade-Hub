@@ -14,7 +14,9 @@ export type SpaceWarKey =
   | 'modeTeams'
   | 'modeTeamsDesc'
   | 'warning'
-  | 'fps';
+  | 'fps'
+  | 'colTime'
+  | 'time';
 
 export const strings: GameStrings<SpaceWarKey> = {
   ru: {
@@ -31,6 +33,8 @@ export const strings: GameStrings<SpaceWarKey> = {
     modeTeamsDesc: 'Команда — это цвет',
     warning: 'Корабль в игре — его могут сбить',
     fps: '{n} FPS',
+    colTime: 'Продержался',
+    time: '{m}:{s}',
   },
   en: {
     title: 'Space War',
@@ -46,5 +50,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     modeTeamsDesc: 'Your colour is your team',
     warning: 'Your ship is in play — it can be shot down',
     fps: '{n} FPS',
+    colTime: 'Survived',
+    time: '{m}:{s}',
   },
 };

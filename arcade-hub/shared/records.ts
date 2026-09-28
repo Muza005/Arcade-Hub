@@ -51,7 +51,8 @@ export function recordMatch(
   const records = readRecords(gameId);
   const top = [...rows].sort((a, b) => a.place - b.place)[0];
   const beaten = { best: false, daily: false };
-  if (top) {
+  // Ноль очков рекордом не считается: «Новый рекорд!» за пустой матч только сбивает с толку.
+  if (top && top.score > 0) {
     const entry: RecordEntry = { nick: top.nick, score: top.score, date: day, ...(top.color ? { color: top.color } : {}) };
     if (!records.best || top.score > records.best.score) {
       records.best = entry;

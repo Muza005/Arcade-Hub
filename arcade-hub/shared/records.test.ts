@@ -37,6 +37,12 @@ describe('рекорды', () => {
     expect(readRecords('g').last?.rows[0]).toEqual({ nick: 'Аня', score: 3, place: 1 });
   });
 
+  it('ноль очков — не рекорд, но последний матч запоминается', () => {
+    expect(recordMatch('g', rows(0), true, '2026-09-27')).toEqual({ best: false, daily: false });
+    expect(readRecords('g').best).toBeUndefined();
+    expect(readRecords('g').last?.rows).toHaveLength(2);
+  });
+
   it('рекорд дня живёт только свой день', () => {
     recordMatch('g', rows(4), true, '2026-09-27');
     expect(dailyBest(readRecords('g'), '2026-09-27')?.score).toBe(4);

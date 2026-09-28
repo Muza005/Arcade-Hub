@@ -55,11 +55,60 @@ export const NICK_FONT_PX = 20;
 export const NICK_GAP_PX = 16;
 export const NICK_ALPHA = 0.85;
 
+// ─── Астероиды (Б2) ──────────────────────────────────────────────
+export type AsteroidSize = 'small' | 'medium' | 'large';
+export const ASTEROID_RADIUS = { small: 18, medium: 34, large: 58 } as const; // TUNE
+export const ASTEROID_SPEED = { small: [150, 230], medium: [100, 170], large: [60, 115] } as const; // TUNE: px/с
+export const ASTEROID_SPIN = 1.2; // TUNE: рад/с, вращение только для вида
+/** Поток камней на одного игрока, шт/с; на N игроков — × (1 + FLOW_PLAYER_K · (N − 1)). */
+export const ASTEROID_SPAWN_PER_S = 1.1; // TUNE
+export const ASTEROID_SIZE_WEIGHTS = { small: 0.4, medium: 0.35, large: 0.25 } as const; // TUNE
+/** Камень летит в случайную точку центральной части поля: доля отступа от краёв. */
+export const ASTEROID_AIM_INSET = 0.2;
+export const ASTEROID_SPAWN_GAP = 8; // рождается за краем поля, px
+export const ASTEROIDS_MAX = 160; // размер пула
+/** Хитбокс камня чуть меньше рисунка: задевание краем контура прощается. */
+export const ASTEROID_HITBOX_K = 0.85;
+// Раскол: крупный → 2 средних, средний → 2 мелких, мелкий рассыпается в безвредные осколки
+export const SPLIT_COUNT = 2;
+export const SPLIT_SPREAD_RAD = 0.6;
+export const SPLIT_SPEED_K = 1.25;
+export const GRID_CELL = 128; // ячейка сетки столкновений, px
+// Удар по кораблю
+export const HIT_INVULN_S = 2; // TUNE: короткая неуязвимость после удара
+export const INVULN_BLINK_HZ = 8;
+export const GAME_OVER_DELAY_S = 1.5; // взрыв последнего корабля успевают увидеть
+// Вид камней: процедурные формы, запекаются в текстуры один раз
+export const ASTEROID_SHAPE_SEED = 0x5eed; // только для вида, симуляцию не трогает
+export const ASTEROID_SHAPE_VARIANTS = 6;
+export const ASTEROID_VERTICES = [9, 14] as const;
+export const ASTEROID_JAGGED = 0.28; // разброс радиуса вершин
+export const ASTEROID_COLOR = '#A99BFF';
+export const ASTEROID_FILL = '#0B0D1C';
+export const ASTEROID_LINE_PX = 3;
+export const ASTEROID_TEXTURE_PAD = 6;
+// Осколки: только вид, урона не наносят
+export const DEBRIS_COUNT = { small: 5, medium: 7, large: 9 } as const;
+export const DEBRIS_SPEED = [120, 320] as const;
+export const DEBRIS_S = 0.6;
+export const DEBRIS_LEN = 10;
+export const DEBRIS_LINE_PX = 2;
+export const DEBRIS_VFX_SEED = 0xdeb415; // осколки — только вид, своя случайность
+export const INVULN_ALPHA = 0.3; // мигание неуязвимого корабля
+export const DEBRIS_MAX = 200;
+// Жизни под кораблём
+export const LIVES_PIP_RADIUS = 4;
+export const LIVES_PIP_GAP = 5;
+export const LIVES_Y = 44; // под центром корабля
+export const LIVES_LOST_ALPHA = 0.2;
+
 // ─── Обратная связь на телефон ───────────────────────────────────
 export const VIBRATE_HIT_MS = 40;
 export const VIBRATE_EXPLODE_MS = 300; // TUNE: взрыв — длинная вибрация
 export const VIBRATE_PICKUP_MS = 25; // TUNE: подбор усиления — два коротких импульса
 export const VIBRATE_PICKUP_GAP_MS = 60; // TUNE
+export const FLASH_HIT = '#FF4D5E'; // попадание — красная вспышка по краям телефона
+export const FLASH_EXPLODE = '#FFFFFF'; // взрыв — белая
 
 // ─── Стрельба и патроны ──────────────────────────────────────────
 export const AMMO_MAX = 10;

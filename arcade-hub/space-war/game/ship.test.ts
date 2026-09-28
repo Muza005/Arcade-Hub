@@ -66,8 +66,8 @@ describe('корабль', () => {
   });
 
   it('одинаковый ввод — одинаковый результат', () => {
-    const a = createSim(['p1', 'p2'], 1920);
-    const b = createSim(['p1', 'p2'], 1920);
+    const a = createSim(['p1', 'p2'], 1920, 1);
+    const b = createSim(['p1', 'p2'], 1920, 1);
     const input = (tick: number) => ({ x: Math.sin(tick / 7), y: Math.cos(tick / 11), btn: false });
     for (let t = 0; t < 600; t++) {
       a.step(DT, () => input(t));

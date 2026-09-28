@@ -5,6 +5,11 @@ import {
   FLAME_ALPHA,
   FLAME_LENGTH,
   FLAME_WIDTH_K,
+  INVULN_ALPHA,
+  LIVES_LOST_ALPHA,
+  LIVES_PIP_GAP,
+  LIVES_PIP_RADIUS,
+  LIVES_Y,
   NICK_ALPHA,
   NICK_FONT_PX,
   NICK_GAP_PX,
@@ -22,6 +27,9 @@ export interface ShipView {
   /** Поле: ник у стены не уходит за край, у верхней — встаёт под корабль. */
   setBounds(bounds: { left: number; top: number; right: number }): void;
   paint(color: string, nick: string): void;
+  /** Жизни точками под кораблём; blink — мигание неуязвимости. */
+  setLives(lives: number, max: number): void;
+  setBlink(dim: boolean): void;
 }
 
 const FONT_UI = 'Golos Text';
@@ -47,7 +55,19 @@ export function createShipView(textColor: string): ShipView {
   nick.anchor.set(0.5, 1);
   nick.alpha = NICK_ALPHA;
   nick.y = -SHIP_SIZE - NICK_GAP_PX;
-  node.addChild(body, nick);
+  const pips = new Graphics();
+  pips.y = LIVES_Y;
+  node.addChild(body, pips, nick);
+  let lastLives = -1;
+  let maxLives = 0;
+  const drawPips = (): void => {
+    const step = LIVES_PIP_RADIUS * 2 + LIVES_PIP_GAP;
+    const x0 = (-(maxLives - 1) * step) / 2;
+    pips.clear();
+    for (let i = 0; i < maxLives; i++) {
+      pips.circle(x0 + i * step, 0, LIVES_PIP_RADIUS).fill({ color, alpha: i < lastLives ? 1 : LIVES_LOST_ALPHA });
+    }
+  };
 
   let color = textColor;
   let bounds = { left: -Infinity, top: -Infinity, right: Infinity };
@@ -73,8 +93,18 @@ export function createShipView(textColor: string): ShipView {
     setBounds(next) {
       bounds = next;
     },
+    setLives(lives, max) {
+      if (lives === lastLives && max === maxLives) return;
+      lastLives = lives;
+      maxLives = max;
+      drawPips();
+    },
+    setBlink(dim) {
+      body.alpha = dim ? INVULN_ALPHA : 1;
+    },
     paint(nextColor, nextNick) {
       color = nextColor;
+      if (maxLives > 0) drawPips();
       nick.text = nextNick;
       const points = hullPoints();
       hull
