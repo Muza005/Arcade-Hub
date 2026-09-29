@@ -13,6 +13,7 @@ import {
   HULLS,
   QUALITY_CHOICES,
 } from '../config';
+import { HULL_SHAPES, hullSvg } from '../hull-shapes';
 
 export const lobbySchema: LobbySchema = {
   playerFields: [
@@ -20,7 +21,7 @@ export const lobbySchema: LobbySchema = {
       key: 'hull',
       label: 'setHull',
       kind: 'select',
-      options: HULLS.map((h) => ({ value: h, label: `hull_${h}` })),
+      options: HULLS.map((h) => ({ value: h, label: `hull_${h}`, icon: hullSvg(h), group: HULL_SHAPES[h].group })),
       default: HULL_DEFAULT,
     },
   ],

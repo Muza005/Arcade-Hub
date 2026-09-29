@@ -27,7 +27,6 @@ import type {
   StMsg,
 } from '../shared/protocol';
 import { createDirectLink } from './direct';
-import { createLobbyPanel } from './lobby-panel';
 import { createGyro, requestGyroPermission } from './gyro';
 import { createPad } from './pad';
 import { loadPrefs, savePrefs, type Prefs } from './prefs';
@@ -134,6 +133,7 @@ const settings = createSettings({
   profile: (nick, color) => send({ t: 'profile', nick, color }),
   recalibrate: () => gyro.calibrate(),
   handoff: (target) => send({ t: 'cmd', cmd: 'handoff', target }),
+  lobbyField: (key, value) => send({ t: 'lobby', key, value }),
   close() {
     settings.hide();
     render();
@@ -170,8 +170,6 @@ const screens: Record<Screen, HTMLElement> = {
   pad: pad.el,
   error: errorScreen,
 };
-const lobbyPanel = createLobbyPanel((msg) => send(msg));
-pad.el.append(lobbyPanel.el);
 app.append(...Object.values(screens), pauseModal, settings.el, flash, banner);
 let screen: Screen = 'connecting';
 
@@ -234,6 +232,7 @@ function settingsContext() {
     gyroAvailable: gyro.available,
     prefs,
     ...(st.layout.warning ? { warning: st.layout.warning } : {}),
+    ...(st.lobby && st.layout.screen === 'menu' ? { lobby: structuredClone(st.lobby) } : {}),
   };
 }
 
@@ -255,7 +254,6 @@ function render(): void {
   pauseModal.hidden = !(screen === 'pad' && st.paused && leader && !settings.open);
   pauseStatus.textContent = st.status ?? '';
   pad.notice.hidden = !(st.paused && !leader);
-  lobbyPanel.update(inMenu && !st.paused ? st.lobby : undefined);
   pad.notice.textContent = st.pausedBy ? t('ctrl.pause.guest', { nick: st.pausedBy }) : '';
   if (settings.open && slot) settings.update(settingsContext());
   if (!controlsLive()) sender.release();

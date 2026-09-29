@@ -34,10 +34,19 @@ export interface SliderField extends FieldBase {
   default: number;
 }
 
+export interface SelectOption {
+  value: string | number;
+  /** Ключ словаря игры. */
+  label: string;
+  /** SVG-разметка иконки (цвет — currentColor): такой выбор рисуется сеткой иконок, а карточка игрока — иконкой. */
+  icon?: string;
+  /** Варианты с одной группой стоят в одном ряду (например, формы корпуса одного вида). */
+  group?: string;
+}
+
 export interface SelectField extends FieldBase {
   kind: 'select';
-  /** label — ключ словаря игры. */
-  options: Array<{ value: string | number; label: string }>;
+  options: SelectOption[];
   default: string | number;
 }
 

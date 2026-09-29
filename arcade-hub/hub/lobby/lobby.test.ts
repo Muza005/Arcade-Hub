@@ -27,7 +27,7 @@ describe('поля лобби', () => {
 });
 
 describe('состав матча', () => {
-  const names = { keyboard: (s: string) => s, bot: (n: number) => `Бот ${n}` };
+  const names = { player: (n: number) => `Игрок ${n}`, bot: (n: number) => `Бот ${n}` };
   const phone = (id: string, color: string, connected = true) => ({ id, nick: id, color, leader: id === '1', connected });
 
   it('телефоны, клавиатура и боты — до максимума, лишние ждут', () => {
@@ -55,5 +55,34 @@ describe('состав матча', () => {
     expect(kb?.color).not.toBe(p?.color);
     expect(bot).toMatchObject({ kind: 'bot', nick: 'Бот 1' });
     expect(roster.missing).toBe(1);
+  });
+
+  it('клавиатура — «Игрок N» со свободным номером, свой ник и цвет из профиля', () => {
+    const roster = buildRoster({
+      phones: [{ ...phone('1', '#FF7676'), nick: 'Игрок 1' }],
+      keyboard: ['wasd', 'arrows'],
+      profiles: new Map([['arrows', { nick: 'Аня', color: '#FF7676' }]]),
+      bots: 0,
+      players: { min: 1, max: 10 },
+      names,
+    });
+    const [, wasd, arrows] = roster.playing;
+    expect(wasd?.nick).toBe('Игрок 2');
+    expect(arrows?.nick).toBe('Аня');
+    // Цвет занят телефоном — клавиатура получает свободный.
+    expect(arrows?.color).not.toBe('#FF7676');
+  });
+
+  it('убранный из матча телефон не играет, но виден отдельно', () => {
+    const roster = buildRoster({
+      phones: [phone('1', '#FF7676'), phone('2', '#FF9F43')],
+      keyboard: [],
+      benched: new Set(['2']),
+      bots: 0,
+      players: { min: 1, max: 10 },
+      names,
+    });
+    expect(roster.playing.map((p) => p.id)).toEqual(['1']);
+    expect(roster.benched.map((p) => p.id)).toEqual(['2']);
   });
 });

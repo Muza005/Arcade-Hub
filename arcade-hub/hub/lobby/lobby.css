@@ -10,6 +10,10 @@
   padding: var(--safe-zone) calc((100vw - var(--content-w)) / 2);
 }
 
+.lobby__content {
+  display: contents;
+}
+
 .lobby__head {
   display: flex;
   align-items: center;
@@ -183,9 +187,13 @@
 }
 
 .lobby__settings {
-  /* Настроек много — столбец прокручивается, а «Старт» и боты всегда на экране. */
+  /* Настроек много — столбец прокручивается, а «Старт» и боты всегда на экране.
+     Полоса прокрутки тонкая, в тон карточки, и не отнимает места у полей. */
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-2) transparent;
+  scrollbar-gutter: stable;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -332,4 +340,238 @@
     0 0 0 var(--focus-offset) var(--bg),
     0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus),
     0 0 calc(28rem / 24) var(--accent);
+}
+
+.lobby__settings::-webkit-scrollbar {
+  width: calc(6rem / 24);
+}
+
+.lobby__settings::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+}
+
+/* Аватар-иконка: выбранный вариант поля игрока (например, корпус) в цвет игрока. */
+.lcard__avatar--icon {
+  background: none;
+  color: var(--player);
+}
+
+.lcard__avatar--icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 calc(8rem / 24) color-mix(in srgb, var(--player) 50%, transparent));
+}
+
+.lcard__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6rem / 24);
+}
+
+.lcard__sub--keys {
+  letter-spacing: 0.18em;
+}
+
+.lcard__sub .icon {
+  font-size: calc(26rem / 24);
+}
+
+.lcard__edit {
+  font-size: calc(22rem / 24);
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.lcard__remove--back {
+  color: var(--ok);
+}
+
+.lobby__note--calm {
+  color: var(--text-3);
+}
+
+.lcard__edit:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow: 0 0 0 var(--focus-width) var(--focus);
+}
+
+/* ─── Окно профиля клавиатурного игрока ─── */
+.pe-dialog {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
+.pe-dialog::backdrop {
+  background: rgb(7 9 18 / 0.72);
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+.pe {
+  width: min(calc(820rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 calc(24rem / 24) calc(80rem / 24) rgb(0 0 0 / 0.55);
+}
+
+.pe__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.pe__label {
+  margin: 0 0 var(--space-1);
+  font-size: var(--fs-secondary);
+  color: var(--text-2);
+}
+
+.pe__actions {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.pe__action {
+  width: calc(52rem / 24);
+  height: calc(52rem / 24);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--danger);
+  font-size: calc(24rem / 24);
+  cursor: pointer;
+}
+
+.pe__action--ok {
+  color: var(--ok);
+}
+
+.pe__nick {
+  height: calc(64rem / 24);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  text-align: center;
+}
+
+.pe__nick::placeholder {
+  color: var(--text-3);
+}
+
+.pe__body {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.pe__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.pe__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.pe__icons,
+.pe__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6rem / 24);
+  padding: calc(8rem / 24);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.pe__icon {
+  width: calc(52rem / 24);
+  height: calc(52rem / 24);
+  display: grid;
+  place-items: center;
+  padding: calc(8rem / 24);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.pe__icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.pe__icon[aria-checked='true'] {
+  background: rgb(255 255 255 / 0.16);
+  color: var(--player, var(--accent));
+}
+
+.pe__colors {
+  display: grid;
+  grid-template-columns: repeat(4, calc(48rem / 24));
+  gap: calc(10rem / 24);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.pe__color {
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  border: 0;
+  border-radius: 50%;
+  background: var(--c);
+  cursor: pointer;
+}
+
+.pe__color[aria-checked='true'] {
+  box-shadow:
+    0 0 0 calc(3rem / 24) var(--surface-2),
+    0 0 0 calc(6rem / 24) var(--text);
+}
+
+.pe__color:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.pe :is(button, input):focus {
+  outline: none;
+  box-shadow: 0 0 0 var(--focus-width) var(--focus);
+}
+
+.pe__color[aria-checked='true']:focus {
+  box-shadow:
+    0 0 0 calc(3rem / 24) var(--surface-2),
+    0 0 0 calc(6rem / 24) var(--focus);
 }

@@ -247,7 +247,12 @@ export const SAB_FRAME_MIN_HEIGHT = 0.6; // рамка ≥ 60 % высоты т�
 
 // ─── Лобби (Б5, SPACE_WAR_SPEC §8) ───────────────────────────────
 /** Формы корпуса: треугольник, круг, квадрат, звезда — у каждой свои варианты рисунка. Хитбокс у всех один. */
-export const HULLS = ['arrow', 'delta', 'wing', 'ring', 'core', 'box', 'diamond', 'star5', 'star4'] as const;
+export const HULLS = [
+  'arrow', 'delta', 'wing', 'dart', 'chevron', 'needle', // треугольник
+  'ring', 'core', 'half', // круг
+  'box', 'diamond', 'kite', 'prism', // квадрат
+  'star5', 'star4', // звезда
+] as const;
 export type Hull = (typeof HULLS)[number];
 export const HULL_DEFAULT: Hull = 'arrow';
 /** У ботов один статичный корпус. */

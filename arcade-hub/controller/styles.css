@@ -812,57 +812,49 @@ button {
   width: 100%;
 }
 
-/* Поля игрока в лобби (например, форма корпуса): под верхней полосой, между джойстиком и кнопкой. */
-.lpanel {
-  position: absolute;
-  top: calc(max(12px, env(safe-area-inset-top)) + 68px);
-  left: 16px;
-  right: 16px;
-  max-height: 42vh;
-  overflow-y: auto;
+/* Поля игрока из лобби в профиле (например, корпус): иконки рядами по видам формы. */
+.hulls {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: 16px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 14px;
   background: var(--surface);
 }
 
-.lpanel__label {
-  margin: 0 0 8px;
-  color: var(--text-2);
-  font-size: 14px;
+.hulls + .hulls {
+  margin-top: 8px;
 }
 
-.lpanel__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.lpanel__chip {
-  min-height: 44px;
-  padding: 0 14px;
+.hull {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 8px;
   border: 0;
-  border-radius: var(--radius-full);
-  background: var(--surface-2);
+  border-radius: 10px;
+  background: none;
   color: var(--text);
-  font: inherit;
-  font-size: 15px;
 }
 
-.lpanel__chip[aria-checked='true'] {
-  background: var(--player);
-  color: var(--bg);
-  font-weight: 600;
+.hull svg {
+  width: 100%;
+  height: 100%;
 }
 
-@media (orientation: landscape) {
-  .lpanel {
-    left: 50%;
-    right: auto;
-    width: min(420px, 44vw);
-    transform: translateX(-50%);
-    max-height: calc(100vh - 110px);
-  }
+.hull[aria-checked='true'] {
+  background: rgb(255 255 255 / 0.14);
+  color: var(--player);
+}
+
+.plate__avatar.plate__avatar--icon {
+  padding: 6px;
+  background: none;
+  color: var(--player);
+}
+
+.plate__avatar--icon svg {
+  width: 100%;
+  height: 100%;
 }

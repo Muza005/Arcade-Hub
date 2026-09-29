@@ -24,6 +24,8 @@ const DIRECTIONS: Record<string, Direction> = {
 };
 
 const BACK_KEYS = new Set(['Escape', 'Backspace']);
+/** Клавиши, которые работают и в текстовом поле. */
+const TEXT_ESCAPES = new Set(['Escape', 'ArrowUp', 'ArrowDown', 'Tab']);
 const SELECT_KEYS = new Set(['Enter', 'Space']);
 const FULLSCREEN_KEY = 'KeyF';
 
@@ -129,6 +131,8 @@ export function createFocusManager(sounds: UiSounds): FocusManager {
     if (e.defaultPrevented || e.ctrlKey || e.altKey || e.metaKey) return;
     const scope = currentScope();
     if (!scope) return;
+    // В текстовом поле буквы (и W A S D) печатаются; из поля уходят стрелками ↑ ↓, Esc — назад.
+    if (e.target instanceof HTMLInputElement && !TEXT_ESCAPES.has(e.code)) return;
     const active = activeIn(scope);
 
     if (e.code === 'Tab') {

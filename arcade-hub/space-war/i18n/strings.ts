@@ -22,6 +22,12 @@ export type SpaceWarKey =
   | 'hull_arrow'
   | 'hull_delta'
   | 'hull_wing'
+  | 'hull_dart'
+  | 'hull_chevron'
+  | 'hull_needle'
+  | 'hull_half'
+  | 'hull_kite'
+  | 'hull_prism'
   | 'hull_ring'
   | 'hull_core'
   | 'hull_box'
@@ -67,6 +73,12 @@ export const strings: GameStrings<SpaceWarKey> = {
     hull_arrow: 'Стрела',
     hull_delta: 'Дельта',
     hull_wing: 'Крыло',
+    hull_dart: 'Дротик',
+    hull_chevron: 'Шеврон',
+    hull_needle: 'Игла',
+    hull_half: 'Полукруг',
+    hull_kite: 'Змей',
+    hull_prism: 'Призма',
     hull_ring: 'Кольцо',
     hull_core: 'Ядро',
     hull_box: 'Короб',
@@ -112,6 +124,12 @@ export const strings: GameStrings<SpaceWarKey> = {
     hull_arrow: 'Arrow',
     hull_delta: 'Delta',
     hull_wing: 'Wing',
+    hull_dart: 'Dart',
+    hull_chevron: 'Chevron',
+    hull_needle: 'Needle',
+    hull_half: 'Half',
+    hull_kite: 'Kite',
+    hull_prism: 'Prism',
     hull_ring: 'Ring',
     hull_core: 'Core',
     hull_box: 'Box',

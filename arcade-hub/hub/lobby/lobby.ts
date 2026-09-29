@@ -10,7 +10,8 @@ import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
 import { defaults, sanitize, stepValue, validValue, type FieldValues } from './fields';
-import { buildRoster, type RosterEntry } from './roster';
+import { createProfileEditor } from './profile-editor';
+import { buildRoster, type KeyboardProfile, type RosterEntry } from './roster';
 
 export interface LobbyStart {
   game: GameManifest;
@@ -82,6 +83,14 @@ export function createLobby(options: LobbyOptions): Lobby {
   let settings: FieldValues = {};
   let daily = false;
   const playerFields = new Map<string, FieldValues>();
+  /** Свой ник и цвет клавиатурных игроков (окно профиля). */
+  const profiles = new Map<KeyboardScheme, KeyboardProfile>();
+  /** Телефоны, убранные из этого матча: в комнате остаются, могут вернуться. */
+  const benched = new Set<string>();
+  const editor = createProfileEditor();
+  /** Перерисовываемая часть; окно профиля живёт рядом и перерисовкой не закрывается. */
+  const content = h('div', { class: 'lobby__content' });
+  el.append(content, editor.el);
   /** Фокус ушёл с «Старт» только потому, что он был неактивен, — вернуть, как только станет можно. */
   let startPending = false;
 
@@ -95,10 +104,12 @@ export function createLobby(options: LobbyOptions): Lobby {
     buildRoster({
       phones: room.players,
       keyboard,
+      profiles,
+      benched,
       bots,
       players: game?.players ?? { min: 1, max: 1 },
       names: {
-        keyboard: (scheme) => t(scheme === 'wasd' ? 'lobby.kb.wasd' : 'lobby.kb.arrows'),
+        player: (n) => t('player.default', { n }),
         bot: (n) => t('lobby.bot', { n }),
       },
     });
@@ -191,36 +202,78 @@ export function createLobby(options: LobbyOptions): Lobby {
     );
   };
 
-  const card = (entry: RosterEntry, playing: boolean): HTMLElement => {
-    const removable = entry.kind === 'keyboard' || entry.kind === 'bot';
-    // Под клавиатурным игроком — схема клавиш (§11).
-    const sub = entry.kind === 'keyboard' ? t(entry.scheme === 'arrows' ? 'lobby.keys.arrows' : 'lobby.keys.wasd') : '';
-    const fields = playing
-      ? schema().playerFields.map((f) =>
-          fieldControl(`p:${entry.id}`, f, valuesOf(entry)[f.key] ?? f.default, (v) => {
-            valuesOf(entry)[f.key] = v;
-            render();
-          }),
-        )
-      : [];
+  /** Иконка выбранного варианта (например, корпус) — вместо буквы в аватаре. */
+  const iconOf = (entry: RosterEntry): string | undefined => {
+    for (const f of schema().playerFields) {
+      if (f.kind !== 'select') continue;
+      const value = valuesOf(entry)[f.key] ?? f.default;
+      const found = f.options.find((o) => o.value === value)?.icon;
+      if (found) return found;
+    }
+    return undefined;
+  };
+
+  /** Ник, поля игрока и цвет клавиатурного игрока — окном на большом экране (у телефона — в его настройках). */
+  const editProfile = (entry: RosterEntry): void => {
+    const scheme = entry.scheme;
+    if (!scheme) return;
+    const others = roster().playing.filter((p) => p.id !== entry.id && p.kind !== 'bot');
+    const custom = profiles.get(scheme)?.nick;
+    editor.open({
+      draft: { nick: custom ?? '', color: entry.color, fields: { ...valuesOf(entry) } },
+      defaultNick: custom ? '' : entry.nick,
+      fields: schema().playerFields,
+      taken: new Set(others.map((p) => p.color)),
+      label: tg,
+      save: (draft) => {
+        profiles.set(scheme, { ...(draft.nick ? { nick: draft.nick } : {}), color: draft.color });
+        for (const f of schema().playerFields) {
+          const v = draft.fields[f.key];
+          if (v !== undefined) valuesOf(entry)[f.key] = validValue(f, v);
+        }
+        render();
+      },
+    });
+  };
+
+  const card = (entry: RosterEntry, state: 'playing' | 'waiting' | 'benched'): HTMLElement => {
+    const hullIcon = entry.kind === 'bot' ? undefined : iconOf(entry);
+    const avatar = h('span', { class: `lcard__avatar${hullIcon ? ' lcard__avatar--icon' : ''}` });
+    if (hullIcon) avatar.innerHTML = hullIcon;
+    else avatar.append(entry.kind === 'bot' ? icon(ICONS.gamepad) : entry.nick.slice(0, 1).toUpperCase());
+    if (entry.leader) avatar.append(icon(ICONS.crown, 'lcard__crown'));
+    // Под ником — чем играет: схема клавиш или телефон-джойстик (§11).
+    const sub =
+      entry.kind === 'keyboard'
+        ? h('span', { class: 'lcard__sub lcard__sub--keys' }, t(entry.scheme === 'arrows' ? 'lobby.keys.arrows' : 'lobby.keys.wasd'))
+        : entry.kind === 'phone'
+          ? h('span', { class: 'lcard__sub' }, icon(ICONS.gamepad), t('lobby.phone'))
+          : null;
+    const remove = (): void => {
+      if (entry.kind === 'keyboard' && entry.scheme) keyboard = keyboard.filter((s) => s !== entry.scheme);
+      else if (entry.kind === 'phone') benched.add(entry.id);
+      else bots = Math.max(0, bots - 1);
+      render();
+    };
     return h(
       'li',
-      { class: `lcard lcard--${entry.kind}${playing ? '' : ' lcard--waiting'}`, style: `--player: ${entry.color}` },
-      h(
-        'span',
-        { class: 'lcard__avatar' },
-        entry.kind === 'bot' ? icon(ICONS.gamepad) : entry.nick.slice(0, 1).toUpperCase(),
-        entry.leader && icon(ICONS.crown, 'lcard__crown'),
-      ),
+      { class: `lcard lcard--${entry.kind}${state === 'playing' ? '' : ' lcard--waiting'}`, style: `--player: ${entry.color}` },
+      entry.kind === 'keyboard' &&
+        state === 'playing' &&
+        (() => {
+          const b = btn(`edit:${entry.id}`, 'lcard__edit', '', () => editProfile(entry), { 'aria-label': t('lobby.edit') });
+          b.append(icon(ICONS.pencil));
+          return b;
+        })(),
+      avatar,
       h('span', { class: 'lcard__nick' }, entry.nick),
-      sub && h('span', { class: 'lcard__sub' }, sub),
-      ...fields,
-      removable &&
-        btn(`rm:${entry.id}`, 'lcard__remove', '×', () => {
-          if (entry.kind === 'keyboard' && entry.scheme) keyboard = keyboard.filter((s) => s !== entry.scheme);
-          else bots = Math.max(0, bots - 1);
-          render();
-        }, { 'aria-label': t('lobby.remove') }),
+      sub,
+      state === 'benched'
+        ? btn(`back:${entry.id}`, 'lcard__remove lcard__remove--back', '+', () => {
+            benched.delete(entry.id);
+            render();
+          }, { 'aria-label': t('lobby.return') })
+        : btn(`rm:${entry.id}`, 'lcard__remove', '×', remove, { 'aria-label': t('lobby.remove') }),
     );
   };
 
@@ -278,7 +331,7 @@ export function createLobby(options: LobbyOptions): Lobby {
     }, { role: 'switch', 'aria-checked': String(daily) });
 
     el.style.cssText = `--accent: ${current.accent}`;
-    el.replaceChildren(
+    content.replaceChildren(
       h(
         'header',
         { class: 'lobby__head' },
@@ -292,13 +345,20 @@ export function createLobby(options: LobbyOptions): Lobby {
         h(
           'section',
           { class: 'lobby__players' },
-          h('ul', { class: 'lobby__cards' }, ...r.playing.map((p) => card(p, true)), ...keyboardSlots()),
+          h('ul', { class: 'lobby__cards' }, ...r.playing.map((p) => card(p, 'playing')), ...keyboardSlots()),
           r.waiting.length > 0 &&
             h(
               'div',
               { class: 'lobby__waiting' },
               h('p', { class: 'lobby__note' }, tn('lobby.onlyN', current.players.max)),
-              h('ul', { class: 'lobby__cards' }, ...r.waiting.map((p) => card(p, false))),
+              h('ul', { class: 'lobby__cards' }, ...r.waiting.map((p) => card(p, 'waiting'))),
+            ),
+          r.benched.length > 0 &&
+            h(
+              'div',
+              { class: 'lobby__waiting' },
+              h('p', { class: 'lobby__note lobby__note--calm' }, t('lobby.benched')),
+              h('ul', { class: 'lobby__cards' }, ...r.benched.map((p) => card(p, 'benched'))),
             ),
         ),
         h(
@@ -337,6 +397,8 @@ export function createLobby(options: LobbyOptions): Lobby {
         ),
       ),
     );
+    // Открыто окно профиля — фокус остаётся в нём.
+    if (editor.el.open) return;
     if (!start.disabled && startPending) {
       startPending = false;
       start.focus();
@@ -363,6 +425,8 @@ export function createLobby(options: LobbyOptions): Lobby {
     'keydown',
     (e) => {
       if (el.hidden || !game || e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+      // Пока открыто окно профиля или печатают ник — клавиши не добавляют игроков.
+      if (editor.el.open || e.target instanceof HTMLInputElement) return;
       const scheme = JOIN_KEYS[e.code];
       if (!scheme || keyboard.includes(scheme)) return;
       if (SCHEMES.indexOf(scheme) >= game.players.keyboardMax) return;
@@ -387,6 +451,7 @@ export function createLobby(options: LobbyOptions): Lobby {
         keyboard = [];
         bots = 0;
         playerFields.clear();
+        benched.clear();
       }
       game = next;
       const saved = loadSaved(next.id);
@@ -420,7 +485,16 @@ export function createLobby(options: LobbyOptions): Lobby {
           key: f.key,
           label: tg(f.label),
           kind: f.kind === 'toggle' ? 'toggle' : 'select',
-          ...(f.kind === 'select' ? { options: f.options.map((o) => ({ value: o.value, label: tg(o.label) })) } : {}),
+          ...(f.kind === 'select'
+            ? {
+                options: f.options.map((o) => ({
+                  value: o.value,
+                  label: tg(o.label),
+                  ...(o.icon ? { icon: o.icon } : {}),
+                  ...(o.group ? { group: o.group } : {}),
+                })),
+              }
+            : {}),
         })),
         values: Object.fromEntries(fields.map((f) => [f.key, values[f.key] ?? f.default])),
       };
