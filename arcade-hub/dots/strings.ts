@@ -19,6 +19,9 @@ export type DotsKey =
   | 'dur60'
   | 'dur90'
   | 'setDash'
+  | 'setShape'
+  | 'shapeCircle'
+  | 'shapeSquare'
   | 'awardStars'
   | 'colStars'
   | 'metaBest'
@@ -44,6 +47,9 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 с',
     dur90: '90 с',
     setDash: 'Рывок',
+    setShape: 'Форма',
+    shapeCircle: 'Круг',
+    shapeSquare: 'Квадрат',
     awardStars: 'Больше всех звёзд',
     colStars: 'Звёзды',
     metaBest: 'Лучший — {nick}, {score} ★',
@@ -68,6 +74,9 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 s',
     dur90: '90 s',
     setDash: 'Dash',
+    setShape: 'Shape',
+    shapeCircle: 'Circle',
+    shapeSquare: 'Square',
     awardStars: 'Most stars',
     colStars: 'Stars',
     metaBest: 'Best — {nick}, {score} ★',

@@ -7,7 +7,7 @@ import cardArt from './assets/card.svg';
 import cover from './assets/cover.svg';
 import logo from './assets/logo.svg';
 import modeFfaIcon from './assets/mode-ffa.svg';
-import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS } from './config';
+import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS, SHAPE_DEFAULT } from './config';
 import { strings } from './strings';
 
 const GAME_ID = 'dots';
@@ -54,6 +54,18 @@ export const dotsManifest: GameManifest = {
         default: MATCH_S_DEFAULT,
       },
       { key: 'dash', label: 'setDash', kind: 'toggle', default: DASH_ENABLED_DEFAULT },
+    ],
+    playerFields: [
+      {
+        key: 'shape',
+        label: 'setShape',
+        kind: 'select',
+        options: [
+          { value: 'circle', label: 'shapeCircle' },
+          { value: 'square', label: 'shapeSquare' },
+        ],
+        default: SHAPE_DEFAULT,
+      },
     ],
   },
 };

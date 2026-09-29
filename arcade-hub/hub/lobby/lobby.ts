@@ -1,15 +1,15 @@
 // Лобби (ARCADE_HUB_SPEC §11): одно на все игры. Игроки комнаты, клавиатурные слоты, боты,
 // режим и настройки матча по схеме игры. Старт — у ведущего (или с клавиатуры у экрана).
 import type { KeyboardScheme } from '../../engine/input';
-import { MAX_KEYBOARD_PLAYERS } from '../../shared/config';
+import { LOBBY_SELECT_CHIPS_MAX, MAX_KEYBOARD_PLAYERS } from '../../shared/config';
 import type { GameManifest, GamePlayer, LobbyField, MatchSettings } from '../../shared/game-manifest';
 import { createTranslator, t, tn } from '../../shared/i18n';
-import type { LobbyValue } from '../../shared/protocol';
+import type { LobbyPanel, LobbyValue } from '../../shared/protocol';
 import type { Room } from '../room';
 import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
-import { defaults, sanitize, stepValue, type FieldValues } from './fields';
+import { defaults, sanitize, stepValue, validValue, type FieldValues } from './fields';
 import { buildRoster, type RosterEntry } from './roster';
 
 export interface LobbyStart {
@@ -32,6 +32,10 @@ export interface Lobby {
   restart(): LobbyStart | null;
   hide(): void;
   setRoom(room: Room): void;
+  /** Поля игрока для его телефона; нет лобби или полей — undefined. */
+  panelFor(playerId: string): LobbyPanel | undefined;
+  /** Выбор с телефона: неизвестное поле или значение не принимается. */
+  setPlayerField(playerId: string, key: string, value: unknown): void;
 }
 
 const SCHEMES: readonly KeyboardScheme[] = ['wasd', 'arrows'];
@@ -61,7 +65,14 @@ function save(gameId: string, value: Saved): void {
   }
 }
 
-export function createLobby(options: { onStart(start: LobbyStart): void; onBack(game: GameManifest): void }): Lobby {
+export interface LobbyOptions {
+  onStart(start: LobbyStart): void;
+  onBack(game: GameManifest): void;
+  /** Поля игроков или состав поменялись — телефонам пора обновить панель. */
+  onFieldsChange?(): void;
+}
+
+export function createLobby(options: LobbyOptions): Lobby {
   const el = h('main', { class: 'lobby', 'data-focus-scope': true, hidden: true });
   let game: GameManifest | null = null;
   let room: Room = { code: null, players: [] };
@@ -149,7 +160,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
         'aria-checked': String(value === true),
       });
     }
-    if (field.kind === 'select') {
+    if (field.kind === 'select' && field.options.length <= LOBBY_SELECT_CHIPS_MAX) {
       return h(
         'div',
         { class: 'field' },
@@ -234,6 +245,7 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
 
   const render = (): void => {
     if (!game) return;
+    options.onFieldsChange?.();
     const focusKey = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.focusKey : undefined;
     const current = game;
     const r = roster();
@@ -390,11 +402,38 @@ export function createLobby(options: { onStart(start: LobbyStart): void; onBack(
     },
     hide() {
       el.hidden = true;
+      options.onFieldsChange?.();
     },
     restart: () => makeStart(),
     setRoom(next) {
       room = next;
       if (!el.hidden) render();
+    },
+    panelFor(playerId) {
+      if (el.hidden || !game) return undefined;
+      const fields = schema().playerFields.filter((f) => f.kind !== 'slider');
+      const entry = roster().playing.find((p) => p.id === playerId);
+      if (fields.length === 0 || !entry) return undefined;
+      const values = valuesOf(entry);
+      return {
+        fields: fields.map((f) => ({
+          key: f.key,
+          label: tg(f.label),
+          kind: f.kind === 'toggle' ? 'toggle' : 'select',
+          ...(f.kind === 'select' ? { options: f.options.map((o) => ({ value: o.value, label: tg(o.label) })) } : {}),
+        })),
+        values: Object.fromEntries(fields.map((f) => [f.key, values[f.key] ?? f.default])),
+      };
+    },
+    setPlayerField(playerId, key, value) {
+      if (el.hidden) return;
+      const field = schema().playerFields.find((f) => f.key === key);
+      const entry = roster().playing.find((p) => p.id === playerId);
+      if (!field || !entry) return;
+      const next = validValue(field, value);
+      if (next !== value) return; // чужое значение не подменяем значением по умолчанию
+      valuesOf(entry)[key] = next;
+      render();
     },
   };
 }

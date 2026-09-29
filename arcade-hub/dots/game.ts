@@ -39,6 +39,11 @@ import {
   SCORE_FONT_PX,
   SCORE_GAP_PX,
   SECONDS_PER_MINUTE,
+  SHAPES,
+  SHAPE_DEFAULT,
+  SQUARE_CORNER_K,
+  SQUARE_K,
+  type Shape,
   STAR_COLOR,
   STAR_INNER_RATIO,
   STAR_POINTS,
@@ -155,9 +160,23 @@ export function createDotsGame(): GameModule {
     starsLayer.fill(STAR_COLOR);
   };
 
+  /** Круг или скруглённый квадрат — поле игрока «Форма» из лобби. */
+  const drawShape = (g: Graphics, shape: Shape, r: number, color: string): Graphics => {
+    g.clear();
+    if (shape === 'square') {
+      const s = r * SQUARE_K;
+      g.roundRect(-s, -s, s * 2, s * 2, s * SQUARE_CORNER_K);
+    } else g.circle(0, 0, r);
+    return g.fill(color);
+  };
+  const shapeOf = (player: GamePlayer): Shape => {
+    const v = player.fields?.shape;
+    return SHAPES.find((s) => s === v) ?? SHAPE_DEFAULT;
+  };
+
   const paintPlayer = (view: PlayerView, player: GamePlayer): void => {
-    view.circle.clear().circle(0, 0, DOT_RADIUS).fill(player.color);
-    view.chipDot.clear().circle(0, 0, SCORE_DOT_RADIUS).fill(player.color);
+    drawShape(view.circle, shapeOf(player), DOT_RADIUS, player.color);
+    drawShape(view.chipDot, shapeOf(player), SCORE_DOT_RADIUS, player.color);
     view.nick.text = player.nick;
   };
 

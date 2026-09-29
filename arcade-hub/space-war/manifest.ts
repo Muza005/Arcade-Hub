@@ -8,6 +8,7 @@ import modeTeamsIcon from './assets/mode-teams.svg';
 import modeVersusIcon from './assets/mode-versus.svg';
 import { ACCENT, ACCENT_ALT, KEYBOARD_MAX } from './config';
 import { strings } from './i18n/strings';
+import { lobbySchema } from './lobby/schema';
 
 export const spaceWarManifest: GameManifest = {
   id: 'space-war',
@@ -35,4 +36,5 @@ export const spaceWarManifest: GameManifest = {
   controllerLayout: { mainButton: true, warning: 'warning' },
   // Боты — три уровня (этап Б6); до тех пор корабли ботов стоят на месте.
   bots: true,
+  lobby: lobbySchema,
 };

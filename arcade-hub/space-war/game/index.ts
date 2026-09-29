@@ -23,6 +23,10 @@ import {
   DEBRIS_SPEED,
   DEBRIS_VFX_SEED,
   FIELD_INSET,
+  HULL_BOT,
+  HULL_DEFAULT,
+  HULLS,
+  type Hull,
   FIELD_LINE_ALPHA,
   FIELD_LINE_PX,
   FIELD_RADIUS,
@@ -39,6 +43,7 @@ import {
   MULT_SPARK_S,
   NICK_FONT_PX,
   PARTICLES_MAX,
+  QUALITY_CHOICES,
   SHAKE_BREAK_LARGE,
   SHAKE_DEATH,
   SHAKE_HIT,
@@ -74,6 +79,13 @@ const SECONDS_PER_MINUTE = 60;
 const EXPLOSION_K = 2;
 /** Пролёт вплотную — несколько искр в цвет игрока. */
 const NEAR_SPARKS = 4;
+
+/** Корпус игрока из лобби; у ботов — один на всех. */
+const hullOf = (player: GamePlayer): Hull => {
+  if (player.kind === 'bot') return HULL_BOT;
+  const v = player.fields?.hull;
+  return HULLS.find((h) => h === v) ?? HULL_DEFAULT;
+};
 
 const formatTime = (seconds: number): string => {
   const total = Math.floor(seconds);
@@ -224,7 +236,9 @@ export function createSpaceWarGame(): GameModule {
       particles = createParticles(vfx);
       multFx = createMultFx(particles, atlas.spark);
       camera = createCamera(settings, worldW, WORLD_H, vfx);
-      quality = createQuality(settings.quality);
+      // Качество из лобби; «Авто» — как в настройках хаба (там тоже может быть «Авто» — адаптивное).
+      const lobbyQuality = QUALITY_CHOICES.find((q) => q === ctx.settings.quality) ?? 'auto';
+      quality = createQuality(lobbyQuality === 'auto' ? settings.quality : lobbyQuality);
       bloomK = (BLOOM_STRENGTH * settings.bloom) / PERCENT;
 
       // Шейдеры — только на WebGL; на другом рендерере игра идёт без них.
@@ -249,7 +263,7 @@ export function createSpaceWarGame(): GameModule {
       const textColor = cssVar('--text');
       for (const player of ctx.players) {
         const view = createShipView(textColor);
-        view.paint(player.color, player.nick);
+        view.paint(player.color, player.nick, hullOf(player));
         view.setBounds(sim.bounds);
         view.setLives(SHIP_LIVES, SHIP_LIVES);
         views.set(player.id, view);
@@ -390,7 +404,7 @@ export function createSpaceWarGame(): GameModule {
     },
 
     updatePlayer(player: GamePlayer) {
-      views.get(player.id)?.paint(player.color, player.nick);
+      views.get(player.id)?.paint(player.color, player.nick, hullOf(player));
       colors.set(player.id, player.color);
       scoreHud.setColor(player.id, player.color);
     },

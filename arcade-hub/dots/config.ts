@@ -28,6 +28,12 @@ export const FIELD_RADIUS = 28;
 export const MATCH_S_DEFAULT = 60;
 export const MATCH_S_OPTIONS = [30, 60, 90] as const; // схема лобби — этап А6
 export const DASH_ENABLED_DEFAULT = true;
+/** Поле игрока в лобби (проверка полей на телефоне): форма точки и её фишки в счёте. */
+export const SHAPES = ['circle', 'square'] as const;
+export type Shape = (typeof SHAPES)[number];
+export const SHAPE_DEFAULT: Shape = 'circle';
+export const SQUARE_K = 0.9; // квадрат чуть меньше описанного — на глаз той же величины, что круг
+export const SQUARE_CORNER_K = 0.25;
 
 export const DOT_RADIUS = 28;
 export const DOT_SPEED = 520; // px/с

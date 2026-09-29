@@ -9,6 +9,8 @@ export const MAX_FRAME_S = 0.25;
 // Игроки и комната
 export const MAX_PLAYERS = 10;
 export const MAX_KEYBOARD_PLAYERS = 2; // игра может разрешить меньше (keyboardMax в манифесте)
+/** Выбор из списка в лобби: больше вариантов — рисуется переключателем «− значение +», а не рядом кнопок. */
+export const LOBBY_SELECT_CHIPS_MAX = 4;
 export const NICK_MAX_LEN = 8;
 /** Цвета игроков (§4, §23): 12, не меньше MAX_PLAYERS. Тёмный #070912 на каждом — не ниже 7.3:1. */
 export const PLAYER_COLORS = [

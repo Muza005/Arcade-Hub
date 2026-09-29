@@ -99,7 +99,21 @@ export interface ProfileMsg {
   color: string;
 }
 
-/** Поле лобби, объявленное игрой. */
+/** Поле игрока из схемы лобби, как его рисует телефон: подписи уже переведены экраном. */
+export interface PhoneField {
+  key: string;
+  label: string;
+  kind: 'toggle' | 'select';
+  options?: Array<{ value: string | number; label: string }>;
+}
+
+/** Поля игрока в лобби (ARCADE_HUB_SPEC §11): телефон выбирает своё сам — например, форму корпуса. */
+export interface LobbyPanel {
+  fields: PhoneField[];
+  values: Record<string, LobbyValue>;
+}
+
+/** Поле игрока, выбранное на телефоне. */
 export interface LobbyMsg {
   t: 'lobby';
   key: string;
@@ -172,6 +186,8 @@ export interface StMsg {
   pausedBy?: string;
   /** Строка состояния матча от игры для окна паузы у ведущего. */
   status?: string;
+  /** Открыто лобби игры с полями игрока — телефон показывает их. */
+  lobby?: LobbyPanel;
   game?: GamePayload;
 }
 

@@ -10,7 +10,7 @@ import {
 } from '../shared/config';
 import type { GameControl, GameManifest } from '../shared/game-manifest';
 import { createTranslator } from '../shared/i18n';
-import type { ControlMode, ControllerLayout, MainButtonState, StMsg } from '../shared/protocol';
+import type { ControlMode, ControllerLayout, LobbyPanel, MainButtonState, StMsg } from '../shared/protocol';
 import type { Match } from './game-runner';
 import type { RoomClient } from './room-client';
 import type { Direction } from './ui/spatial';
@@ -49,6 +49,8 @@ export interface PhonesOptions {
   /** Пауза на большом экране: показать (by — ник поставившего, пусто — с клавиатуры) или убрать. */
   showPause(paused: boolean, by: string): void;
   nickOf(playerId: string): string;
+  /** Лобби: поля игрока для телефона и выбор с телефона (ARCADE_HUB_SPEC §11). */
+  lobby: { panelFor(playerId: string): LobbyPanel | undefined; setPlayerField(playerId: string, key: string, value: unknown): void };
 }
 
 export interface Phones {
@@ -58,9 +60,11 @@ export interface Phones {
   pause(by?: string): void;
   resume(): void;
   end(): void;
+  /** Разослать состояние сейчас (например, поменялись поля лобби). */
+  refresh(): void;
 }
 
-export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): Phones {
+export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOptions): Phones {
   let layout: ControllerLayout = MENU_LAYOUT;
   let match: Match | null = null;
   let paused = false;
@@ -72,6 +76,7 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
   const stFor = (playerId: string): StMsg => {
     const mainButton = match?.mainButton(playerId);
     const status = match?.status();
+    const panel = layout.screen === 'menu' ? lobby.panelFor(playerId) : undefined;
     return {
       t: 'st',
       alive: true,
@@ -80,6 +85,7 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
       ...(mainButton ? { mainButton } : {}),
       ...(pausedBy ? { pausedBy } : {}),
       ...(status && playerId === room.leaderId() ? { status } : {}),
+      ...(panel ? { lobby: panel } : {}),
     };
   };
   const broadcast = (): void => room.sendEach(stFor);
@@ -140,6 +146,8 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
     match.finish();
   };
 
+  room.onLobby((playerId, key, value) => lobby.setPlayerField(playerId, key, value));
+
   room.onCmd((playerId, msg, leader) => {
     if (!leader) return;
     if (layout.screen === 'menu') {
@@ -187,6 +195,7 @@ export function connectPhones({ room, nav, showPause, nickOf }: PhonesOptions): 
     pause,
     resume,
     end,
+    refresh: broadcast,
   };
 }
 

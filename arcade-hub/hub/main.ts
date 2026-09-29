@@ -199,6 +199,7 @@ async function play(start: LobbyStart): Promise<void> {
 }
 
 const lobby = createLobby({
+  onFieldsChange: () => phones?.refresh(),
   onStart: (start) => void play(start),
   onBack: (game) => {
     lobby.hide();
@@ -284,6 +285,7 @@ if (fixtureRoom) {
     nav: focus,
     showPause: (paused, by) => pause.show(paused, by, client.room.code),
     nickOf: (id) => client.room.players.find((p) => p.id === id)?.nick ?? '',
+    lobby,
   });
   if (import.meta.env.DEV) await enableTestPhones(() => client.room.code);
 }

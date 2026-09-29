@@ -183,6 +183,9 @@
 }
 
 .lobby__settings {
+  /* Настроек много — столбец прокручивается, а «Старт» и боты всегда на экране. */
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
@@ -276,6 +279,15 @@
 
 .lcard .field {
   width: 100%;
+}
+
+/* Выбор из длинного списка в карточке игрока (например, корпус): название между «−» и «+» не вылезает. */
+.lcard .field__value {
+  min-width: 0;
+  font-size: var(--fs-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .link-btn {

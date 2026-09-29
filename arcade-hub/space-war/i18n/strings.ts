@@ -17,7 +17,34 @@ export type SpaceWarKey =
   | 'fps'
   | 'colTime'
   | 'colScore'
-  | 'time';
+  | 'time'
+  | 'setHull'
+  | 'hull_arrow'
+  | 'hull_delta'
+  | 'hull_wing'
+  | 'hull_ring'
+  | 'hull_core'
+  | 'hull_box'
+  | 'hull_diamond'
+  | 'hull_star5'
+  | 'hull_star4'
+  | 'setCollisions'
+  | 'setPowerups'
+  | 'setSabotage'
+  | 'setDifficulty'
+  | 'diff_easy'
+  | 'diff_normal'
+  | 'diff_hard'
+  | 'setQuality'
+  | 'q_auto'
+  | 'q_low'
+  | 'q_mid'
+  | 'q_high'
+  | 'setGhost'
+  | 'setBots'
+  | 'bot_weak'
+  | 'bot_mid'
+  | 'bot_strong';
 
 export const strings: GameStrings<SpaceWarKey> = {
   ru: {
@@ -36,6 +63,33 @@ export const strings: GameStrings<SpaceWarKey> = {
     fps: '{n} FPS',
     colTime: 'Продержался',
     colScore: 'Очки',
+    setHull: 'Корпус',
+    hull_arrow: 'Стрела',
+    hull_delta: 'Дельта',
+    hull_wing: 'Крыло',
+    hull_ring: 'Кольцо',
+    hull_core: 'Ядро',
+    hull_box: 'Короб',
+    hull_diamond: 'Ромб',
+    hull_star5: 'Звезда',
+    hull_star4: 'Звезда-4',
+    setCollisions: 'Столкновения кораблей',
+    setPowerups: 'Усиления',
+    setSabotage: 'Саботаж погибших',
+    setDifficulty: 'Стартовая сложность',
+    diff_easy: 'Лёгкая',
+    diff_normal: 'Обычная',
+    diff_hard: 'Тяжёлая',
+    setQuality: 'Качество графики',
+    q_auto: 'Авто',
+    q_low: 'Низкое',
+    q_mid: 'Среднее',
+    q_high: 'Высокое',
+    setGhost: 'Время призрака, с',
+    setBots: 'Уровень ботов',
+    bot_weak: 'Слабые',
+    bot_mid: 'Средние',
+    bot_strong: 'Сильные',
     time: '{m}:{s}',
   },
   en: {
@@ -54,6 +108,33 @@ export const strings: GameStrings<SpaceWarKey> = {
     fps: '{n} FPS',
     colTime: 'Survived',
     colScore: 'Score',
+    setHull: 'Hull',
+    hull_arrow: 'Arrow',
+    hull_delta: 'Delta',
+    hull_wing: 'Wing',
+    hull_ring: 'Ring',
+    hull_core: 'Core',
+    hull_box: 'Box',
+    hull_diamond: 'Diamond',
+    hull_star5: 'Star',
+    hull_star4: 'Star-4',
+    setCollisions: 'Ship collisions',
+    setPowerups: 'Power-ups',
+    setSabotage: 'Sabotage by the fallen',
+    setDifficulty: 'Starting difficulty',
+    diff_easy: 'Easy',
+    diff_normal: 'Normal',
+    diff_hard: 'Hard',
+    setQuality: 'Graphics quality',
+    q_auto: 'Auto',
+    q_low: 'Low',
+    q_mid: 'Medium',
+    q_high: 'High',
+    setGhost: 'Ghost time, s',
+    setBots: 'Bot level',
+    bot_weak: 'Weak',
+    bot_mid: 'Medium',
+    bot_strong: 'Strong',
     time: '{m}:{s}',
   },
 };

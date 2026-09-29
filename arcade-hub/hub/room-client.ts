@@ -41,6 +41,8 @@ export interface RoomClient {
   retry(): void;
   /** Ввод с телефона пришёл (id игрока = id слота строкой). */
   onInput(cb: (playerId: string, input: InputState) => void): void;
+  /** Поле игрока из лобби, выбранное на телефоне. */
+  onLobby(cb: (playerId: string, key: string, value: unknown) => void): void;
   /** Команда с телефона (pause, back, …); `leader` — прислал ли её ведущий. */
   onCmd(cb: (playerId: string, msg: CmdMsg, leader: boolean) => void): void;
   /** Последний ввод игрока с телефона. */
@@ -104,6 +106,7 @@ export function connectRoom(): RoomClient {
   const joinListeners: Array<(player: RoomPlayer) => void> = [];
   const inputListeners: Array<(playerId: string, input: InputState) => void> = [];
   const cmdListeners: Array<(playerId: string, msg: CmdMsg, leader: boolean) => void> = [];
+  const lobbyListeners: Array<(playerId: string, key: string, value: unknown) => void> = [];
   const leaderListeners: Array<(player: RoomPlayer) => void> = [];
   const statusListeners: Array<(online: boolean) => void> = [];
   let ws: WebSocket | null = null;
@@ -227,8 +230,14 @@ export function connectRoom(): RoomClient {
         for (const cb of cmdListeners) cb(String(slot.id), msg, state.isLeader(slot));
         return;
       }
+      case 'lobby': {
+        const slot = state.bySid(from);
+        if (!slot || typeof msg.key !== 'string') return;
+        for (const cb of lobbyListeners) cb(String(slot.id), msg.key, msg.value);
+        return;
+      }
       default:
-        // lobby, g — следующие этапы.
+        // g — особые действия игр, следующие этапы.
         return;
     }
   };
@@ -307,6 +316,7 @@ export function connectRoom(): RoomClient {
       connect();
     },
     onCmd: (cb) => void cmdListeners.push(cb),
+    onLobby: (cb) => void lobbyListeners.push(cb),
     inputOf: (id) => inputs.get(id) ?? { ...IDLE_INPUT },
     leaderId: () => {
       const leader = state.leader();

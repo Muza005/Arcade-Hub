@@ -23,8 +23,9 @@ import {
   NICK_GAP_PX,
   SHIP_LINE_PX,
   SHIP_SIZE,
-  SHIP_TAIL_K,
+  type Hull,
 } from '../config';
+import { drawHull, HULL_TAIL_X } from './hulls';
 
 export interface ShipView {
   /** Корпус и пламя — в слой свечения. */
@@ -36,7 +37,7 @@ export interface ShipView {
   set(x: number, y: number, angle: number, thrust: number): void;
   /** Поле: подписи у стены не уходят за край, у верхней — встают под корабль. */
   setBounds(bounds: { left: number; top: number; right: number }): void;
-  paint(color: string, nick: string): void;
+  paint(color: string, nick: string, hull: Hull): void;
   /** Жизни точками под кораблём. */
   setLives(lives: number, max: number): void;
   /** Мигание неуязвимости. */
@@ -51,20 +52,14 @@ const FONT_UI = 'Golos Text';
 const FONT_DISPLAY = 'Unbounded';
 const FONT_FALLBACK = 'sans-serif';
 
-/** Треугольник-стрелка: нос в (SHIP_SIZE, 0), корма с выемкой. */
-function hullPoints(): number[] {
-  const s = SHIP_SIZE;
-  const tail = s * SHIP_TAIL_K;
-  return [s, 0, -tail, -tail, -tail * 0.45, 0, -tail, tail];
-}
 
 export function createShipView(textColor: string): ShipView {
   const node = new Container();
   const body = new Container();
   const flame = new Graphics();
   const glow = new Graphics();
-  const hull = new Graphics();
-  body.addChild(flame, glow, hull);
+  const outline = new Graphics();
+  body.addChild(flame, glow, outline);
   const pips = new Graphics();
   pips.y = LIVES_Y;
   const label = new Container();
@@ -84,8 +79,7 @@ export function createShipView(textColor: string): ShipView {
   const tag = new Container();
   tag.addChild(pips, label);
 
-  const points = hullPoints();
-  const tailX = -SHIP_SIZE * SHIP_TAIL_K * 0.45;
+  let hull: Hull = 'arrow';
   const above = -SHIP_SIZE - NICK_GAP_PX;
   let color = textColor;
   let bounds = { left: -Infinity, top: -Infinity, right: Infinity };
@@ -103,13 +97,10 @@ export function createShipView(textColor: string): ShipView {
     }
   };
 
-  const drawHull = (): void => {
+  const repaint = (): void => {
     const i = mult - 1;
-    glow
-      .clear()
-      .poly(points)
-      .stroke({ color, width: MULT_GLOW_PX[i] ?? SHIP_LINE_PX, alpha: MULT_GLOW_ALPHA[i] ?? 0, join: 'round' });
-    hull.clear().poly(points).stroke({ color, width: SHIP_LINE_PX, alpha: MULT_HULL_ALPHA[i] ?? 1, join: 'round' });
+    drawHull(glow.clear(), hull, { color, width: MULT_GLOW_PX[i] ?? SHIP_LINE_PX, alpha: MULT_GLOW_ALPHA[i] ?? 0, join: 'round' });
+    drawHull(outline.clear(), hull, { color, width: SHIP_LINE_PX, alpha: MULT_HULL_ALPHA[i] ?? 1, join: 'round' });
   };
 
   /** Ник и цифра множителя одной строкой по центру над кораблём. */
@@ -142,17 +133,19 @@ export function createShipView(textColor: string): ShipView {
       if (thrust <= 0) return;
       const len = FLAME_LENGTH * thrust;
       const w = SHIP_SIZE * FLAME_WIDTH_K;
+      const tailX = HULL_TAIL_X[hull];
       flame.poly([tailX, -w / 2, tailX - len, 0, tailX, w / 2]).fill({ color, alpha: FLAME_ALPHA * thrust });
     },
     setBounds(next) {
       bounds = next;
     },
-    paint(nextColor, nextNick) {
+    paint(nextColor, nextNick, nextHull) {
       color = nextColor;
+      hull = nextHull;
       nick.text = nextNick;
       nick.style.fill = color;
       multText.style.fill = color;
-      drawHull();
+      repaint();
       layoutLabel();
       if (maxLives > 0) drawPips();
     },
@@ -170,7 +163,7 @@ export function createShipView(textColor: string): ShipView {
       if (next > mult) pop = 1;
       mult = next;
       multText.text = `×${mult}`;
-      drawHull();
+      repaint();
       layoutLabel();
     },
     update(dtS) {

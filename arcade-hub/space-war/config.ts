@@ -245,6 +245,20 @@ export const SAB_STEP_THRESHOLDS = [0.25, 0.5, 0.75] as const; // доли ди�
 export const SAB_CANCEL_CM = 1.5; // короче — отмена; тап тоже отмена
 export const SAB_FRAME_MIN_HEIGHT = 0.6; // рамка ≥ 60 % высоты телефона
 
+// ─── Лобби (Б5, SPACE_WAR_SPEC §8) ───────────────────────────────
+/** Формы корпуса: треугольник, круг, квадрат, звезда — у каждой свои варианты рисунка. Хитбокс у всех один. */
+export const HULLS = ['arrow', 'delta', 'wing', 'ring', 'core', 'box', 'diamond', 'star5', 'star4'] as const;
+export type Hull = (typeof HULLS)[number];
+export const HULL_DEFAULT: Hull = 'arrow';
+/** У ботов один статичный корпус. */
+export const HULL_BOT: Hull = 'delta';
+export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
+export const DIFFICULTY_DEFAULT = 'normal';
+export const BOT_LEVELS = ['weak', 'mid', 'strong'] as const;
+export const BOT_LEVEL_DEFAULT = 'mid';
+export const QUALITY_CHOICES = ['auto', 'low', 'mid', 'high'] as const;
+export const GHOST_S_RANGE = { min: 10, max: 30, step: 5 } as const;
+
 // ─── Воскрешение и призрак ───────────────────────────────────────
 export const GHOST_S = 15; // настраивается в лобби
 export const REVIVE_SHARDS = 3;
