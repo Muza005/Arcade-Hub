@@ -27,7 +27,11 @@ import {
 } from '../config';
 
 export interface ShipView {
+  /** Корпус и пламя — в слой свечения. */
   readonly node: Container;
+  /** Ник, множитель и жизни — отдельным слоем без bloom, чтобы текст оставался чётким. */
+  readonly tag: Container;
+  setVisible(visible: boolean): void;
   /** Положение, поворот носа и тяга 0…1. */
   set(x: number, y: number, angle: number, thrust: number): void;
   /** Поле: подписи у стены не уходят за край, у верхней — встают под корабль. */
@@ -76,7 +80,9 @@ export function createShipView(textColor: string): ShipView {
   });
   multText.anchor.set(0.5, 1);
   label.addChild(nick, multText);
-  node.addChild(body, pips, label);
+  node.addChild(body);
+  const tag = new Container();
+  tag.addChild(pips, label);
 
   const points = hullPoints();
   const tailX = -SHIP_SIZE * SHIP_TAIL_K * 0.45;
@@ -118,8 +124,14 @@ export function createShipView(textColor: string): ShipView {
 
   return {
     node,
+    tag,
+    setVisible(visible) {
+      node.visible = visible;
+      tag.visible = visible;
+    },
     set(x, y, angle, thrust) {
       node.position.set(x, y);
+      tag.position.set(x, y);
       body.rotation = angle;
       const half = label.width / 2;
       label.x = Math.min(Math.max(0, bounds.left + half - x), bounds.right - half - x);

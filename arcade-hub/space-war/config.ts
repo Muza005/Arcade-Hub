@@ -47,11 +47,10 @@ export const HIT_STOP_S = 0.05;
 export const HIT_STOP_DEATH_S = 0.12;
 // Bloom (с среднего качества): свечение рисуется в уменьшенную текстуру, размывается и ложится сверху
 export const BLOOM_SCALE = 0.25;
-export const BLOOM_BLUR = 8;
-export const BLOOM_BLUR_QUALITY = 2;
-export const BLOOM_STRENGTH = 1; // × ползунок «Bloom» хаба
-// Хроматическая аберрация (только высокое): постоянно чуть-чуть у краёв, сильнее при ударе
-export const CHROMA_BASE_PX = 1.2;
+export const BLOOM_BLUR = 10;
+export const BLOOM_BLUR_QUALITY = 4; // меньше — размытие распадается на заметные копии
+export const BLOOM_STRENGTH = 0.7; // × ползунок «Bloom» хаба
+// Хроматическая аберрация (только высокое): импульсом при ударе — постоянная размывала картинку
 export const CHROMA_HIT_PX = 5;
 export const CHROMA_DECAY_S = 0.35;
 // Частицы

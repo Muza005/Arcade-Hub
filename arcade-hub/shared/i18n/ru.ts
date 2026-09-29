@@ -151,6 +151,7 @@ export const ru = {
   'set.bloom': 'Свечение',
   'set.reducedMotion': 'Уменьшить движение',
   'set.replay': 'Повтор конца матча',
+  'set.showFps': 'Показывать FPS',
   'set.language': 'Язык',
   'set.room': 'Комната',
   'set.changeCode': 'Сменить код комнаты',

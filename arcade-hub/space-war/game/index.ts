@@ -16,7 +16,6 @@ import {
   BULLET_LENGTH,
   BULLET_LINE_PX,
   CHIP_COUNT,
-  CHROMA_BASE_PX,
   CHROMA_HIT_PX,
   CRACK_GLOW,
   DEBRIS_COUNT,
@@ -75,8 +74,6 @@ const SECONDS_PER_MINUTE = 60;
 const EXPLOSION_K = 2;
 /** Пролёт вплотную — несколько искр в цвет игрока. */
 const NEAR_SPARKS = 4;
-/** Счётчик FPS — в dev или с ?fps в адресе: игрокам он не нужен. */
-const SHOW_FPS = import.meta.env.DEV || new URLSearchParams(location.search).has('fps');
 
 const formatTime = (seconds: number): string => {
   const total = Math.floor(seconds);
@@ -103,6 +100,7 @@ export function createSpaceWarGame(): GameModule {
   const shipsLayer = new Container();
   /** Слой свечения: под bloom — только неон (след, снаряды, корабли, частицы); ореол камней запечён в атлас. */
   const glowLayer = new Container();
+  const tagsLayer = new Container();
   /** Спрайт камня по id; спрайты переиспользуются. */
   const rockSprites = new Map<number, Sprite>();
   const spareSprites: Sprite[] = [];
@@ -116,6 +114,8 @@ export function createSpaceWarGame(): GameModule {
   let bloom: BloomFilter | null = null;
   let chroma: ChromaFilter | null = null;
   let bloomK = 0;
+  /** Аберрация разрешена качеством; включается только на время импульса. */
+  let chromaOn = false;
   /** Часы эффектов: идут по шагам симуляции, на паузе стоят. */
   let fxTimeS = 0;
   let lastFrameAt = 0;
@@ -144,7 +144,7 @@ export function createSpaceWarGame(): GameModule {
     particles.setLimit(PARTICLES_MAX[level]);
     multFx.sparks = level !== 'low';
     glowLayer.filters = bloom && level !== 'low' && bloomK > 0 ? [bloom] : [];
-    stage.world.filters = chroma && level === 'high' ? [chroma.filter] : [];
+    chromaOn = chroma !== null && level === 'high';
   };
 
   const shards = (x: number, y: number, count: number, color: string): void =>
@@ -255,13 +255,15 @@ export function createSpaceWarGame(): GameModule {
         views.set(player.id, view);
         colors.set(player.id, player.color);
         shipsLayer.addChild(view.node);
+        tagsLayer.addChild(view.tag);
       }
       glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
-      scene.addChild(field, rocksLayer, glowLayer);
+      scene.addChild(field, rocksLayer, glowLayer, tagsLayer);
 
       scoreHud = createScoreHud(ctx.players, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
       stage.world.addChild(starsSprite, scene, scoreHud.view, camera.flash);
-      if (SHOW_FPS) {
+      // Счётчик FPS — по переключателю в настройках хаба (или ?fps в адресе).
+      if (settings.showFps || new URLSearchParams(location.search).has('fps')) {
         fpsText = new Text({
           text: '',
           style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: FPS_FONT_PX, fill: textColor },
@@ -307,7 +309,7 @@ export function createSpaceWarGame(): GameModule {
         const view = views.get(ship.id);
         const pilot = sim.pilots.get(ship.id);
         if (!view || !pilot) continue;
-        view.node.visible = pilot.alive;
+        view.setVisible(pilot.alive);
         if (!pilot.alive) continue;
         view.set(
           ship.prev.x + (ship.pos.x - ship.prev.x) * alpha,
@@ -333,7 +335,10 @@ export function createSpaceWarGame(): GameModule {
       multFx.draw();
       scoreHud.draw();
       stars?.set(fxTimeS, stage.world.scale.x, -camera.offsetX, -camera.offsetY);
-      chroma?.set(CHROMA_BASE_PX + (CHROMA_HIT_PX - CHROMA_BASE_PX) * camera.chroma);
+      const pulse = chromaOn && chroma && camera.chroma > 0 ? chroma : null;
+      pulse?.set(CHROMA_HIT_PX * camera.chroma);
+      const worldFilters = pulse ? [pulse.filter] : [];
+      if ((stage.world.filters?.length ?? 0) !== worldFilters.length) stage.world.filters = worldFilters;
 
       const now = performance.now();
       if (!paused && quality.sample(now - lastFrameAt)) applyQuality(quality.level);

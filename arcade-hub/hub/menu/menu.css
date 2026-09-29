@@ -453,7 +453,8 @@
 
 .gw {
   width: min(calc(1400rem / 24), calc(100vw - 2 * var(--safe-zone)));
-  height: min(calc(860rem / 24), calc(100vh - var(--safe-zone)));
+  /* Высота — по содержимому (у игр разное число режимов); не влезает — прокручивается тело окна. */
+  max-height: calc(100vh - var(--safe-zone));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -538,10 +539,11 @@
 .gw__body {
   flex: 1;
   min-height: 0;
+  overflow-y: auto;
   display: grid;
   grid-template-columns: 1fr calc(360rem / 24);
   gap: var(--space-6);
-  padding: var(--space-4) calc(56rem / 24) var(--space-6);
+  padding: var(--space-4) calc(56rem / 24) calc(56rem / 24);
 }
 
 .gw__main {

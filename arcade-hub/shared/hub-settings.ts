@@ -15,6 +15,8 @@ export interface HubSettings {
   quality: Quality;
   /** Масштаб интерфейса, 90–130 %. */
   uiScale: number;
+  /** Счётчик FPS в углу игры (для игр, которые его рисуют). */
+  showFps: boolean;
   // Комфорт, 0–100
   flash: number;
   shake: number;
@@ -36,6 +38,7 @@ export const defaultHubSettings = (): HubSettings => ({
   menuSounds: true,
   quality: 'auto',
   uiScale: FULL,
+  showFps: false,
   flash: FULL,
   shake: FULL,
   bloom: FULL,
@@ -58,6 +61,7 @@ export function sanitizeHubSettings(raw: unknown): HubSettings {
     effects: percent(s.effects, d.effects),
     menuSounds: typeof s.menuSounds === 'boolean' ? s.menuSounds : d.menuSounds,
     quality: QUALITIES.includes(s.quality as Quality) ? (s.quality as Quality) : d.quality,
+    showFps: typeof s.showFps === 'boolean' ? s.showFps : d.showFps,
     uiScale: Math.min(UI_SCALE_RANGE.max, Math.max(UI_SCALE_RANGE.min, Math.round(scale))),
     flash: percent(s.flash, d.flash),
     shake: percent(s.shake, d.shake),

@@ -143,6 +143,7 @@ export function createSettingsScreen(options: SettingsScreenOptions): SettingsSc
               ),
             ),
           ),
+          toggle('showFps', 'set.showFps', s.showFps, () => patch({ showFps: !s.showFps })),
           toggle('fullscreen', 'set.fullscreen', document.fullscreenElement !== null, () => {
             toggleFullscreen();
             // Состояние полного экрана меняется асинхронно — перерисуем по событию.

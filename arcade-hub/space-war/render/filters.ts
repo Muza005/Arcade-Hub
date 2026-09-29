@@ -16,6 +16,10 @@ import { BLOOM_BLUR, BLOOM_BLUR_QUALITY, STAR_DENSITY, STAR_LAYERS } from '../co
 
 const num = (v: number): string => (Number.isInteger(v) ? `${v}.0` : String(v));
 
+/** Разрешение фильтра — как у экрана. По умолчанию PixiJS рендерит фильтры в разрешении 1,
+ *  и на плотных экранах ноутбуков всё под фильтром выходит мутным. */
+const SHARP = { resolution: 'inherit', antialias: 'inherit' } as const;
+
 // ─── Звёзды ──────────────────────────────────────────────────────
 // Каждый слой — сетка ячеек; в части ячеек звезда со своим смещением, размером, цветом и мерцанием.
 // Слои плывут с разной скоростью и по-разному смещаются вместе с тряской камеры — отсюда глубина.
@@ -70,6 +74,7 @@ export function createStarsFilter(): StarsFilter {
     uOffset: { value: new Float32Array(2), type: 'vec2<f32>' },
   });
   const filter = new Filter({
+    ...SHARP,
     glProgram: GlProgram.from({ vertex: defaultFilterVert, fragment: starsFrag, name: 'sw-stars' }),
     resources: { starUniforms: uniforms },
   });
@@ -104,17 +109,18 @@ void main() {
 export class BloomFilter extends Filter {
   private readonly blur: BlurFilter;
   /** Копия входа: размытие PixiJS пишет промежуточные проходы прямо во входную текстуру. */
-  private readonly copy = new AlphaFilter({ alpha: 1 });
+  private readonly copy = new AlphaFilter({ alpha: 1, ...SHARP });
   private readonly bloomUniforms: UniformGroup;
 
   constructor() {
     const bloomUniforms = new UniformGroup({ uStrength: { value: 1, type: 'f32' } });
     super({
+      ...SHARP,
       glProgram: GlProgram.from({ vertex: defaultFilterVert, fragment: bloomFrag, name: 'sw-bloom' }),
       resources: { bloomUniforms, uBloom: Texture.WHITE.source },
     });
     this.bloomUniforms = bloomUniforms;
-    this.blur = new BlurFilter({ strength: BLOOM_BLUR, quality: BLOOM_BLUR_QUALITY });
+    this.blur = new BlurFilter({ strength: BLOOM_BLUR, quality: BLOOM_BLUR_QUALITY, ...SHARP });
     this.padding = BLOOM_BLUR * 2;
   }
 
@@ -163,6 +169,7 @@ export interface ChromaFilter {
 export function createChromaFilter(): ChromaFilter {
   const uniforms = new UniformGroup({ uAmount: { value: 0, type: 'f32' } });
   const filter = new Filter({
+    ...SHARP,
     glProgram: GlProgram.from({ vertex: defaultFilterVert, fragment: chromaFrag, name: 'sw-chroma' }),
     resources: { chromaUniforms: uniforms },
   });

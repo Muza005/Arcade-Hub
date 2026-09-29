@@ -151,6 +151,7 @@ export const en: Dictionary = {
   'set.bloom': 'Glow',
   'set.reducedMotion': 'Reduce motion',
   'set.replay': 'End-of-match replay',
+  'set.showFps': 'Show FPS',
   'set.language': 'Language',
   'set.room': 'Room',
   'set.changeCode': 'Change room code',
