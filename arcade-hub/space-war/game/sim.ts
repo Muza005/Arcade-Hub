@@ -12,6 +12,8 @@ import {
   GAME_OVER_DELAY_S,
   GRID_CELL,
   HIT_INVULN_S,
+  HIT_STOP_DEATH_S,
+  HIT_STOP_S,
   NEAR_MISS_DISTANCE,
   SCORE_ASTEROID,
   SCORE_LIFE_LEFT,
@@ -52,6 +54,8 @@ export interface Sim {
   readonly timeS: number;
   /** Все погибли и пауза на взрыв прошла. */
   readonly over: boolean;
+  /** Hit-stop: мир замер на мгновение после удара — шаг ничего не двигает. */
+  readonly frozen: boolean;
   step(dtS: number, read: (id: string) => InputState): void;
   /** Итоговые очки: накопленные плюс SCORE_LIFE_LEFT за каждую оставшуюся жизнь. */
   finalScore(id: string): number;
@@ -90,6 +94,7 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
   let spawnDebt = 0;
   let timeS = 0;
   let overInS: number | null = null;
+  let hitStopS = 0;
 
   const rebuildGrid = (): void => {
     grid.clear();
@@ -124,7 +129,9 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
     pilot.invulnS = HIT_INVULN_S;
     resetMult(pilot);
     events.hits.push(pilot.ship.id);
+    hitStopS = Math.max(hitStopS, HIT_STOP_S);
     if (pilot.lives > 0) return;
+    hitStopS = Math.max(hitStopS, HIT_STOP_DEATH_S);
     pilot.alive = false;
     pilot.diedAtS = timeS;
     events.deaths.push(pilot.ship.id);
@@ -187,12 +194,19 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
     get over() {
       return overInS !== null && overInS <= 0;
     },
+    get frozen() {
+      return hitStopS > 0;
+    },
     finalScore(id) {
       const p = pilots.get(id);
       return p ? p.score + Math.max(0, p.lives) * SCORE_LIFE_LEFT : 0;
     },
     step(dtS, read) {
       for (const list of Object.values(events)) (list as unknown[]).length = 0;
+      if (hitStopS > 0) {
+        hitStopS -= dtS;
+        return;
+      }
       timeS += dtS;
 
       spawnDebt += spawnPerS * dtS;

@@ -17,8 +17,47 @@ export const FRAME_BUDGET_MS = 8; // наш бюджет из 16 мс
 export const QUALITY_DOWNGRADE_FRAME_MS = 20; // кадр дольше этого...
 export const QUALITY_DOWNGRADE_HOLD_S = 2; // ...2 с подряд → качество на ступень ниже
 export const QUALITY_PROBE_S = 3; // первичный замер при старте
-export const PARTICLES_MAX = { mid: 300, high: 1500 } as const;
+/** Лимит частиц по качеству. На низком — только короткие осколки от камней, искры множителя выключены. */
+export const PARTICLES_MAX = { low: 40, mid: 300, high: 1500 } as const;
 export const BUNDLE_GAME_KB = 500;
+/** Первые кадры после старта не считаются: загрузка и прогрев шейдеров. */
+export const QUALITY_WARMUP_S = 0.5;
+
+// ─── Визуал (Б4) ─────────────────────────────────────────────────
+// Параллакс-звёзды: три слоя в шейдере, дальние мельче, тусклее и медленнее
+export const STAR_LAYERS = [
+  { cell: 90, drift: 4, parallax: 0.15, bright: 0.35 },
+  { cell: 150, drift: 9, parallax: 0.35, bright: 0.6 },
+  { cell: 240, drift: 16, parallax: 0.6, bright: 0.9 },
+] as const;
+export const STAR_DENSITY = 0.35; // доля ячеек со звездой
+// Тряска камеры (trauma: сдвиг ∝ trauma², спадает линейно); × ползунок «Тряска» хаба
+export const SHAKE_HIT = 0.45;
+export const SHAKE_DEATH = 0.8;
+export const SHAKE_BREAK_LARGE = 0.12;
+export const SHAKE_MAX_PX = 18;
+export const SHAKE_DECAY_PER_S = 1.6;
+export const SHAKE_FREQ_HZ = 28;
+// Вспышка экрана; × ползунок «Вспышки» хаба
+export const FLASH_HIT_ALPHA = 0.16;
+export const FLASH_DEATH_ALPHA = 0.3;
+export const FLASH_DECAY_S = 0.25;
+// Hit-stop: мир замирает на мгновение — часть симуляции, в записи повторяется так же
+export const HIT_STOP_S = 0.05;
+export const HIT_STOP_DEATH_S = 0.12;
+// Bloom (с среднего качества): свечение рисуется в уменьшенную текстуру, размывается и ложится сверху
+export const BLOOM_SCALE = 0.25;
+export const BLOOM_BLUR = 8;
+export const BLOOM_BLUR_QUALITY = 2;
+export const BLOOM_STRENGTH = 1; // × ползунок «Bloom» хаба
+// Хроматическая аберрация (только высокое): постоянно чуть-чуть у краёв, сильнее при ударе
+export const CHROMA_BASE_PX = 1.2;
+export const CHROMA_HIT_PX = 5;
+export const CHROMA_DECAY_S = 0.35;
+// Частицы
+export const SPARK_TEXTURE_PX = 16; // мягкая точка в атласе
+export const SHARD_TEXTURE_PX = 20; // чёрточка осколка
+export const ATLAS_GAP = 2;
 // Счётчик FPS (этап Б0): обновляется дважды в секунду, мелко в углу
 export const FPS_SAMPLE_S = 0.5;
 export const FPS_FONT_PX = 22;
@@ -86,16 +125,15 @@ export const ASTEROID_JAGGED = 0.28; // разброс радиуса верши
 export const ASTEROID_COLOR = '#A99BFF';
 export const ASTEROID_FILL = '#0B0D1C';
 export const ASTEROID_LINE_PX = 3;
+export const ASTEROID_GLOW_PX = 9; // неоновый ореол контура
+export const ASTEROID_GLOW_ALPHA = 0.18;
 export const ASTEROID_TEXTURE_PAD = 6;
 // Осколки: только вид, урона не наносят
 export const DEBRIS_COUNT = { small: 5, medium: 7, large: 9 } as const;
 export const DEBRIS_SPEED = [120, 320] as const;
 export const DEBRIS_S = 0.6;
-export const DEBRIS_LEN = 10;
-export const DEBRIS_LINE_PX = 2;
 export const DEBRIS_VFX_SEED = 0xdeb415; // осколки — только вид, своя случайность
 export const INVULN_ALPHA = 0.3; // мигание неуязвимого корабля
-export const DEBRIS_MAX = 200;
 // Три состояния камня по урону: целый, трещины, светящиеся разломы на последнем попадании
 export const CRACK_COLOR = '#6E62B8';
 export const CRACK_GLOW = '#FFB84D';
@@ -156,9 +194,7 @@ export const MULT_GLOW_PX = [10, 10, 14, 16, 20] as const;
 export const MULT_TRAIL_S = [0, 0, 0, 0.35, 0.6] as const; // ×4 — след, ×5 — длиннее
 export const MULT_SPARK_S = [0, 0, 0, 1, 1.75] as const; // искры гаснут ~1 с и 1,5–2 с
 export const MULT_SPARK_PER_S = [0, 0, 0, 22, 36] as const;
-export const SPARKS_MAX = 150; // общий лимит: при толпе лидеров следы короче, но не пропадают
 export const SPARK_SPEED = 40;
-export const SPARK_RADIUS = 2;
 export const TRAIL_LINE_PX = 6;
 export const TRAIL_ALPHA = 0.5;
 export const MULT_FONT_PX = 20;

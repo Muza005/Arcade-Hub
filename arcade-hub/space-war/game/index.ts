@@ -1,45 +1,63 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
-// Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки. Волны — Б8.
-import { Container, Graphics, Sprite, Text } from 'pixi.js';
+// Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
+// Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Волны — Б8.
+import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { IDLE_INPUT } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
 import { rankByScore, type GameContext, type GameModule, type GamePlayer, type MatchResult } from '../../shared/game-manifest';
+import { readHubSettings } from '../../shared/hub-settings';
 import { createTranslator } from '../../shared/i18n';
 import {
   ACCENT,
   AMMO_MAX,
+  ASTEROID_COLOR,
+  BLOOM_STRENGTH,
   BULLET_LENGTH,
   BULLET_LINE_PX,
   CHIP_COUNT,
+  CHROMA_BASE_PX,
+  CHROMA_HIT_PX,
   CRACK_GLOW,
   DEBRIS_COUNT,
+  DEBRIS_S,
+  DEBRIS_SPEED,
   DEBRIS_VFX_SEED,
   FIELD_INSET,
   FIELD_LINE_ALPHA,
   FIELD_LINE_PX,
   FIELD_RADIUS,
+  FLASH_DEATH_ALPHA,
   FLASH_EXPLODE,
   FLASH_HIT,
+  FLASH_HIT_ALPHA,
   FPS_ALPHA,
   FPS_FONT_PX,
   FPS_PAD_PX,
   FPS_SAMPLE_S,
   HUD_PAD_PX,
   INVULN_BLINK_HZ,
+  MULT_SPARK_S,
   NICK_FONT_PX,
+  PARTICLES_MAX,
+  SHAKE_BREAK_LARGE,
+  SHAKE_DEATH,
+  SHAKE_HIT,
   SHIP_LIVES,
+  SPARK_SPEED,
   VIBRATE_EXPLODE_MS,
   VIBRATE_HIT_MS,
   WORLD_H,
-  ASTEROID_COLOR,
   worldWidth,
 } from '../config';
 import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
-import { bakeAsteroids, rockState, type AsteroidTextures } from '../render/asteroid-art';
-import { createDebris, type Debris } from '../render/debris';
+import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
+import { createCamera, type Camera } from '../render/camera';
+import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
 import { createMultFx, type MultFx } from '../render/mult-fx';
+import { createParticles, type Particles } from '../render/particles';
+import { createQuality, type Level, type QualityControl } from '../render/quality';
 import { createScoreHud, type ScoreHud } from '../render/score-hud';
 import { createShipView, type ShipView } from '../render/ship-view';
 import { angleDelta } from './ship';
@@ -51,9 +69,14 @@ const FONT_DISPLAY = 'Unbounded';
 const FONT_UI = 'Golos Text';
 const FONT_FALLBACK = 'sans-serif';
 const MS_PER_S = 1000;
+const PERCENT = 100;
 const SECONDS_PER_MINUTE = 60;
-/** Взрыв корабля — осколков как от крупного камня, вдвое больше. */
+/** Взрыв корабля — осколков как от крупного камня, вдвое больше, и столько же искр. */
 const EXPLOSION_K = 2;
+/** Пролёт вплотную — несколько искр в цвет игрока. */
+const NEAR_SPARKS = 4;
+/** Счётчик FPS — в dev или с ?fps в адресе: игрокам он не нужен. */
+const SHOW_FPS = import.meta.env.DEV || new URLSearchParams(location.search).has('fps');
 
 const formatTime = (seconds: number): string => {
   const total = Math.floor(seconds);
@@ -70,18 +93,33 @@ export function createSpaceWarGame(): GameModule {
   let bots = new Set<string>();
   const views = new Map<string, ShipView>();
   const colors = new Map<string, string>();
-  let textures: AsteroidTextures;
+  let atlas: Atlas;
+
+  // Сцена: звёзды (свой сдвиг параллакса) → трясущаяся сцена → счёт и вспышка поверх.
+  const scene = new Container();
   const rocksLayer = new Container();
+  const bulletsView = new Graphics();
+  bulletsView.blendMode = 'add';
+  const shipsLayer = new Container();
+  /** Слой свечения: под bloom — только неон (след, снаряды, корабли, частицы); ореол камней запечён в атлас. */
+  const glowLayer = new Container();
   /** Спрайт камня по id; спрайты переиспользуются. */
   const rockSprites = new Map<number, Sprite>();
   const spareSprites: Sprite[] = [];
-  let debris: Debris;
+  const vfx = createRng(DEBRIS_VFX_SEED);
+  let particles: Particles;
   let multFx: MultFx;
   let scoreHud: ScoreHud;
-  const bulletsView = new Graphics();
-  const vfx = createRng(DEBRIS_VFX_SEED);
-  let fpsText: Text;
-  /** FPS считается по кадрам отрисовки: это замер производительности, не симуляция. */
+  let camera: Camera;
+  let quality: QualityControl;
+  let stars: StarsFilter | null = null;
+  let bloom: BloomFilter | null = null;
+  let chroma: ChromaFilter | null = null;
+  let bloomK = 0;
+  /** Часы эффектов: идут по шагам симуляции, на паузе стоят. */
+  let fxTimeS = 0;
+  let lastFrameAt = 0;
+  let fpsText: Text | null = null;
   let frames = 0;
   let sampleStart = 0;
 
@@ -101,6 +139,20 @@ export function createSpaceWarGame(): GameModule {
     ctx.end(result());
   };
 
+  /** Качество: лимит частиц, искры множителя, bloom (со среднего), аберрация (только высокое). */
+  const applyQuality = (level: Level): void => {
+    particles.setLimit(PARTICLES_MAX[level]);
+    multFx.sparks = level !== 'low';
+    glowLayer.filters = bloom && level !== 'low' && bloomK > 0 ? [bloom] : [];
+    stage.world.filters = chroma && level === 'high' ? [chroma.filter] : [];
+  };
+
+  const shards = (x: number, y: number, count: number, color: string): void =>
+    particles.burst(x, y, { texture: atlas.shard, color, count, speed: DEBRIS_SPEED, life: DEBRIS_S, aligned: true });
+  const sparks = (x: number, y: number, count: number, color: string, life: number): void => {
+    if (quality.level !== 'low') particles.burst(x, y, { texture: atlas.spark, color, count, speed: [0, SPARK_SPEED * 3], life });
+  };
+
   const syncRocks = (alpha: number): void => {
     const seen = new Set<number>();
     for (const rock of sim.asteroids) {
@@ -112,7 +164,7 @@ export function createSpaceWarGame(): GameModule {
         rocksLayer.addChild(sprite);
         rockSprites.set(rock.id, sprite);
       }
-      const shape = textures[rock.size][rock.shape] ?? textures[rock.size][0]!;
+      const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
       sprite.texture = shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!;
       sprite.position.set(rock.prev.x + (rock.pos.x - rock.prev.x) * alpha, rock.prev.y + (rock.pos.y - rock.prev.y) * alpha);
       sprite.rotation = rock.angle;
@@ -125,10 +177,41 @@ export function createSpaceWarGame(): GameModule {
     }
   };
 
+  /** События шага → частицы, тряска, вспышки и обратная связь на телефоне. */
+  const react = (): void => {
+    const { events } = sim;
+    for (const b of events.breaks) {
+      shards(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR);
+      if (b.size === 'large') camera.shake(SHAKE_BREAK_LARGE);
+    }
+    for (const c of events.chips) sparks(c.x, c.y, CHIP_COUNT, CRACK_GLOW, DEBRIS_S);
+    for (const n of events.near) sparks(n.x, n.y, NEAR_SPARKS, colors.get(n.id) ?? ACCENT, DEBRIS_S);
+    for (const id of events.hits) {
+      camera.shake(SHAKE_HIT);
+      camera.flashScreen(FLASH_HIT, FLASH_HIT_ALPHA);
+      camera.pulseChroma();
+      if (sim.pilots.get(id)?.alive) ctx.fx(id, { vib: VIBRATE_HIT_MS, flash: FLASH_HIT });
+    }
+    for (const id of events.deaths) {
+      const pilot = sim.pilots.get(id);
+      const color = colors.get(id) ?? ACCENT;
+      if (pilot) {
+        const { x, y } = pilot.ship.pos;
+        shards(x, y, DEBRIS_COUNT.large * EXPLOSION_K, color);
+        sparks(x, y, DEBRIS_COUNT.large * EXPLOSION_K, color, MULT_SPARK_S[MULT_SPARK_S.length - 1] ?? 1);
+      }
+      camera.shake(SHAKE_DEATH);
+      camera.flashScreen(FLASH_EXPLODE, FLASH_DEATH_ALPHA);
+      ctx.fx(id, { vib: VIBRATE_EXPLODE_MS, flash: FLASH_EXPLODE });
+      multFx.drop(id);
+    }
+  };
+
   return {
     async init(context) {
       ctx = context;
       const worldW = worldWidth(ctx.aspect);
+      const settings = readHubSettings();
       bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
       sim = createSim(
         ctx.players.map((p) => p.id),
@@ -137,23 +220,32 @@ export function createSpaceWarGame(): GameModule {
       );
       await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`, `600 ${NICK_FONT_PX}px "${FONT_UI}"`]);
       stage = await createStage(ctx.mount, worldW, WORLD_H, { background: cssVar('--bg') });
-      textures = bakeAsteroids(stage.app.renderer);
-      debris = createDebris();
-      multFx = createMultFx(vfx);
+      atlas = bakeAtlas(stage.app.renderer);
+      particles = createParticles(vfx);
+      multFx = createMultFx(particles, atlas.spark);
+      camera = createCamera(settings, worldW, WORLD_H, vfx);
+      quality = createQuality(settings.quality);
+      bloomK = (BLOOM_STRENGTH * settings.bloom) / PERCENT;
+
+      // Шейдеры — только на WebGL; на другом рендерере игра идёт без них.
+      const webgl = stage.app.renderer.name === 'webgl';
+      if (webgl) {
+        stars = createStarsFilter();
+        bloom = new BloomFilter();
+        bloom.strength = bloomK;
+        chroma = createChromaFilter();
+      }
+
+      const starsSprite = new Sprite(Texture.WHITE);
+      starsSprite.width = worldW;
+      starsSprite.height = WORLD_H;
+      starsSprite.tint = cssVar('--bg');
+      if (stars) starsSprite.filters = [stars.filter];
 
       const field = new Graphics()
         .roundRect(FIELD_INSET, FIELD_INSET, worldW - FIELD_INSET * 2, WORLD_H - FIELD_INSET * 2, FIELD_RADIUS)
         .stroke({ color: ACCENT, width: FIELD_LINE_PX, alpha: FIELD_LINE_ALPHA });
 
-      fpsText = new Text({
-        text: '',
-        style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: FPS_FONT_PX, fill: cssVar('--text') },
-      });
-      fpsText.alpha = FPS_ALPHA;
-      fpsText.anchor.set(1, 0);
-      fpsText.position.set(worldW - FIELD_INSET - FPS_PAD_PX, FIELD_INSET + FPS_PAD_PX);
-
-      stage.world.addChild(field, multFx.view, rocksLayer, bulletsView, debris.view);
       const textColor = cssVar('--text');
       for (const player of ctx.players) {
         const view = createShipView(textColor);
@@ -162,32 +254,35 @@ export function createSpaceWarGame(): GameModule {
         view.setLives(SHIP_LIVES, SHIP_LIVES);
         views.set(player.id, view);
         colors.set(player.id, player.color);
-        stage.world.addChild(view.node);
+        shipsLayer.addChild(view.node);
       }
+      glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
+      scene.addChild(field, rocksLayer, glowLayer);
+
       scoreHud = createScoreHud(ctx.players, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
-      stage.world.addChild(scoreHud.view, fpsText);
-      sampleStart = performance.now();
+      stage.world.addChild(starsSprite, scene, scoreHud.view, camera.flash);
+      if (SHOW_FPS) {
+        fpsText = new Text({
+          text: '',
+          style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: FPS_FONT_PX, fill: textColor },
+        });
+        fpsText.alpha = FPS_ALPHA;
+        fpsText.anchor.set(1, 0);
+        fpsText.position.set(worldW - FIELD_INSET - FPS_PAD_PX, FIELD_INSET + FPS_PAD_PX);
+        stage.world.addChild(fpsText);
+      }
+      applyQuality(quality.level);
+      sampleStart = lastFrameAt = performance.now();
     },
 
     update(dtS) {
       if (paused || ended) return;
       sim.step(dtS, (id) => (bots.has(id) ? IDLE_INPUT : ctx.input.read(id)));
-      const { events } = sim;
-      for (const b of events.breaks) debris.burst(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR, vfx.next);
-      for (const c of events.chips) debris.burst(c.x, c.y, CHIP_COUNT, CRACK_GLOW, vfx.next);
-      for (const id of events.hits) {
-        const pilot = sim.pilots.get(id);
-        if (pilot?.alive) ctx.fx(id, { vib: VIBRATE_HIT_MS, flash: FLASH_HIT });
-      }
-      for (const id of events.deaths) {
-        const pilot = sim.pilots.get(id);
-        if (pilot) {
-          const color = colors.get(id) ?? ACCENT;
-          debris.burst(pilot.ship.pos.x, pilot.ship.pos.y, DEBRIS_COUNT.large * EXPLOSION_K, color, vfx.next);
-        }
-        ctx.fx(id, { vib: VIBRATE_EXPLODE_MS, flash: FLASH_EXPLODE });
-        multFx.drop(id);
-      }
+      react();
+      camera.update(dtS);
+      // Hit-stop: мир на мгновение замер — замирают и частицы, и следы; тряска и вспышка идут.
+      if (sim.frozen) return;
+      fxTimeS += dtS;
       for (const pilot of sim.pilots.values()) {
         if (!pilot.alive) continue;
         const { id, pos } = pilot.ship;
@@ -195,15 +290,18 @@ export function createSpaceWarGame(): GameModule {
         views.get(id)?.update(dtS);
       }
       multFx.update(dtS);
+      particles.update(dtS);
       scoreHud.update(
         ctx.players.map((p) => ({ id: p.id, score: sim.pilots.get(p.id)?.score ?? 0 })),
         dtS,
       );
-      debris.update(dtS);
       if (sim.over) endMatch();
     },
 
-    render(alpha) {
+    render(frameAlpha) {
+      // В hit-stop шаги не двигают мир — рисуем последний кадр без интерполяции.
+      const alpha = sim.frozen ? 1 : frameAlpha;
+      scene.position.set(camera.offsetX, camera.offsetY);
       syncRocks(alpha);
       for (const ship of sim.ships) {
         const view = views.get(ship.id);
@@ -234,15 +332,20 @@ export function createSpaceWarGame(): GameModule {
       }
       multFx.draw();
       scoreHud.draw();
-      debris.draw();
+      stars?.set(fxTimeS, stage.world.scale.x, -camera.offsetX, -camera.offsetY);
+      chroma?.set(CHROMA_BASE_PX + (CHROMA_HIT_PX - CHROMA_BASE_PX) * camera.chroma);
 
-      frames++;
       const now = performance.now();
-      const elapsedS = (now - sampleStart) / MS_PER_S;
-      if (elapsedS >= FPS_SAMPLE_S) {
-        fpsText.text = t('fps', { n: Math.round(frames / elapsedS) });
-        frames = 0;
-        sampleStart = now;
+      if (!paused && quality.sample(now - lastFrameAt)) applyQuality(quality.level);
+      lastFrameAt = now;
+      if (fpsText) {
+        frames++;
+        const elapsedS = (now - sampleStart) / MS_PER_S;
+        if (elapsedS >= FPS_SAMPLE_S) {
+          fpsText.text = t('fps', { n: Math.round(frames / elapsedS) });
+          frames = 0;
+          sampleStart = now;
+        }
       }
       stage.render();
     },
@@ -254,7 +357,7 @@ export function createSpaceWarGame(): GameModule {
     resume() {
       paused = false;
       frames = 0;
-      sampleStart = performance.now();
+      sampleStart = lastFrameAt = performance.now();
     },
 
     finish() {
@@ -288,8 +391,8 @@ export function createSpaceWarGame(): GameModule {
     },
 
     dispose() {
-      if (textures) for (const shapes of Object.values(textures)) for (const states of shapes) for (const tex of states) tex.destroy(true);
       stage?.destroy();
+      atlas?.destroy();
       views.clear();
       rockSprites.clear();
       spareSprites.length = 0;
