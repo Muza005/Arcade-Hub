@@ -26,7 +26,8 @@ export const spaceWarManifest: GameManifest = {
   modes: [
     { id: 'coop', title: 'modeCoop', description: 'modeCoopDesc', icon: modeCoopIcon },
     { id: 'versus', title: 'modeVersus', description: 'modeVersusDesc', icon: modeVersusIcon },
-    { id: 'teams', title: 'modeTeams', description: 'modeTeamsDesc', icon: modeTeamsIcon },
+    // Цвет — это команда: в лобби несколько игроков могут выбрать один цвет.
+    { id: 'teams', title: 'modeTeams', description: 'modeTeamsDesc', icon: modeTeamsIcon, sharedColors: true },
   ],
   status: 'available',
   version: '0',

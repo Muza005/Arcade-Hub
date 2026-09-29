@@ -109,8 +109,33 @@ export class RoomState {
   }
 
   /** Цвета, занятые другими игроками. */
+  /** Режим игры, где цвет — команда (§11): одинаковые цвета разрешены. */
+  private shared = false;
+
+  /** Цвета, недоступные игроку; в режиме общих цветов — никакие. */
   takenBy(slot: Slot | null): string[] {
+    return this.shared ? [] : this.occupied(slot);
+  }
+
+  private occupied(slot: Slot | null): string[] {
     return this.slots.filter((s) => s !== slot).map((s) => s.color);
+  }
+
+  /** Включить или выключить общие цвета. При выключении повторы расходятся по ближайшим свободным.
+   *  Возвращает true, если чей-то цвет поменялся. */
+  setSharedColors(on: boolean): boolean {
+    this.shared = on;
+    if (on) return false;
+    let moved = false;
+    const seen = new Set<string>();
+    for (const slot of this.slots) {
+      if (seen.has(slot.color)) {
+        slot.color = this.nearestFree(Math.max(0, this.options.palette.indexOf(slot.color)), slot, true);
+        moved = true;
+      }
+      seen.add(slot.color);
+    }
+    return moved;
   }
 
   join(cid: string, token?: string, unsupported = false): JoinResult {
@@ -127,7 +152,8 @@ export class RoomState {
       token: this.options.makeToken(),
       cid,
       nick: this.options.defaultNick(id),
-      color: this.nearestFree(0, null),
+      // Новый игрок всегда получает свободный цвет — даже в режиме общих цветов.
+      color: this.nearestFree(0, null, true),
       unsupported,
     };
     this.slots.push(slot);
@@ -177,9 +203,9 @@ export class RoomState {
     this.leaderId = saved.leaderId ?? this.slots[0]?.id ?? null;
   }
 
-  private nearestFree(from: number, self: Slot | null): string {
+  private nearestFree(from: number, self: Slot | null, strict = false): string {
     const { palette } = this.options;
-    const taken = new Set(this.takenBy(self));
+    const taken = new Set(strict ? this.occupied(self) : this.takenBy(self));
     for (let step = 0; step < palette.length; step++) {
       // Сначала сам цвет, потом соседи: +1, −1, +2, −2…
       for (const dir of step === 0 ? [0] : [1, -1]) {

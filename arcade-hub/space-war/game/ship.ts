@@ -48,6 +48,13 @@ export function angleDelta(from: number, to: number): number {
   return d;
 }
 
+/** Удержать корабль в поле (после толчка другим кораблём). */
+export function clampToBounds(ship: Ship, bounds: Bounds): void {
+  const r = SHIP_WALL_MARGIN;
+  ship.pos.x = Math.min(Math.max(ship.pos.x, bounds.left + r), bounds.right - r);
+  ship.pos.y = Math.min(Math.max(ship.pos.y, bounds.top + r), bounds.bottom - r);
+}
+
 export function stepShip(ship: Ship, input: InputState, dtS: number, bounds: Bounds): void {
   ship.prev.x = ship.pos.x;
   ship.prev.y = ship.pos.y;

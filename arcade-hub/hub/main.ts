@@ -179,6 +179,8 @@ async function play(start: LobbyStart): Promise<void> {
   gameMount.hidden = true;
   phones?.enterMenu();
   sounds.music(true);
+  // Команды по цвету живут до выхода из лобби: «Ещё раз» их сохраняет, меню — разводит.
+  if (failed || choice === 'game' || choice === 'menu') room?.setSharedColors(false);
 
   if (failed) {
     menu.show(game.id, true, { retry: () => void play(start) });
@@ -200,9 +202,11 @@ async function play(start: LobbyStart): Promise<void> {
 
 const lobby = createLobby({
   onFieldsChange: () => phones?.refresh(),
+  onSharedColors: (on) => room?.setSharedColors(on),
   onStart: (start) => void play(start),
   onBack: (game) => {
     lobby.hide();
+    room?.setSharedColors(false);
     menu.show(game.id, true);
   },
 });

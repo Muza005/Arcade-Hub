@@ -142,3 +142,55 @@ describe('стрельба', () => {
     expect(shots).toBeLessThanOrEqual(14);
   });
 });
+
+describe('столкновения кораблей', () => {
+  /** Два корабля летят навстречу; у обоих ×3. */
+  function headOn(options: Parameters<typeof createSim>[4]) {
+    const sim = createSim(['a', 'b'], W, 1, undefined, options);
+    const a = sim.pilots.get('a')!;
+    const b = sim.pilots.get('b')!;
+    a.ship.pos.x = 800;
+    b.ship.pos.x = 1000;
+    a.ship.pos.y = b.ship.pos.y = 540;
+    a.mult = b.mult = 3;
+    a.nearIds.add(-1);
+    b.nearIds.add(-1);
+    a.lastNearS = b.lastNearS = 1e9; // простой не мешает
+    let bumps = 0;
+    let rams = 0;
+    for (let i = 0; i < FIXED_STEP_HZ; i++) {
+      sim.step(DT, (id) => ({ x: id === 'a' ? 1 : -1, y: 0, btn: false }));
+      bumps += sim.events.bumps.length;
+      rams += sim.events.bumps.filter((e) => e.ram).length;
+    }
+    return { a, b, bumps, rams };
+  }
+
+  it('соревнование: отталкиваются, таран сбрасывает множитель обоим — один раз за касание', () => {
+    const { a, b, bumps, rams } = headOn({ mode: 'versus' });
+    expect(bumps).toBeGreaterThanOrEqual(1);
+    expect(rams).toBe(bumps);
+    expect(a.mult).toBe(1);
+    expect(b.mult).toBe(1);
+    expect(b.ship.pos.x - a.ship.pos.x).toBeGreaterThanOrEqual(0);
+  });
+
+  it('кооператив: толкаются, но множитель цел', () => {
+    const { a, b, bumps, rams } = headOn({ mode: 'coop' });
+    expect(bumps).toBeGreaterThanOrEqual(1);
+    expect(rams).toBe(0);
+    expect(a.mult).toBe(3);
+    expect(b.mult).toBe(3);
+  });
+
+  it('командное: своих не таранят, чужих — да', () => {
+    expect(headOn({ mode: 'teams', teamOf: () => 'red' }).rams).toBe(0);
+    expect(headOn({ mode: 'teams', teamOf: (id) => (id === 'a' ? 'red' : 'blue') }).rams).toBeGreaterThan(0);
+  });
+
+  it('столкновения выключены — проходят насквозь', () => {
+    const { a, b, bumps } = headOn({ mode: 'versus', collisions: false });
+    expect(bumps).toBe(0);
+    expect(a.ship.pos.x).toBeGreaterThan(b.ship.pos.x);
+  });
+});

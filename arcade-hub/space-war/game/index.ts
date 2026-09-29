@@ -33,6 +33,12 @@ import {
   FLASH_EXPLODE,
   FLASH_HIT,
   FLASH_HIT_ALPHA,
+  MODE_DEFAULT,
+  MODES,
+  RAM_SPARKS,
+  SHAKE_RAM,
+  VIBRATE_RAM_MS,
+  type Mode,
   FPS_ALPHA,
   FPS_FONT_PX,
   FPS_PAD_PX,
@@ -138,14 +144,32 @@ export function createSpaceWarGame(): GameModule {
   let frames = 0;
   let sampleStart = 0;
 
-  /** Места — по итоговым очкам (с бонусом за оставшиеся жизни). */
-  const result = (): MatchResult => ({
-    gameId: spaceWarManifest.id,
-    mode: ctx.mode,
-    seed: ctx.seed,
-    version: spaceWarManifest.version,
-    rows: rankByScore(ctx.players.map((p) => ({ playerId: p.id, score: sim.finalScore(p.id) }))),
-  });
+  let mode: Mode = MODE_DEFAULT;
+  /** Команда игрока в командном режиме — его цвет на старте матча (§5 «Режимы»). */
+  const teamOf = new Map<string, string>();
+  const teamTotal = (team: string): number =>
+    ctx.players.filter((p) => teamOf.get(p.id) === team).reduce((sum, p) => sum + sim.finalScore(p.id), 0);
+
+  /** Места по режиму: соревнование — личные очки; кооператив — одна общая победа с общим счётом;
+   *  командное — очки команды, у всех её игроков одно место. Итоговые очки — с бонусом за жизни. */
+  const result = (): MatchResult => {
+    const base = { gameId: spaceWarManifest.id, mode: ctx.mode, seed: ctx.seed, version: spaceWarManifest.version };
+    if (mode === 'coop') {
+      const total = ctx.players.reduce((sum, p) => sum + sim.finalScore(p.id), 0);
+      return { ...base, rows: ctx.players.map((p) => ({ playerId: p.id, score: total, place: 1 })) };
+    }
+    if (mode === 'teams') {
+      const teams = [...new Set(teamOf.values())];
+      const ranked = rankByScore(teams.map((team) => ({ playerId: team, score: teamTotal(team) })));
+      const placeOf = new Map(ranked.map((r) => [r.playerId, r]));
+      const rows = ctx.players.map((p) => {
+        const team = placeOf.get(teamOf.get(p.id) ?? '');
+        return { playerId: p.id, score: team?.score ?? 0, place: team?.place ?? ranked.length };
+      });
+      return { ...base, rows: rows.sort((a, b) => a.place - b.place) };
+    }
+    return { ...base, rows: rankByScore(ctx.players.map((p) => ({ playerId: p.id, score: sim.finalScore(p.id) }))) };
+  };
   const survivedS = (id: string): number => sim.pilots.get(id)?.diedAtS ?? sim.timeS;
 
   const endMatch = (): void => {
@@ -195,6 +219,13 @@ export function createSpaceWarGame(): GameModule {
   /** События шага → частицы, тряска, вспышки и обратная связь на телефоне. */
   const react = (): void => {
     const { events } = sim;
+    for (const bump of events.bumps) {
+      sparks(bump.x, bump.y, RAM_SPARKS, bump.ram ? FLASH_HIT : ACCENT, DEBRIS_S);
+      if (!bump.ram) continue;
+      camera.shake(SHAKE_RAM);
+      ctx.fx(bump.a, { vib: VIBRATE_RAM_MS });
+      ctx.fx(bump.b, { vib: VIBRATE_RAM_MS });
+    }
     for (const b of events.breaks) {
       shards(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR);
       if (b.size === 'large') camera.shake(SHAKE_BREAK_LARGE);
@@ -231,11 +262,14 @@ export function createSpaceWarGame(): GameModule {
       const worldH = WORLD_H * zoom;
       const settings = readHubSettings();
       bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
+      mode = MODES.find((m) => m === ctx.mode) ?? MODE_DEFAULT;
+      for (const p of ctx.players) teamOf.set(p.id, p.color);
       sim = createSim(
         ctx.players.map((p) => p.id),
         worldW,
         ctx.seed,
         worldH,
+        { mode, collisions: ctx.settings.collisions !== false, teamOf: (id) => teamOf.get(id) ?? id },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
       brains = createBots(sim, [...bots], botLevel, ctx.seed);
@@ -286,7 +320,9 @@ export function createSpaceWarGame(): GameModule {
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
       const hud = new Container();
       hud.scale.set(zoom);
-      scoreHud = createScoreHud(ctx.players, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
+      // Командное — фишка на команду (её цвет и сумма очков); иначе — на игрока.
+      const chips = mode === 'teams' ? [...new Set(teamOf.values())].map((c) => ({ id: c, color: c })) : ctx.players;
+      scoreHud = createScoreHud(chips, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
       hud.addChild(scoreHud.view);
       stage.world.addChild(starsSprite, scene, hud, camera.flash);
       // Счётчик FPS — по переключателю в настройках хаба (или ?fps в адресе).
@@ -320,8 +356,14 @@ export function createSpaceWarGame(): GameModule {
       }
       multFx.update(dtS);
       particles.update(dtS);
+      const live = (id: string): number => sim.pilots.get(id)?.score ?? 0;
       scoreHud.update(
-        ctx.players.map((p) => ({ id: p.id, score: sim.pilots.get(p.id)?.score ?? 0 })),
+        mode === 'teams'
+          ? [...new Set(teamOf.values())].map((team) => ({
+              id: team,
+              score: ctx.players.filter((p) => teamOf.get(p.id) === team).reduce((sum, p) => sum + live(p.id), 0),
+            }))
+          : ctx.players.map((p) => ({ id: p.id, score: live(p.id) })),
         dtS,
       );
       if (sim.over) endMatch();
@@ -397,13 +439,19 @@ export function createSpaceWarGame(): GameModule {
     },
 
     results() {
+      // В кооперативе и командном у строки — общий счёт; личный вклад — отдельной колонкой.
+      const shared = mode !== 'versus';
       return {
         awards: [],
         table: {
-          columns: [t('colScore'), t('colTime')],
+          columns: shared ? [t(mode === 'coop' ? 'colTotal' : 'colTeam'), t('colScore'), t('colTime')] : [t('colScore'), t('colTime')],
           rows: result().rows.map((r) => ({
             playerId: r.playerId,
-            cells: [String(r.score), formatTime(survivedS(r.playerId))],
+            cells: [
+              ...(shared ? [String(r.score)] : []),
+              String(sim.finalScore(r.playerId)),
+              formatTime(survivedS(r.playerId)),
+            ],
           })),
         },
       };
@@ -417,6 +465,11 @@ export function createSpaceWarGame(): GameModule {
     },
 
     updatePlayer(player: GamePlayer) {
+      // В командном цвет — это команда: посреди матча она не меняется.
+      if (mode === 'teams') {
+        views.get(player.id)?.paint(colors.get(player.id) ?? player.color, hullOf(player));
+        return;
+      }
       views.get(player.id)?.paint(player.color, hullOf(player));
       colors.set(player.id, player.color);
       scoreHud.setColor(player.id, player.color);

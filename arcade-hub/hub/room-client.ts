@@ -51,6 +51,8 @@ export interface RoomClient {
   send(playerId: string, msg: ScreenToPhone): void;
   /** Убрать отключённого игрока (id = id слота строкой). */
   remove(playerId: string): void;
+  /** Режим «цвет — команда»: одинаковые цвета разрешены; выключение разводит повторы. */
+  setSharedColors(on: boolean): void;
   /** Убрать всех игроков: телефоны получают «вас убрали», места освобождаются. */
   removeAll(): void;
   /** Новая комната с новым кодом; старые телефоны получают «вас убрали». */
@@ -115,6 +117,7 @@ export function connectRoom(): RoomClient {
   let downTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let handoffTimer: ReturnType<typeof setTimeout> | null = null;
+  let sharedColors = false;
 
   const setOnline = (value: boolean): void => {
     if (online === value) return;
@@ -329,6 +332,14 @@ export function connectRoom(): RoomClient {
     },
     sendEach: (make) => {
       for (const slot of state.connected()) if (slot.cid) toPhone(slot.cid, make(String(slot.id)));
+    },
+    setSharedColors(on) {
+      if (sharedColors === on) return;
+      sharedColors = on;
+      state.setSharedColors(on);
+      // Телефонам — новый список занятых цветов (или новый цвет, если повтор развели).
+      syncPhones();
+      changed();
     },
     remove(playerId) {
       if (state.remove(Number(playerId))) {

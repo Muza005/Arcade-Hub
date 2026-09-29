@@ -36,6 +36,8 @@ export interface RosterInput {
   /** Свой ник и цвет клавиатурного игрока (если меняли). */
   profiles?: ReadonlyMap<KeyboardScheme, KeyboardProfile>;
   benched?: ReadonlySet<string>;
+  /** Режим «цвет — команда»: свой цвет клавиатурного игрока допускается, даже если занят. */
+  sharedColors?: boolean;
   bots: number;
   players: { min: number; max: number };
   names: { player(n: number): string; bot(n: number): string };
@@ -46,7 +48,7 @@ export function keyboardColor(taken: ReadonlySet<string>): string {
   return PLAYER_COLORS.find((c) => !taken.has(c)) ?? (PLAYER_COLORS[0] as string);
 }
 
-export function buildRoster({ phones, keyboard, profiles, benched, bots, players, names }: RosterInput): Roster {
+export function buildRoster({ phones, keyboard, profiles, benched, sharedColors, bots, players, names }: RosterInput): Roster {
   // Отключившийся держит место в комнате, но в матч не идёт.
   const online = phones.filter((p) => p.connected);
   const phoneEntry = (p: RoomPlayer): RosterEntry => ({
@@ -75,7 +77,7 @@ export function buildRoster({ phones, keyboard, profiles, benched, bots, players
     ...online.filter((p) => !benched?.has(p.id)).map(phoneEntry),
     ...keyboard.map((scheme) => {
       const profile = profiles?.get(scheme);
-      const color = profile?.color && !taken.has(profile.color) ? profile.color : keyboardColor(taken);
+      const color = profile?.color && (sharedColors || !taken.has(profile.color)) ? profile.color : keyboardColor(taken);
       taken.add(color);
       return {
         id: `kb-${scheme}`,

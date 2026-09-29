@@ -71,6 +71,8 @@ export interface LobbyOptions {
   onBack(game: GameManifest): void;
   /** Поля игроков или состав поменялись — телефонам пора обновить панель. */
   onFieldsChange?(): void;
+  /** Выбран режим, где цвет — команда (или другой): комната разрешает одинаковые цвета. */
+  onSharedColors?(on: boolean): void;
 }
 
 export function createLobby(options: LobbyOptions): Lobby {
@@ -99,6 +101,7 @@ export function createLobby(options: LobbyOptions): Lobby {
     playerFields: game?.lobby?.playerFields ?? [],
   });
   const tg = (key: string): string => (game ? createTranslator(game.strings)(key) : key);
+  const sharedMode = (): boolean => game?.modes.find((m) => m.id === mode)?.sharedColors === true;
 
   const roster = () =>
     buildRoster({
@@ -106,6 +109,7 @@ export function createLobby(options: LobbyOptions): Lobby {
       keyboard,
       profiles,
       benched,
+      sharedColors: sharedMode(),
       bots,
       players: game?.players ?? { min: 1, max: 1 },
       names: {
@@ -223,7 +227,8 @@ export function createLobby(options: LobbyOptions): Lobby {
       draft: { nick: custom ?? '', color: entry.color, fields: { ...valuesOf(entry) } },
       defaultNick: custom ? '' : entry.nick,
       fields: schema().playerFields,
-      taken: new Set(others.map((p) => p.color)),
+      // «Цвет — команда»: можно взять цвет товарища.
+      taken: new Set(sharedMode() ? [] : others.map((p) => p.color)),
       label: tg,
       save: (draft) => {
         profiles.set(scheme, { ...(draft.nick ? { nick: draft.nick } : {}), color: draft.color });
@@ -298,6 +303,7 @@ export function createLobby(options: LobbyOptions): Lobby {
 
   const render = (): void => {
     if (!game) return;
+    options.onSharedColors?.(sharedMode());
     options.onFieldsChange?.();
     const focusKey = document.activeElement instanceof HTMLElement ? document.activeElement.dataset.focusKey : undefined;
     const current = game;

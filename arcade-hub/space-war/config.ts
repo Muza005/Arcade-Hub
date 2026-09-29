@@ -76,7 +76,17 @@ export const SHIP_TURN_RATE = 10; // TUNE: рад/с
 export const SHIP_FACE_MIN_SPEED = 40; // TUNE: px/с
 /** Старт: корабли по кругу вокруг центра поля. */
 export const SPAWN_RING_RADIUS = 240;
-export const SHIP_LIVES = 5;
+export const SHIP_LIVES = 5; // у каждого свои — во всех режимах (решение заказчика)
+// Режимы (Б7, SPACE_WAR_SPEC §5): кооператив — общий счёт; соревнование — по очкам; командное — цвет = команда
+export const MODES = ['coop', 'versus', 'teams'] as const;
+export type Mode = (typeof MODES)[number];
+export const MODE_DEFAULT: Mode = 'coop';
+// Столкновения кораблей: отталкивание; таран сбрасывает множитель обоим (не в кооперативе и не своим)
+export const SHIP_BOUNCE = 0.8; // TUNE: упругость удара кораблей
+export const SHIP_PUSH_MIN = 180; // TUNE: px/с — минимум, с которым корабли расходятся, чтобы не слипались
+export const RAM_SPARKS = 6;
+export const SHAKE_RAM = 0.2;
+export const VIBRATE_RAM_MS = 30;
 export const DISCONNECT_INVULN_S = 2;
 export const KEYBOARD_MAX = 2;
 

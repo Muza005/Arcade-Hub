@@ -126,3 +126,25 @@ it('cleanNick', () => {
   expect(cleanNick('  Очень  длинный ник ')).toBe('Очень дл');
   expect(cleanNick('   ')).toBe('');
 });
+
+describe('общие цвета', () => {
+  it('общие цвета: одинаковый цвет можно выбрать, при выключении повторы расходятся', () => {
+    const room = make();
+    room.join('c1');
+    room.join('c2');
+    room.setSharedColors(true);
+    const a = room.profile('c1', 'A', 'green');
+    const b = room.profile('c2', 'B', 'green');
+    expect(a?.color).toBe('green');
+    expect(b?.color).toBe('green');
+    expect(room.takenBy(b ?? null)).toEqual([]);
+    // Новый игрок всё равно получает свободный цвет.
+    const c = room.join('c3');
+    if ('error' in c) throw new Error();
+    expect(c.slot.color).not.toBe('green');
+    expect(room.setSharedColors(false)).toBe(true);
+    const colors = room.players().map((p) => p.color);
+    expect(new Set(colors).size).toBe(colors.length);
+    expect(colors[0]).toBe('green');
+  });
+});

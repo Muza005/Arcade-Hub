@@ -17,6 +17,8 @@ export type SpaceWarKey =
   | 'fps'
   | 'colTime'
   | 'colScore'
+  | 'colTotal'
+  | 'colTeam'
   | 'time'
   | 'setHull'
   | 'hull_arrow'
@@ -69,6 +71,8 @@ export const strings: GameStrings<SpaceWarKey> = {
     fps: '{n} FPS',
     colTime: 'Продержался',
     colScore: 'Очки',
+    colTotal: 'Общий счёт',
+    colTeam: 'Команда',
     setHull: 'Корпус',
     hull_arrow: 'Стрела',
     hull_delta: 'Дельта',
@@ -120,6 +124,8 @@ export const strings: GameStrings<SpaceWarKey> = {
     fps: '{n} FPS',
     colTime: 'Survived',
     colScore: 'Score',
+    colTotal: 'Total',
+    colTeam: 'Team',
     setHull: 'Hull',
     hull_arrow: 'Arrow',
     hull_delta: 'Delta',

@@ -17,17 +17,20 @@ import {
   NEAR_MISS_DISTANCE,
   SCORE_ASTEROID,
   SCORE_LIFE_LEFT,
+  SHIP_BOUNCE,
+  SHIP_PUSH_MIN,
   SHIP_HITBOX_RADIUS,
   SPAWN_RING_RADIUS,
   WORLD_H,
   type AsteroidSize,
+  type Mode,
 } from '../config';
 import { FEATURES } from '../features';
 import { createAsteroidField, type Asteroid } from './asteroids';
 import { createBullets, type Bullet } from './bullets';
 import { Grid } from './grid';
 import { checkIdle, createPilot, nearMiss, regenAmmo, resetMult, type Pilot } from './pilot';
-import { createShip, stepShip, type Bounds, type Ship } from './ship';
+import { clampToBounds, createShip, stepShip, type Bounds, type Ship } from './ship';
 
 export type { Pilot } from './pilot';
 
@@ -42,6 +45,16 @@ export interface SimEvents {
   near: Array<{ id: string; x: number; y: number }>;
   /** У кого добавился патрон — вспышка на кнопке телефона. */
   reloads: string[];
+  /** Корабли столкнулись: точка удара и был ли это таран (множитель сброшен обоим). */
+  bumps: Array<{ a: string; b: string; x: number; y: number; ram: boolean }>;
+}
+
+export interface SimOptions {
+  mode?: Mode;
+  /** Настройка лобби «Столкновения кораблей»: выключены — корабли проходят насквозь. */
+  collisions?: boolean;
+  /** Команда игрока (в командном режиме — его цвет). */
+  teamOf?: (id: string) => string;
 }
 
 export interface Sim {
@@ -69,7 +82,18 @@ const inside = (b: Bounds, p: { x: number; y: number }): boolean =>
   p.x > b.left && p.x < b.right && p.y > b.top && p.y < b.bottom;
 
 /** worldH — высота мира с учётом отдаления камеры (worldZoom); без неё — WORLD_H. */
-export function createSim(playerIds: readonly string[], worldW: number, seed: number, worldH: number = WORLD_H): Sim {
+export function createSim(
+  playerIds: readonly string[],
+  worldW: number,
+  seed: number,
+  worldH: number = WORLD_H,
+  options: SimOptions = {},
+): Sim {
+  const mode = options.mode ?? 'versus';
+  const collisions = options.collisions ?? true;
+  const teamOf = options.teamOf ?? ((id: string) => id);
+  /** Пары кораблей, которые касаются сейчас: таран считается один раз за касание. */
+  const touching = new Set<string>();
   const bounds = fieldBounds(worldW, worldH);
   const rng = createRng(seed);
   const cx = (bounds.left + bounds.right) / 2;
@@ -90,7 +114,7 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
   const claimed = new Set<Asteroid>();
   const killed: Array<{ rock: Asteroid; by: Pilot }> = [];
   const spent: Bullet[] = [];
-  const events: SimEvents = { hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [] };
+  const events: SimEvents = { hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [] };
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
   let spawnDebt = 0;
   let timeS = 0;
@@ -136,6 +160,56 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
     pilot.alive = false;
     pilot.diedAtS = timeS;
     events.deaths.push(pilot.ship.id);
+  };
+
+  /** Таран: не в кооперативе и не по своим — множитель теряют оба. */
+  const rammable = (a: Pilot, b: Pilot): boolean =>
+    mode !== 'coop' && (mode !== 'teams' || teamOf(a.ship.id) !== teamOf(b.ship.id));
+
+  /** Корабли отталкиваются друг от друга, как упругие шары одной массы. */
+  const collideShips = (): void => {
+    const alive = [...pilots.values()].filter((p) => p.alive);
+    for (let i = 0; i < alive.length; i++) {
+      for (let j = i + 1; j < alive.length; j++) {
+        const a = alive[i] as Pilot;
+        const b = alive[j] as Pilot;
+        const key = `${a.ship.id}|${b.ship.id}`;
+        const dx = b.ship.pos.x - a.ship.pos.x;
+        const dy = b.ship.pos.y - a.ship.pos.y;
+        const d = Math.hypot(dx, dy);
+        const min = SHIP_HITBOX_RADIUS * 2;
+        if (!collisions || d >= min) {
+          touching.delete(key);
+          continue;
+        }
+        const nx = d > 0 ? dx / d : 1;
+        const ny = d > 0 ? dy / d : 0;
+        const push = (min - d) / 2;
+        a.ship.pos.x -= nx * push;
+        a.ship.pos.y -= ny * push;
+        b.ship.pos.x += nx * push;
+        b.ship.pos.y += ny * push;
+        clampToBounds(a.ship, bounds);
+        clampToBounds(b.ship, bounds);
+        // Скорости вдоль линии удара: сближались — обмен с потерей; расходятся не медленнее SHIP_PUSH_MIN.
+        const closing = (a.ship.vel.x - b.ship.vel.x) * nx + (a.ship.vel.y - b.ship.vel.y) * ny;
+        let impulse = closing > 0 ? (closing * (1 + SHIP_BOUNCE)) / 2 : 0;
+        const apart = -closing + impulse * 2;
+        if (apart < SHIP_PUSH_MIN) impulse += (SHIP_PUSH_MIN - apart) / 2;
+        a.ship.vel.x -= nx * impulse;
+        a.ship.vel.y -= ny * impulse;
+        b.ship.vel.x += nx * impulse;
+        b.ship.vel.y += ny * impulse;
+        if (touching.has(key)) continue;
+        touching.add(key);
+        const ram = rammable(a, b);
+        if (ram) {
+          resetMult(a);
+          resetMult(b);
+        }
+        events.bumps.push({ a: a.ship.id, b: b.ship.id, x: a.ship.pos.x + nx * SHIP_HITBOX_RADIUS, y: a.ship.pos.y + ny * SHIP_HITBOX_RADIUS, ram });
+      }
+    }
   };
 
   const fire = (pilot: Pilot, btn: boolean): void => {
@@ -226,6 +300,7 @@ export function createSim(playerIds: readonly string[], worldW: number, seed: nu
         if (regenAmmo(pilot, dtS)) events.reloads.push(pilot.ship.id);
       }
 
+      collideShips();
       bullets.step(dtS);
       rebuildGrid();
       resolveBullets();
