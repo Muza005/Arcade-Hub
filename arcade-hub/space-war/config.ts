@@ -133,7 +133,7 @@ export const AMMO_MAX = 10;
 /** Патрон копится за t = AMMO_BASE_S / (1 + AMMO_MULT_K · (m − 1)), m — итоговый множитель. */
 export const AMMO_BASE_S = 3;
 export const AMMO_MULT_K = 0.4;
-export const ASTEROID_HP = { small: 2, medium: [4, 5], large: 8 } as const;
+export const ASTEROID_HP = { small: 1, medium: [4, 5], large: 8 } as const; // заказчик: мелкий — с одного выстрела
 export const AMMO_START = 10; // TUNE: с чем начинается матч
 // Выстрел Power: снаряд летит с упреждением в ближайший камень на поле
 export const BULLET_SPEED = 1500; // TUNE: px/с
@@ -147,8 +147,8 @@ export const BULLET_LINE_PX = 4;
 export const MULT_MAX = 5;
 export const MULT_STEPS = [3, 5, 8, 12] as const; // сближений до ×2, ×3, ×4, ×5 (всего 28)
 export const NEAR_MISS_COOLDOWN_S = 0.5;
-export const NEAR_MISS_DISTANCE = 60; // TUNE: зазор между хитбоксами, px
-export const MULT_IDLE_RESET_S = 3; // заказчик: 3 с, проверить в игре (SPACE_WAR_SPEC §14 п. 3)
+export const NEAR_MISS_DISTANCE = 90; // TUNE: зазор между хитбоксами, px (было 60 — множитель рос медленно)
+export const MULT_IDLE_RESET_S = 5; // заказчик: 5 с после проверки в игре (SPACE_WAR_SPEC §14 п. 3)
 // Показ множителя (только большой экран): индекс — ступень ×1…×5
 export const MULT_HULL_ALPHA = [0.7, 0.85, 1, 1, 1] as const; // ×2 чуть ярче, ×3 заметно
 export const MULT_GLOW_ALPHA = [0.18, 0.2, 0.4, 0.5, 0.65] as const; // ×3 — мягкое свечение
