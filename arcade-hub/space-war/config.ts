@@ -89,17 +89,15 @@ export const SHIP_GLOW_ALPHA = 0.22;
 export const FLAME_LENGTH = 22; // при полной тяге
 export const FLAME_WIDTH_K = 0.45;
 export const FLAME_ALPHA = 0.8;
-export const NICK_FONT_PX = 20;
-export const NICK_GAP_PX = 16;
-export const NICK_ALPHA = 0.85;
+export const LABEL_GAP_PX = 16; // от носа до цифры множителя
 
 // ─── Астероиды (Б2) ──────────────────────────────────────────────
 export type AsteroidSize = 'small' | 'medium' | 'large';
 export const ASTEROID_RADIUS = { small: 18, medium: 34, large: 58 } as const; // TUNE
-export const ASTEROID_SPEED = { small: [150, 230], medium: [100, 170], large: [60, 115] } as const; // TUNE: px/с
+export const ASTEROID_SPEED = { small: [160, 240], medium: [110, 180], large: [80, 130] } as const; // TUNE: px/с
 export const ASTEROID_SPIN = 1.2; // TUNE: рад/с, вращение только для вида
 /** Поток камней на одного игрока, шт/с; на N игроков — × (1 + FLOW_PLAYER_K · (N − 1)). */
-export const ASTEROID_SPAWN_PER_S = 1.1; // TUNE
+export const ASTEROID_SPAWN_PER_S = 0.8; // TUNE (было 1.1: на 10 игроках поле превращалось в кашу)
 export const ASTEROID_SIZE_WEIGHTS = { small: 0.4, medium: 0.35, large: 0.25 } as const; // TUNE
 /** Камень летит в случайную точку центральной части поля: доля отступа от краёв. */
 export const ASTEROID_AIM_INSET = 0.2;
@@ -197,7 +195,6 @@ export const SPARK_SPEED = 40;
 export const TRAIL_LINE_PX = 6;
 export const TRAIL_ALPHA = 0.5;
 export const MULT_FONT_PX = 20;
-export const MULT_GAP_PX = 6;
 
 // ─── Очки ────────────────────────────────────────────────────────
 export const SCORE_WAVE = 100; // × номер волны, без множителя
@@ -220,6 +217,10 @@ export const FLOW_PLAYER_K = 0.5; // поток = база · (1 + 0.5 · (N −
 export const WAVE_DENSITY_GROWTH = 0.08; // TUNE: +8 % камней за волну
 export const WAVE_SPEED_GROWTH = 0.04; // TUNE: +4 % скорости за волну
 export const CAMERA_ZOOM_STEP_PLAYERS = 2; // шаг отдаления на каждые 2 игрока
+export const CAMERA_ZOOM_STEP = 0.15; // TUNE: на столько мир шире и выше за шаг (10 игроков — ×1,6)
+/** Размер мира под экран и число игроков: камера отъезжает, пропорции поля не меняются. */
+export const worldZoom = (players: number): number =>
+  1 + CAMERA_ZOOM_STEP * Math.floor(Math.max(0, players - 1) / CAMERA_ZOOM_STEP_PLAYERS);
 
 // ─── Боссы ───────────────────────────────────────────────────────
 export const BOSS_HP_PLAYER_K = 0.7; // прочность = база · (1 + 0.7 · (N − 1))
@@ -263,6 +264,30 @@ export const BOT_LEVELS = ['weak', 'mid', 'strong'] as const;
 export const BOT_LEVEL_DEFAULT = 'mid';
 export const QUALITY_CHOICES = ['auto', 'low', 'mid', 'high'] as const;
 export const GHOST_S_RANGE = { min: 10, max: 30, step: 5 } as const;
+
+// ─── Боты (Б6, SPACE_WAR_SPEC §8) ────────────────────────────────
+export type BotLevel = 'weak' | 'mid' | 'strong';
+/** Задержка реакции: бот видит мир таким, каким он был столько секунд назад. */
+export const BOT_REACTION_S = { weak: 0.4, mid: 0.2, strong: 0.08 } as const;
+export const BOT_THRUST = { weak: 0.6, mid: 0.85, strong: 1 } as const; // доля полного ввода
+/** Пауза между выстрелами; слабый не стреляет. */
+export const BOT_FIRE_GAP_S = { weak: Number.POSITIVE_INFINITY, mid: 0.8, strong: 0.45 } as const;
+export const BOT_LOOKAHEAD_S = 1.4; // на сколько вперёд бот предсказывает камни (плюс своя задержка реакции)
+export const BOT_SAFE_MARGIN = 60; // запас сверх хитбоксов
+export const BOT_AVOID_WEIGHT = 3;
+export const BOT_WALL_MARGIN = 150; // ближе к стене — отталкивается
+export const BOT_EDGE_HOME = 280; // слабый держится у края на таком расстоянии (ближе — камни из-за края не успеть увидеть)
+export const BOT_WANDER_S = 3; // средний и сильный меняют точку, к которой плывут
+export const BOT_WANDER_INSET = 0.2; // точки — в середине поля
+export const BOT_ARRIVE_PX = 220; // ближе — сбавляет ход
+export const BOT_CRUISE = 0.5; // к цели — вполсилы, полный ход — на уклонение
+export const BOT_HUNT_RANGE = 520; // сильный ищет камень для сближения не дальше
+export const BOT_FIRE_RANGE = 650; // средний стреляет по крупным не дальше
+export const BOT_FIRE_MIN_RANGE = 260; // и не ближе: раскол вплотную бьёт по себе
+export const BOT_THREAT_FIRE = 0.35; // сильный стреляет, когда угроза выше
+export const BOT_SEED_SALT = 0xb07b07; // своя случайность ботов, из сида матча
+export const BOT_BRAKE_SPEED = 1000; // px/с: такую скорость бот гасит полным ходом против неё
+export const BOT_HUNT_GAP_K = 0.5; // сильный целится в середину зоны сближения
 
 // ─── Воскрешение и призрак ───────────────────────────────────────
 export const GHOST_S = 15; // настраивается в лобби

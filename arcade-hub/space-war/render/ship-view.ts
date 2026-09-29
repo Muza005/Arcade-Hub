@@ -1,4 +1,4 @@
-// Вид корабля: неоновый контур в цвет игрока, язычок тяги, жизни точками, ник и множитель над кораблём.
+// Вид корабля: неоновый контур в цвет игрока, язычок тяги, жизни точками, цифра множителя над кораблём.
 // Корпус рисуется носом вправо (угол 0) и поворачивается целиком; подписи не поворачиваются.
 // Множитель (SPACE_WAR_SPEC §5 «Показ множителя»): цифра только с ×2, корпус ярче по ступеням, с ×3 — свечение.
 import { Container, Graphics, Text } from 'pixi.js';
@@ -14,13 +14,10 @@ import {
   LIVES_PIP_RADIUS,
   LIVES_Y,
   MULT_FONT_PX,
-  MULT_GAP_PX,
   MULT_GLOW_ALPHA,
   MULT_GLOW_PX,
   MULT_HULL_ALPHA,
-  NICK_ALPHA,
-  NICK_FONT_PX,
-  NICK_GAP_PX,
+  LABEL_GAP_PX,
   SHIP_LINE_PX,
   SHIP_SIZE,
   type Hull,
@@ -30,14 +27,14 @@ import { drawHull, HULL_TAIL_X } from './hulls';
 export interface ShipView {
   /** Корпус и пламя — в слой свечения. */
   readonly node: Container;
-  /** Ник, множитель и жизни — отдельным слоем без bloom, чтобы текст оставался чётким. */
+  /** Цифра множителя и жизни — отдельным слоем без bloom, чтобы оставались чёткими. */
   readonly tag: Container;
   setVisible(visible: boolean): void;
   /** Положение, поворот носа и тяга 0…1. */
   set(x: number, y: number, angle: number, thrust: number): void;
   /** Поле: подписи у стены не уходят за край, у верхней — встают под корабль. */
   setBounds(bounds: { left: number; top: number; right: number }): void;
-  paint(color: string, nick: string, hull: Hull): void;
+  paint(color: string, hull: Hull): void;
   /** Жизни точками под кораблём. */
   setLives(lives: number, max: number): void;
   /** Мигание неуязвимости. */
@@ -48,7 +45,6 @@ export interface ShipView {
   update(dtS: number): void;
 }
 
-const FONT_UI = 'Golos Text';
 const FONT_DISPLAY = 'Unbounded';
 const FONT_FALLBACK = 'sans-serif';
 
@@ -63,24 +59,18 @@ export function createShipView(textColor: string): ShipView {
   const pips = new Graphics();
   pips.y = LIVES_Y;
   const label = new Container();
-  const nick = new Text({
-    text: '',
-    style: { fontFamily: [FONT_UI, FONT_FALLBACK], fontWeight: '600', fontSize: NICK_FONT_PX, fill: textColor },
-  });
-  nick.anchor.set(0, 1);
-  nick.alpha = NICK_ALPHA;
   const multText = new Text({
     text: '',
     style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: MULT_FONT_PX, fill: textColor },
   });
   multText.anchor.set(0.5, 1);
-  label.addChild(nick, multText);
+  label.addChild(multText);
   node.addChild(body);
   const tag = new Container();
   tag.addChild(pips, label);
 
   let hull: Hull = 'arrow';
-  const above = -SHIP_SIZE - NICK_GAP_PX;
+  const above = -SHIP_SIZE - LABEL_GAP_PX;
   let color = textColor;
   let bounds = { left: -Infinity, top: -Infinity, right: Infinity };
   let lastLives = -1;
@@ -103,14 +93,9 @@ export function createShipView(textColor: string): ShipView {
     drawHull(outline.clear(), hull, { color, width: SHIP_LINE_PX, alpha: MULT_HULL_ALPHA[i] ?? 1, join: 'round' });
   };
 
-  /** Ник и цифра множителя одной строкой по центру над кораблём. */
+  /** Над кораблём — только цифра множителя, с ×2 (ников в игре нет: игрока находят по цвету). */
   const layoutLabel = (): void => {
-    const showMult = mult >= 2;
-    multText.visible = showMult;
-    const multW = showMult ? multText.width + MULT_GAP_PX : 0;
-    const total = nick.width + multW;
-    nick.x = -total / 2;
-    multText.x = nick.x + nick.width + MULT_GAP_PX + multText.width / 2;
+    multText.visible = mult >= 2;
   };
 
   return {
@@ -139,11 +124,9 @@ export function createShipView(textColor: string): ShipView {
     setBounds(next) {
       bounds = next;
     },
-    paint(nextColor, nextNick, nextHull) {
+    paint(nextColor, nextHull) {
       color = nextColor;
       hull = nextHull;
-      nick.text = nextNick;
-      nick.style.fill = color;
       multText.style.fill = color;
       repaint();
       layoutLabel();

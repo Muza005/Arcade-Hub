@@ -2,7 +2,6 @@
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Волны — Б8.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
-import { IDLE_INPUT } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
 import { rankByScore, type GameContext, type GameModule, type GamePlayer, type MatchResult } from '../../shared/game-manifest';
@@ -41,7 +40,7 @@ import {
   HUD_PAD_PX,
   INVULN_BLINK_HZ,
   MULT_SPARK_S,
-  NICK_FONT_PX,
+  MULT_FONT_PX,
   PARTICLES_MAX,
   QUALITY_CHOICES,
   SHAKE_BREAK_LARGE,
@@ -51,8 +50,11 @@ import {
   SPARK_SPEED,
   VIBRATE_EXPLODE_MS,
   VIBRATE_HIT_MS,
+  BOT_LEVEL_DEFAULT,
+  BOT_LEVELS,
   WORLD_H,
   worldWidth,
+  worldZoom,
 } from '../config';
 import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
@@ -65,12 +67,12 @@ import { createQuality, type Level, type QualityControl } from '../render/qualit
 import { createScoreHud, type ScoreHud } from '../render/score-hud';
 import { createShipView, type ShipView } from '../render/ship-view';
 import { angleDelta } from './ship';
+import { createBots, type Bots } from './bots';
 import { createSim, type Sim } from './sim';
 
 const t = createTranslator(strings);
 
 const FONT_DISPLAY = 'Unbounded';
-const FONT_UI = 'Golos Text';
 const FONT_FALLBACK = 'sans-serif';
 const MS_PER_S = 1000;
 const PERCENT = 100;
@@ -98,8 +100,9 @@ export function createSpaceWarGame(): GameModule {
   let ended = false;
   let paused = false;
   let sim: Sim;
-  /** Боты — этап Б6; до тех пор без ввода. */
+  /** Кого ведёт мозг ботов (SPACE_WAR_SPEC §8), а не ввод платформы. */
   let bots = new Set<string>();
+  let brains: Bots;
   const views = new Map<string, ShipView>();
   const colors = new Map<string, string>();
   let atlas: Atlas;
@@ -222,20 +225,26 @@ export function createSpaceWarGame(): GameModule {
   return {
     async init(context) {
       ctx = context;
-      const worldW = worldWidth(ctx.aspect);
+      // Камера отъезжает на шаг за каждые 2 игрока: мир больше, пропорции те же (SPACE_WAR_SPEC §9).
+      const zoom = worldZoom(ctx.players.length);
+      const worldW = worldWidth(ctx.aspect) * zoom;
+      const worldH = WORLD_H * zoom;
       const settings = readHubSettings();
       bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
       sim = createSim(
         ctx.players.map((p) => p.id),
         worldW,
         ctx.seed,
+        worldH,
       );
-      await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`, `600 ${NICK_FONT_PX}px "${FONT_UI}"`]);
-      stage = await createStage(ctx.mount, worldW, WORLD_H, { background: cssVar('--bg') });
+      const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
+      brains = createBots(sim, [...bots], botLevel, ctx.seed);
+      await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`, `700 ${MULT_FONT_PX}px "${FONT_DISPLAY}"`]);
+      stage = await createStage(ctx.mount, worldW, worldH, { background: cssVar('--bg') });
       atlas = bakeAtlas(stage.app.renderer);
       particles = createParticles(vfx);
       multFx = createMultFx(particles, atlas.spark);
-      camera = createCamera(settings, worldW, WORLD_H, vfx);
+      camera = createCamera(settings, worldW, worldH, vfx);
       // Качество из лобби; «Авто» — как в настройках хаба (там тоже может быть «Авто» — адаптивное).
       const lobbyQuality = QUALITY_CHOICES.find((q) => q === ctx.settings.quality) ?? 'auto';
       quality = createQuality(lobbyQuality === 'auto' ? settings.quality : lobbyQuality);
@@ -252,18 +261,18 @@ export function createSpaceWarGame(): GameModule {
 
       const starsSprite = new Sprite(Texture.WHITE);
       starsSprite.width = worldW;
-      starsSprite.height = WORLD_H;
+      starsSprite.height = worldH;
       starsSprite.tint = cssVar('--bg');
       if (stars) starsSprite.filters = [stars.filter];
 
       const field = new Graphics()
-        .roundRect(FIELD_INSET, FIELD_INSET, worldW - FIELD_INSET * 2, WORLD_H - FIELD_INSET * 2, FIELD_RADIUS)
+        .roundRect(FIELD_INSET, FIELD_INSET, worldW - FIELD_INSET * 2, worldH - FIELD_INSET * 2, FIELD_RADIUS)
         .stroke({ color: ACCENT, width: FIELD_LINE_PX, alpha: FIELD_LINE_ALPHA });
 
       const textColor = cssVar('--text');
       for (const player of ctx.players) {
         const view = createShipView(textColor);
-        view.paint(player.color, player.nick, hullOf(player));
+        view.paint(player.color, hullOf(player));
         view.setBounds(sim.bounds);
         view.setLives(SHIP_LIVES, SHIP_LIVES);
         views.set(player.id, view);
@@ -274,8 +283,12 @@ export function createSpaceWarGame(): GameModule {
       glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
       scene.addChild(field, rocksLayer, glowLayer, tagsLayer);
 
+      // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
+      const hud = new Container();
+      hud.scale.set(zoom);
       scoreHud = createScoreHud(ctx.players, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
-      stage.world.addChild(starsSprite, scene, scoreHud.view, camera.flash);
+      hud.addChild(scoreHud.view);
+      stage.world.addChild(starsSprite, scene, hud, camera.flash);
       // Счётчик FPS — по переключателю в настройках хаба (или ?fps в адресе).
       if (settings.showFps || new URLSearchParams(location.search).has('fps')) {
         fpsText = new Text({
@@ -284,8 +297,8 @@ export function createSpaceWarGame(): GameModule {
         });
         fpsText.alpha = FPS_ALPHA;
         fpsText.anchor.set(1, 0);
-        fpsText.position.set(worldW - FIELD_INSET - FPS_PAD_PX, FIELD_INSET + FPS_PAD_PX);
-        stage.world.addChild(fpsText);
+        fpsText.position.set(worldW / zoom - FIELD_INSET - FPS_PAD_PX, FIELD_INSET + FPS_PAD_PX);
+        hud.addChild(fpsText);
       }
       applyQuality(quality.level);
       sampleStart = lastFrameAt = performance.now();
@@ -293,7 +306,7 @@ export function createSpaceWarGame(): GameModule {
 
     update(dtS) {
       if (paused || ended) return;
-      sim.step(dtS, (id) => (bots.has(id) ? IDLE_INPUT : ctx.input.read(id)));
+      sim.step(dtS, (id) => (bots.has(id) ? brains.input(id) : ctx.input.read(id)));
       react();
       camera.update(dtS);
       // Hit-stop: мир на мгновение замер — замирают и частицы, и следы; тряска и вспышка идут.
@@ -404,7 +417,7 @@ export function createSpaceWarGame(): GameModule {
     },
 
     updatePlayer(player: GamePlayer) {
-      views.get(player.id)?.paint(player.color, player.nick, hullOf(player));
+      views.get(player.id)?.paint(player.color, hullOf(player));
       colors.set(player.id, player.color);
       scoreHud.setColor(player.id, player.color);
     },

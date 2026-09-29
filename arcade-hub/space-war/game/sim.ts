@@ -61,15 +61,16 @@ export interface Sim {
   finalScore(id: string): number;
 }
 
-export function fieldBounds(worldW: number): Bounds {
-  return { left: FIELD_INSET, top: FIELD_INSET, right: worldW - FIELD_INSET, bottom: WORLD_H - FIELD_INSET };
+export function fieldBounds(worldW: number, worldH: number = WORLD_H): Bounds {
+  return { left: FIELD_INSET, top: FIELD_INSET, right: worldW - FIELD_INSET, bottom: worldH - FIELD_INSET };
 }
 
 const inside = (b: Bounds, p: { x: number; y: number }): boolean =>
   p.x > b.left && p.x < b.right && p.y > b.top && p.y < b.bottom;
 
-export function createSim(playerIds: readonly string[], worldW: number, seed: number): Sim {
-  const bounds = fieldBounds(worldW);
+/** worldH — высота мира с учётом отдаления камеры (worldZoom); без неё — WORLD_H. */
+export function createSim(playerIds: readonly string[], worldW: number, seed: number, worldH: number = WORLD_H): Sim {
+  const bounds = fieldBounds(worldW, worldH);
   const rng = createRng(seed);
   const cx = (bounds.left + bounds.right) / 2;
   const cy = (bounds.top + bounds.bottom) / 2;
