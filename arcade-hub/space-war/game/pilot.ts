@@ -10,15 +10,25 @@ import {
   NEAR_MISS_COOLDOWN_S,
   SCORE_NEAR_MISS,
   SHIP_LIVES,
+  type SabKind,
 } from '../config';
 import type { Ship } from './ship';
+
+export type PilotPhase = 'alive' | 'ghost' | 'saboteur' | 'out';
 
 export interface Pilot {
   readonly ship: Ship;
   lives: number;
   /** Неуязвимость после удара, с. */
   invulnS: number;
+  /** Корабль в игре (phase === 'alive'). */
   alive: boolean;
+  /** Жив; призрак (ждёт, пока соберут осколки); саботажник; выбыл. */
+  phase: PilotPhase;
+  /** Сколько ещё быть призраком, с. */
+  ghostS: number;
+  /** Кулдауны саботажника по снарядам, с. */
+  readonly sabS: Record<SabKind, number>;
   /** Время гибели от начала матча — для итогов. */
   diedAtS: number | null;
   score: number;
@@ -41,6 +51,9 @@ export function createPilot(ship: Ship): Pilot {
     lives: SHIP_LIVES,
     invulnS: 0,
     alive: true,
+    phase: 'alive',
+    ghostS: 0,
+    sabS: { rock: 0, bomb: 0 },
     diedAtS: null,
     score: 0,
     ammo: AMMO_START,

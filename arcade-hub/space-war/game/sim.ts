@@ -16,6 +16,7 @@ import {
   FIELD_INSET,
   FLOW_PLAYER_K,
   GAME_OVER_DELAY_S,
+  GHOST_S,
   GRID_CELL,
   HIT_INVULN_S,
   HIT_STOP_DEATH_S,
@@ -44,6 +45,7 @@ import {
 } from '../config';
 import { FEATURES } from '../features';
 import { createAsteroidField, type Asteroid } from './asteroids';
+import { createAfterlife, type AfterlifeEvents, type Bomb, type SabShot, type Shard } from './afterlife';
 import { createBoss, type Boss, type BossControl } from './bosses';
 import { createBullets, type Bullet, type Mover } from './bullets';
 import { Grid } from './grid';
@@ -54,7 +56,7 @@ import { createWaves, type WaveEvent, type Waves } from './waves';
 export type { Pilot } from './pilot';
 
 /** Что случилось на последнем шаге — для графики и обратной связи на телефоне. */
-export interface SimEvents {
+export interface SimEvents extends AfterlifeEvents {
   hits: string[];
   deaths: string[];
   breaks: Array<{ x: number; y: number; size: AsteroidSize }>;
@@ -82,6 +84,10 @@ export interface SimOptions {
   difficulty?: Difficulty;
   /** С какой волны начать (проверка поздних волн и боссов); по умолчанию — с первой. */
   startWave?: number;
+  /** Время призрака из лобби, с. */
+  ghostS?: number;
+  /** Настройка лобби «Саботаж погибших». */
+  sabotage?: boolean;
 }
 
 export interface Sim {
@@ -93,6 +99,13 @@ export interface Sim {
   readonly waves: Waves;
   /** Босс текущей волны или null. */
   readonly boss: Boss | null;
+  /** Осколки погибших (кооператив, командное) и бомбы саботажников. */
+  readonly shards: readonly Shard[];
+  readonly bombs: readonly Bomb[];
+  /** Выстрел саботажника; false — не саботажник или снаряд ещё не готов. */
+  sabotage(id: string, shot: SabShot): boolean;
+  /** Полный кулдаун снаряда сейчас (база + за погибших). */
+  sabCooldownS(kind: SabShot['kind']): number;
   readonly events: SimEvents;
   readonly timeS: number;
   /** Все погибли или пройдена последняя волна — и пауза после этого прошла. */
@@ -146,6 +159,7 @@ export function createSim(
   const spent: Bullet[] = [];
   const events: SimEvents = {
     hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [], bossDown: [],
+    ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [],
   };
   let bossCtl: BossControl | null = null;
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
@@ -153,6 +167,18 @@ export function createSim(
   const shift = DIFFICULTY_WAVE_SHIFT[options.difficulty ?? DIFFICULTY_DEFAULT];
   /** Рост с номером волны, сдвинутый стартовой сложностью. */
   const growth = (k: number): number => Math.max(WAVE_GROWTH_MIN, 1 + k * (waves.wave - 1 + shift));
+  const afterlife = createAfterlife({
+    pilots,
+    bounds,
+    field,
+    rng,
+    mode,
+    teamOf,
+    ghostS: options.ghostS ?? GHOST_S,
+    sabotage: options.sabotage ?? true,
+    events,
+    speedK: () => growth(WAVE_SPEED_GROWTH),
+  });
   let spawnDebt = 0;
   let timeS = 0;
   let overInS: number | null = null;
@@ -174,6 +200,15 @@ export function createSim(
     let best: Mover | null = null;
     let bestD = Infinity;
     const boss = bossCtl?.target ? bossCtl.boss : null;
+    // Бомбу саботажника тоже можно сбить.
+    for (const b of afterlife.bombs) {
+      if (!inside(bounds, b.pos)) continue;
+      const d = (b.pos.x - from.x) ** 2 + (b.pos.y - from.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = b;
+      }
+    }
     if (boss && inside(bounds, boss.pos)) {
       bestD = Math.max(0, Math.hypot(boss.pos.x - from.x, boss.pos.y - from.y) - boss.radius) ** 2;
       best = boss;
@@ -199,9 +234,9 @@ export function createSim(
     hitStopS = Math.max(hitStopS, HIT_STOP_S);
     if (pilot.lives > 0) return;
     hitStopS = Math.max(hitStopS, HIT_STOP_DEATH_S);
-    pilot.alive = false;
     pilot.diedAtS = timeS;
     events.deaths.push(pilot.ship.id);
+    afterlife.die(pilot);
   };
 
   /** Таран: не в кооперативе и не по своим — множитель теряют оба. */
@@ -297,6 +332,10 @@ export function createSim(
         spent.push(b);
         continue;
       }
+      if (afterlife.shootBomb(b.pos, BULLET_RADIUS)) {
+        spent.push(b);
+        continue;
+      }
       // Тело босса: цель теряет прочность, ядро Воронки просто гасит снаряд.
       const boss = bossCtl?.boss;
       if (bossCtl && boss && boss.radius > 0 && Math.hypot(boss.pos.x - b.pos.x, boss.pos.y - b.pos.y) < BULLET_RADIUS + boss.radius) {
@@ -344,6 +383,10 @@ export function createSim(
     get boss() {
       return bossCtl?.boss ?? null;
     },
+    shards: afterlife.shards,
+    bombs: afterlife.bombs,
+    sabotage: (id, shot) => afterlife.sabotage(id, shot),
+    sabCooldownS: (kind) => afterlife.cooldownS(kind),
     events,
     get timeS() {
       return timeS;
@@ -399,6 +442,8 @@ export function createSim(
       const shipPull = comp === 'vortex' ? VORTEX_SHIP_PULL : (bossCtl?.boss.shipPull ?? 0);
       if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
       field.step(dtS);
+      afterlife.moveGhosts(dtS, read);
+      afterlife.step(dtS);
       if (bossCtl?.boss.kind === 'vortex') {
         const core = bossCtl.boss;
         for (let i = field.list.length - 1; i >= 0; i--) {

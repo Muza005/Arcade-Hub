@@ -36,6 +36,8 @@ export interface Asteroid {
   immortal: boolean;
   /** Ведёт босс: не удаляется за краем, пока его держат. */
   held: boolean;
+  /** Камень саботажника: кто бросил (контур в его цвет); обычный — null. */
+  owner: string | null;
 }
 
 const SIZES: readonly AsteroidSize[] = ['small', 'medium', 'large'];
@@ -95,6 +97,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       spin: 0,
       immortal: false,
       held: false,
+      owner: null,
     }),
     () => undefined,
     ASTEROIDS_MAX,
@@ -117,6 +120,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
     a.spin = rng.range(-ASTEROID_SPIN, ASTEROID_SPIN);
     a.immortal = false;
     a.held = false;
+    a.owner = null;
     list.push(a);
     return a;
   };

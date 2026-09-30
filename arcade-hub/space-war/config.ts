@@ -350,9 +350,22 @@ export const JAMMER_TARGETS = 3; // всегда 3 ближайших сопер
 export const SAB_COOLDOWN_S = { rock: 5, bomb: 8 } as const; // + 1 с за каждого погибшего
 export const SAB_ROCK_HP = [4, 5] as const;
 export const SAB_SPEED_STEPS = [0.5, 1, 2, 3] as const; // × скорость обычного астероида
-export const SAB_STEP_THRESHOLDS = [0.25, 0.5, 0.75] as const; // доли диагонали рамки
-export const SAB_CANCEL_CM = 1.5; // короче — отмена; тап тоже отмена
-export const SAB_FRAME_MIN_HEIGHT = 0.6; // рамка ≥ 60 % высоты телефона
+// Ступени силы, отмена и рамка — у раскладки «прицел» платформы (shared/config: AIM_*).
+export type SabKind = keyof typeof SAB_COOLDOWN_S;
+export const SAB_KINDS: readonly SabKind[] = ['rock', 'bomb'];
+export const SAB_DEAD_EXTRA_S = 1; // + к кулдауну за каждого погибшего
+export const SAB_ROCK_SIZE: AsteroidSize = 'medium';
+export const BOMB_RADIUS = 20;
+export const BOMB_BLAST_RADIUS = 280; // TUNE: радиус отброса
+export const BOMB_PUSH = 900; // TUNE: px/с у центра взрыва, к краю радиуса — до нуля
+export const BOMB_FUSE_HZ = 4; // мигание фитиля
+export const SHAKE_BOMB = 0.35;
+export const SAB_TRAIL_ALPHA = 0.25;
+// Боты-саботажники: после готовности ждут, целятся в соперника с упреждением.
+export const BOT_SAB_WAIT_S = { weak: 2.5, mid: 1.2, strong: 0.5 } as const;
+export const BOT_SAB_STEP = 3;
+export const BOT_SAB_ROCK_CHANCE = 0.5; // иначе — бомба
+export const BOT_SAB_LEAD_S = 0.8;
 
 // ─── Лобби (Б5, SPACE_WAR_SPEC §8) ───────────────────────────────
 /** Формы корпуса: треугольник, круг, квадрат, звезда — у каждой свои варианты рисунка. Хитбокс у всех один. */
@@ -401,3 +414,15 @@ export const BOT_HUNT_GAP_K = 0.5; // сильный целится в сере�
 // ─── Воскрешение и призрак ───────────────────────────────────────
 export const GHOST_S = 15; // настраивается в лобби
 export const REVIVE_SHARDS = 3;
+export const REVIVE_LIVES = 1;
+export const REVIVE_INVULN_S = 2.5;
+export const SHARD_RADIUS = 18;
+export const SHARD_SPEED = 320; // разлетаются в разные стороны
+export const SHARD_DRAG = 1.6; // 1/с: и останавливаются
+export const SHARD_PUSH_SPEED = 420; // чужой корабль отталкивает осколок
+export const SHARD_PULSE_HZ = 2;
+export const GHOST_ALPHA = 0.35;
+export const GHOST_PUSH_RADIUS = 110; // призрак слегка отталкивает камни
+export const GHOST_PUSH = 160; // px/с²
+export const GHOST_RING_PX = 3;
+export const GHOST_RING_GAP = 34;

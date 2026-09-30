@@ -1,11 +1,13 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
+// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне).
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
 import { rankByScore, type GameContext, type GameModule, type GamePlayer, type MatchResult } from '../../shared/game-manifest';
+import { parseAimShot } from '../../shared/aim';
 import { readHubSettings } from '../../shared/hub-settings';
 import { createTranslator } from '../../shared/i18n';
 import {
@@ -75,6 +77,11 @@ import {
   BOSS_EXPLOSION_SHARDS,
   SHAKE_BOSS_DEATH,
   SWARM_TINT,
+  BOMB_BLAST_RADIUS,
+  GHOST_S,
+  SAB_KINDS,
+  SHAKE_BOMB,
+  VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
   WAVE_HUD_FONT_PX,
   WAVE_LIMIT,
   WORLD_H,
@@ -85,6 +92,7 @@ import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
 import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
 import { createCamera, type Camera } from '../render/camera';
+import { createAfterlifeView, type AfterlifeView } from '../render/afterlife-view';
 import { createBossView, type BossView } from '../render/boss-view';
 import { createDarkness, type Darkness } from '../render/darkness';
 import { createVortexFx, type VortexFx } from '../render/vortex-fx';
@@ -109,6 +117,8 @@ const SECONDS_PER_MINUTE = 60;
 const EXPLOSION_K = 2;
 /** Пролёт вплотную — несколько искр в цвет игрока. */
 const NEAR_SPARKS = 4;
+/** Взрыв бомбы — кольцо искр. */
+const BLAST_SPARKS = 36;
 
 /** Корпус игрока из лобби; у ботов — один на всех. */
 const hullOf = (player: GamePlayer): Hull => {
@@ -116,6 +126,13 @@ const hullOf = (player: GamePlayer): Hull => {
   const v = player.fields?.hull;
   return HULLS.find((h) => h === v) ?? HULL_DEFAULT;
 };
+
+/** Иконки карточек саботажника (цвет — currentColor): камень — неровный многоугольник, бомба — круг с фитилём. */
+const SAB_ICONS = {
+  rock: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 3l7-1 6 5 1 7-4 7-8 1-5-5-1-8z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+  bomb: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="11" cy="14" r="7.5" fill="currentColor"/><path d="M15.5 8.5l3-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><circle cx="20" cy="4" r="1.8" fill="currentColor"/></svg>',
+} as const;
+const isSabKind = (v: string): v is (typeof SAB_KINDS)[number] => (SAB_KINDS as readonly string[]).includes(v);
 
 const formatTime = (seconds: number): string => {
   const total = Math.floor(seconds);
@@ -170,6 +187,9 @@ export function createSpaceWarGame(): GameModule {
   let darkness: Darkness;
   let vortexFx: VortexFx;
   let bossView: BossView;
+  let afterView: AfterlifeView;
+  let ghostTotalS = GHOST_S;
+  const phones = new Set<string>();
   let bossBar: Graphics;
   let waveTextY = 0;
   /** Цель этой волны уже повержена — вместо «волна пройдена» остаётся уведомление о победе. */
@@ -240,8 +260,8 @@ export function createSpaceWarGame(): GameModule {
       }
       const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
       sprite.texture = shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!;
-      // Камни Роя — другим оттенком: их не разбить.
-      sprite.tint = rock.immortal ? SWARM_TINT : 0xffffff;
+      // Камни Роя — другим оттенком: их не разбить; камень саботажника — в цвет бросившего.
+      sprite.tint = rock.immortal ? SWARM_TINT : rock.owner ? (colors.get(rock.owner) ?? 0xffffff) : 0xffffff;
       sprite.position.set(rock.prev.x + (rock.pos.x - rock.prev.x) * alpha, rock.prev.y + (rock.pos.y - rock.prev.y) * alpha);
       sprite.rotation = rock.angle;
     }
@@ -303,6 +323,23 @@ export function createSpaceWarGame(): GameModule {
       ctx.fx(bump.a, { vib: VIBRATE_RAM_MS });
       ctx.fx(bump.b, { vib: VIBRATE_RAM_MS });
     }
+    for (const id of events.ghosts) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
+    for (const id of events.saboteurs) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
+    for (const r of events.revives) {
+      const color = colors.get(r.id) ?? ACCENT;
+      sparks(r.x, r.y, DEBRIS_COUNT.large, color, DEBRIS_S);
+      ctx.fx(r.id, { vib: VIBRATE_EXPLODE_MS, flash: color });
+    }
+    for (const b of events.blasts) {
+      const color = colors.get(b.owner) ?? ACCENT;
+      shards(b.x, b.y, DEBRIS_COUNT.large, color);
+      sparks(b.x, b.y, DEBRIS_COUNT.large * EXPLOSION_K, color, DEBRIS_S);
+      // Кольцо искр до края радиуса отброса — видно, кого задело.
+      if (quality.level !== 'low') {
+        particles.burst(b.x, b.y, { texture: atlas.spark, color, count: BLAST_SPARKS, speed: [BOMB_BLAST_RADIUS / DEBRIS_S, BOMB_BLAST_RADIUS / DEBRIS_S], life: DEBRIS_S });
+      }
+      camera.shake(SHAKE_BOMB);
+    }
     for (const d of events.bossDown) {
       shards(d.x, d.y, BOSS_EXPLOSION_SHARDS, BOSS_COLOR);
       sparks(d.x, d.y, BOSS_EXPLOSION_SHARDS, BOSS_COLOR, MULT_SPARK_S[MULT_SPARK_S.length - 1] ?? 1);
@@ -347,6 +384,8 @@ export function createSpaceWarGame(): GameModule {
       const settings = readHubSettings();
       bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
       mode = MODES.find((m) => m === ctx.mode) ?? MODE_DEFAULT;
+      ghostTotalS = typeof ctx.settings.ghostS === 'number' ? ctx.settings.ghostS : GHOST_S;
+      for (const p of ctx.players) if (p.kind === 'phone') phones.add(p.id);
       for (const p of ctx.players) teamOf.set(p.id, p.color);
       sim = createSim(
         ctx.players.map((p) => p.id),
@@ -360,10 +399,12 @@ export function createSpaceWarGame(): GameModule {
           difficulty: DIFFICULTIES.find((d) => d === ctx.settings.difficulty) ?? DIFFICULTY_DEFAULT,
           // ?wave=N в адресе — начать с N-й волны (проверка боссов и поздних волн).
           startWave: Number(new URLSearchParams(location.search).get('wave')) || 1,
+          ghostS: ghostTotalS,
+          sabotage: ctx.settings.sabotage !== false,
         },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
-      brains = createBots(sim, [...bots], botLevel, ctx.seed);
+      brains = createBots(sim, [...bots], botLevel, ctx.seed, mode, (id) => teamOf.get(id) ?? id);
       await loadFonts([`700 ${FPS_FONT_PX}px "${FONT_DISPLAY}"`, `700 ${MULT_FONT_PX}px "${FONT_DISPLAY}"`]);
       stage = await createStage(ctx.mount, worldW, worldH, { background: cssVar('--bg') });
       atlas = bakeAtlas(stage.app.renderer);
@@ -410,6 +451,8 @@ export function createSpaceWarGame(): GameModule {
       bg = cssVar('--bg');
       bossView = createBossView(vfx);
       glowLayer.addChildAt(bossView.view, 0);
+      afterView = createAfterlifeView();
+      glowLayer.addChild(afterView.view);
       scene.addChild(field, vortexFx.view, rocksLayer, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
@@ -460,6 +503,11 @@ export function createSpaceWarGame(): GameModule {
 
     update(dtS) {
       if (paused || ended) return;
+      // Боты-саботажники бросают по своему решению — в начале шага, как и люди.
+      for (const id of bots) {
+        const shot = brains.sabotage(id);
+        if (shot) sim.sabotage(id, shot);
+      }
       sim.step(dtS, (id) => (bots.has(id) ? brains.input(id) : ctx.input.read(id)));
       react();
       announce();
@@ -500,8 +548,10 @@ export function createSpaceWarGame(): GameModule {
         const view = views.get(ship.id);
         const pilot = sim.pilots.get(ship.id);
         if (!view || !pilot) continue;
-        view.setVisible(pilot.alive);
-        if (!pilot.alive) continue;
+        const ghost = pilot.phase === 'ghost';
+        view.setVisible(pilot.alive || ghost);
+        view.setGhost(ghost);
+        if (!pilot.alive && !ghost) continue;
         view.set(
           ship.prev.x + (ship.pos.x - ship.prev.x) * alpha,
           ship.prev.y + (ship.pos.y - ship.prev.y) * alpha,
@@ -526,6 +576,21 @@ export function createSpaceWarGame(): GameModule {
       multFx.draw();
       scoreHud.draw();
       vortexFx.draw();
+      afterView.draw(
+        sim.shards,
+        sim.bombs,
+        [...sim.pilots.values()]
+          .filter((p) => p.phase === 'ghost')
+          .map((p) => ({
+            x: p.ship.prev.x + (p.ship.pos.x - p.ship.prev.x) * alpha,
+            y: p.ship.prev.y + (p.ship.pos.y - p.ship.prev.y) * alpha,
+            color: colors.get(p.ship.id) ?? ACCENT,
+            left: Math.max(0, p.ghostS / ghostTotalS),
+          })),
+        (id) => colors.get(id) ?? ACCENT,
+        alpha,
+        fxTimeS,
+      );
       const boss = sim.boss;
       bossView.draw(
         boss,
@@ -607,6 +672,21 @@ export function createSpaceWarGame(): GameModule {
           })),
         },
       };
+    },
+
+    aim(playerId) {
+      // Экран саботажника — только у телефонов: клавиатурному прицелиться нечем.
+      const pilot = sim.pilots.get(playerId);
+      if (!pilot || pilot.phase !== 'saboteur' || !phones.has(playerId)) return undefined;
+      return {
+        cards: SAB_KINDS.map((kind) => ({ id: kind, icon: SAB_ICONS[kind], readyInS: pilot.sabS[kind], cooldownS: sim.sabCooldownS(kind) })),
+      };
+    },
+
+    action(playerId, payload) {
+      const shot = parseAimShot(payload);
+      if (!shot || !isSabKind(shot.card)) return;
+      sim.sabotage(playerId, { kind: shot.card, x: shot.x, y: shot.y, dx: shot.dx, dy: shot.dy, step: shot.step });
     },
 
     mainButton(playerId) {

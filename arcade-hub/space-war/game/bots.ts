@@ -22,6 +22,10 @@ import {
   BOT_HUNT_RANGE,
   BOT_LOOKAHEAD_S,
   BOT_REACTION_S,
+  BOT_SAB_LEAD_S,
+  BOT_SAB_ROCK_CHANCE,
+  BOT_SAB_STEP,
+  BOT_SAB_WAIT_S,
   BOT_SAFE_MARGIN,
   BOT_SEED_SALT,
   BOT_THREAT_FIRE,
@@ -32,7 +36,10 @@ import {
   NEAR_MISS_DISTANCE,
   SHIP_HITBOX_RADIUS,
   type BotLevel,
+  type Mode,
+  type SabKind,
 } from '../config';
+import type { SabShot } from './afterlife';
 import type { Asteroid } from './asteroids';
 import type { Vec } from './ship';
 import type { Pilot, Sim } from './sim';
@@ -43,23 +50,34 @@ interface Brain {
   retargetS: number;
   cooldownS: number;
   lastBtn: boolean;
+  /** Саботажник: сколько ещё выжидать перед броском. */
+  sabWaitS: number;
 }
 
 export interface Bots {
   /** Ввод бота на этом шаге (вызывать один раз за шаг на бота). */
   input(id: string): InputState;
+  /** Бросок бота-саботажника на этом шаге или null (вызывать один раз за шаг на бота). */
+  sabotage(id: string): SabShot | null;
 }
 
 const IDLE: InputState = { x: 0, y: 0, btn: false };
 const DT = 1 / FIXED_STEP_HZ;
 
-export function createBots(sim: Sim, ids: readonly string[], level: BotLevel, seed: number): Bots {
+export function createBots(
+  sim: Sim,
+  ids: readonly string[],
+  level: BotLevel,
+  seed: number,
+  mode: Mode = 'versus',
+  teamOf: (id: string) => string = (id) => id,
+): Bots {
   const rng = createRng((seed ^ BOT_SEED_SALT) >>> 0);
   const delaySteps = Math.round(BOT_REACTION_S[level] * FIXED_STEP_HZ);
   /** Бот действует с опозданием — значит, и смотреть вперёд надо дальше. */
   const lookaheadS = BOT_LOOKAHEAD_S + BOT_REACTION_S[level];
   const brains = new Map<string, Brain>(
-    ids.map((id) => [id, { queue: [], target: null, retargetS: 0, cooldownS: 0, lastBtn: false }]),
+    ids.map((id) => [id, { queue: [], target: null, retargetS: 0, cooldownS: 0, lastBtn: false, sabWaitS: BOT_SAB_WAIT_S[level] }]),
   );
   const b = sim.bounds;
 
@@ -215,7 +233,55 @@ export function createBots(sim: Sim, ids: readonly string[], level: BotLevel, se
     return { x, y, btn: fire };
   };
 
+  /** Вход на краю: от точки назад по направлению до рамки поля (в долях поля). */
+  const entryFor = (target: Vec, dx: number, dy: number): { x: number; y: number } => {
+    const ts: number[] = [];
+    if (dx > 0) ts.push((target.x - b.left) / dx);
+    if (dx < 0) ts.push((target.x - b.right) / dx);
+    if (dy > 0) ts.push((target.y - b.top) / dy);
+    if (dy < 0) ts.push((target.y - b.bottom) / dy);
+    const t = Math.min(...ts);
+    const w = b.right - b.left;
+    const h = b.bottom - b.top;
+    const clamp = (v: number): number => Math.min(1, Math.max(0, v));
+    return { x: clamp((target.x - dx * t - b.left) / w), y: clamp((target.y - dy * t - b.top) / h) };
+  };
+
+  /** Цель саботажника: в соревновании — любой живой, в командном — чужая команда (упреждение по скорости).
+   *  В кооперативе бьёт бомбой в камень возле союзника — отбросить его подальше. */
+  const sabTarget = (id: string): { at: Vec; kind: SabKind } | null => {
+    const alive = [...sim.pilots.values()].filter((p) => p.alive);
+    if (alive.length === 0) return null;
+    if (mode === 'coop') {
+      const ally = rng.pick(alive);
+      const rock = nearestRock(ally.ship.pos);
+      return rock ? { at: { ...rock.rock.pos }, kind: 'bomb' } : null;
+    }
+    const enemies = alive.filter((p) => mode !== 'teams' || teamOf(p.ship.id) !== teamOf(id));
+    if (enemies.length === 0) return null;
+    const enemy = rng.pick(enemies);
+    const { pos, vel } = enemy.ship;
+    return { at: { x: pos.x + vel.x * BOT_SAB_LEAD_S, y: pos.y + vel.y * BOT_SAB_LEAD_S }, kind: rng.next() < BOT_SAB_ROCK_CHANCE ? 'rock' : 'bomb' };
+  };
+
   return {
+    sabotage(id) {
+      const pilot = sim.pilots.get(id);
+      const brain = brains.get(id);
+      if (!pilot || !brain || pilot.phase !== 'saboteur') return null;
+      brain.sabWaitS -= DT;
+      if (brain.sabWaitS > 0) return null;
+      const target = sabTarget(id);
+      if (!target) return null;
+      // Выбранный снаряд ещё не готов — берём другой, если он готов.
+      const kind = pilot.sabS[target.kind] <= 0 ? target.kind : target.kind === 'rock' && mode !== 'coop' ? 'bomb' : 'rock';
+      if (pilot.sabS[kind] > 0 || (mode === 'coop' && kind === 'rock')) return null;
+      brain.sabWaitS = BOT_SAB_WAIT_S[level];
+      const angle = rng.range(0, Math.PI * 2);
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      return { kind, ...entryFor(target.at, dx, dy), dx, dy, step: BOT_SAB_STEP };
+    },
     input(id) {
       const pilot = sim.pilots.get(id);
       const brain = brains.get(id);

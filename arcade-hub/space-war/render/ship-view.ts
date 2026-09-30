@@ -8,6 +8,7 @@ import {
   FLAME_WIDTH_K,
   HUD_POP_S,
   HUD_POP_SCALE,
+  GHOST_ALPHA,
   INVULN_ALPHA,
   LIVES_LOST_ALPHA,
   LIVES_PIP_GAP,
@@ -39,6 +40,8 @@ export interface ShipView {
   setLives(lives: number, max: number): void;
   /** Мигание неуязвимости. */
   setBlink(dim: boolean): void;
+  /** Призрак: полупрозрачный корпус, без подписи. */
+  setGhost(ghost: boolean): void;
   /** Ступень множителя ×1…×5. */
   setMult(mult: number): void;
   /** Анимации подписи — по шагам симуляции. */
@@ -140,6 +143,10 @@ export function createShipView(textColor: string): ShipView {
     },
     setBlink(dim) {
       body.alpha = dim ? INVULN_ALPHA : 1;
+    },
+    setGhost(ghost) {
+      node.alpha = ghost ? GHOST_ALPHA : 1;
+      if (ghost) tag.visible = false;
     },
     setMult(next) {
       if (next === mult) return;
