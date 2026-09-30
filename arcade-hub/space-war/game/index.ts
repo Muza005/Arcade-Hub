@@ -1,7 +1,7 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
-// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления.
+// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления. Б12: звук.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
@@ -86,6 +86,7 @@ import {
   OVERLOAD_FADE_S,
   POWERUP_COLOR,
   SHIELD_BLINK_S,
+  LOW_LIVES,
   ROCK_BOUNCE_DEFAULT,
   VIBRATE_PICKUP,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
@@ -95,6 +96,7 @@ import {
   worldWidth,
   worldZoom,
 } from '../config';
+import { createGameAudio, type GameAudio, type Sfx } from '../audio/sound';
 import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
 import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
@@ -198,6 +200,10 @@ export function createSpaceWarGame(): GameModule {
   let bossView: BossView;
   let afterView: AfterlifeView;
   let powerupView: PowerupView;
+  let audio: GameAudio | null = null;
+  const BREAK_SFX: Record<'small' | 'medium' | 'large', Sfx> = { small: 'breakSmall', medium: 'breakMedium', large: 'breakLarge' };
+  /** Ступень множителя поднимает свист сближения. */
+  const NEAR_PITCH_STEP = 0.12;
   let ghostTotalS = GHOST_S;
   const phones = new Set<string>();
   let bossBar: Graphics;
@@ -336,6 +342,33 @@ export function createSpaceWarGame(): GameModule {
   };
 
   /** События шага → частицы, тряска, вспышки и обратная связь на телефоне. */
+  /** Звуки шага: панорама — по положению на поле. */
+  const sound = (): void => {
+    if (!audio) return;
+    const { events } = sim;
+    const width = sim.bounds.right + sim.bounds.left;
+    const pan = (x: number): number => x / width;
+    const at = (id: string): number => pan(sim.pilots.get(id)?.ship.pos.x ?? width / 2);
+    for (const id of events.shots) audio.play('shot', at(id));
+    for (const c of events.chips) audio.play('chip', pan(c.x));
+    for (const b of events.breaks) audio.play(BREAK_SFX[b.size], pan(b.x));
+    for (const n of events.near) audio.play('near', pan(n.x), 1 + NEAR_PITCH_STEP * ((sim.pilots.get(n.id)?.mult ?? 1) - 1));
+    for (const id of events.hits) audio.play('hit', at(id));
+    for (const id of events.deaths) audio.play('explode', at(id));
+    for (const b of events.bumps) audio.play(b.ram ? 'ram' : 'bump', pan(b.x));
+    for (const p of events.pickups) audio.play(p.kind === 'overload' ? 'overload' : 'pickup', pan(p.x));
+    for (const id of events.jammed) audio.play('jam', at(id));
+    for (const b of events.blasts) audio.play('blast', pan(b.x));
+    for (const d of events.bossDown) audio.play('bossDown', pan(d.x));
+    for (const w of events.waves) audio.play(w.kind === 'start' ? 'waveStart' : 'waveClear');
+    for (const r of events.revives) audio.play('revive', pan(r.x));
+    for (const id of events.ghosts) audio.play('ghost', at(id));
+    for (const s of events.sabShots) audio.play('sabLaunch', at(s.id));
+    // Слои музыки: волна всегда; босс — в его волне; «мало жизней» — у кого-то из живых людей последняя жизнь.
+    const low = ctx.players.some((p) => p.kind !== 'bot' && (sim.pilots.get(p.id)?.alive ?? false) && (sim.pilots.get(p.id)?.lives ?? 0) <= LOW_LIVES);
+    audio.layers({ wave: true, boss: sim.waves.boss !== null, low });
+  };
+
   const react = (): void => {
     const { events } = sim;
     for (const bump of events.bumps) {
@@ -444,6 +477,7 @@ export function createSpaceWarGame(): GameModule {
       const lobbyQuality = QUALITY_CHOICES.find((q) => q === ctx.settings.quality) ?? 'auto';
       quality = createQuality(lobbyQuality === 'auto' ? settings.quality : lobbyQuality);
       bloomK = (BLOOM_STRENGTH * settings.bloom) / PERCENT;
+      audio = createGameAudio(settings);
 
       // Шейдеры — только на WebGL; на другом рендерере игра идёт без них.
       const webgl = stage.app.renderer.name === 'webgl';
@@ -540,6 +574,7 @@ export function createSpaceWarGame(): GameModule {
       }
       sim.step(dtS, (id) => (bots.has(id) ? brains.input(id) : ctx.input.read(id)));
       react();
+      sound();
       announce();
       notice.update(dtS);
       darkness.update(sim.waves.complication === 'dark', dtS);
@@ -667,10 +702,12 @@ export function createSpaceWarGame(): GameModule {
 
     pause() {
       paused = true;
+      audio?.pause(true);
     },
 
     resume() {
       paused = false;
+      audio?.pause(false);
       frames = 0;
       sampleStart = lastFrameAt = performance.now();
     },
@@ -742,6 +779,8 @@ export function createSpaceWarGame(): GameModule {
     },
 
     dispose() {
+      audio?.dispose();
+      audio = null;
       darkness?.destroy();
       stage?.destroy();
       atlas?.destroy();

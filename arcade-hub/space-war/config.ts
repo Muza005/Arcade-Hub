@@ -459,3 +459,20 @@ export const GHOST_PUSH_RADIUS = 110; // призрак слегка оттал�
 export const GHOST_PUSH = 160; // px/с²
 export const GHOST_RING_PX = 3;
 export const GHOST_RING_GAP = 34;
+
+// ─── Звук (Б12) ──────────────────────────────────────────────────
+// Всё синтезируется в браузере (без файлов) и идёт через общий выход Howler хаба:
+// кнопка звука и общая громкость хаба действуют и на игру; музыка и эффекты — ползунками настроек хаба.
+export const SFX_VOLUME = 0.55; // эффекты при ползунке 100 %
+export const MUSIC_VOLUME = 0.32; // музыка при ползунке 100 %
+export const SFX_VOICES_MAX = 24; // одновременно звучащих эффектов
+export const SFX_MIN_GAP_S = 0.04; // один и тот же звук — не чаще
+export const SFX_PAN = 0.6; // стереопанорама по положению на экране
+export const MUSIC_BPM = 120;
+export const MUSIC_BARS = 8;
+export const MUSIC_RATE = 22050;
+export const MUSIC_FADE_S = 1.2; // слои входят и уходят
+export const MUSIC_PAUSE_K = 0.3; // на паузе музыка тише
+/** Слой «мало жизней»: у кого-то из живых людей осталась последняя жизнь. */
+export const LOW_LIVES = 1;
+export const AUDIO_NOISE_SEED = 0x5a0d; // шум для эффектов — из своего генератора
