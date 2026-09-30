@@ -130,6 +130,8 @@ export interface MatchResult {
   seed: number;
   version: string;
   rows: MatchResultRow[];
+  /** Числа игры о матче (например, дожитые волны) — сохраняются с последним матчем для meta(). */
+  meta?: Record<string, number>;
 }
 
 // ─── Итоги (§12): содержимое шагов присылает игра, оболочка — порядок, анимация, кнопки ───
@@ -139,6 +141,8 @@ export interface Award {
   /** Название награды (уже переведённое). */
   title: string;
   value?: string;
+  /** Аватар — SVG-иконка в цвете игрока (например, корабль); нет — буква ника. */
+  icon?: string;
 }
 
 export interface ResultsTable {

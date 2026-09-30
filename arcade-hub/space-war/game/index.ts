@@ -1,12 +1,14 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
-// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления. Б12: звук.
+// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления. Б12: звук. Б13: итоги (повтор, награды, полоски волн), метки записи.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
+import { FixedLoop } from '../../engine/loop';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
-import { rankByScore, type GameContext, type GameModule, type GamePlayer, type MatchResult } from '../../shared/game-manifest';
+import { FIXED_STEP_HZ } from '../../shared/config';
+import { rankByScore, type Award, type GameContext, type GameModule, type GamePlayer, type MatchResult, type ReplayMark } from '../../shared/game-manifest';
 import { parseAimShot } from '../../shared/aim';
 import { readHubSettings } from '../../shared/hub-settings';
 import { createTranslator } from '../../shared/i18n';
@@ -87,6 +89,8 @@ import {
   POWERUP_COLOR,
   SHIELD_BLINK_S,
   LOW_LIVES,
+  REPLAY_SLOW,
+  REPLAY_TAIL_S,
   ROCK_BOUNCE_DEFAULT,
   VIBRATE_PICKUP,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
@@ -97,6 +101,8 @@ import {
   worldZoom,
 } from '../config';
 import { createGameAudio, type GameAudio, type Sfx } from '../audio/sound';
+import { hullSvg } from '../hull-shapes';
+import { pluralForm } from '../i18n/plural';
 import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
 import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
@@ -115,7 +121,9 @@ import { createScoreHud, type ScoreHud } from '../render/score-hud';
 import { createShipView, type ShipView } from '../render/ship-view';
 import { angleDelta } from './ship';
 import { createBots, type Bots } from './bots';
+import { pickAwards, type AwardValue } from './awards';
 import { createSim, type Pilot, type Sim } from './sim';
+import { snapshot } from './tail';
 
 const t = createTranslator(strings);
 
@@ -201,6 +209,17 @@ export function createSpaceWarGame(): GameModule {
   let afterView: AfterlifeView;
   let powerupView: PowerupView;
   let audio: GameAudio | null = null;
+  /** Последние шаги — для замедленного повтора в итогах; метки волн и гибелей — для шкалы записи. */
+  const tail: Sim[] = [];
+  const TAIL_STEPS = REPLAY_TAIL_S * FIXED_STEP_HZ;
+  const marks: ReplayMark[] = [];
+  /** Идёт повтор в итогах: телефоны не вибрируют, живая симуляция отложена. */
+  let replaying = false;
+  let replayLoop: FixedLoop | null = null;
+  /** Вибрация и вспышка на телефоне — только во время матча, не в повторе. */
+  const buzz: GameContext['fx'] = (id, fx) => {
+    if (!replaying) ctx.fx(id, fx);
+  };
   const BREAK_SFX: Record<'small' | 'medium' | 'large', Sfx> = { small: 'breakSmall', medium: 'breakMedium', large: 'breakLarge' };
   /** Ступень множителя поднимает свист сближения. */
   const NEAR_PITCH_STEP = 0.12;
@@ -224,7 +243,14 @@ export function createSpaceWarGame(): GameModule {
   /** Места по режиму: соревнование — личные очки; кооператив — одна общая победа с общим счётом;
    *  командное — очки команды, у всех её игроков одно место. Итоговые очки — с бонусом за жизни. */
   const result = (): MatchResult => {
-    const base = { gameId: spaceWarManifest.id, mode: ctx.mode, seed: ctx.seed, version: spaceWarManifest.version };
+    // С результатом — до какой волны дошли (строка «Волна 14 · лучший — …» на карточке игры).
+    const base = {
+      gameId: spaceWarManifest.id,
+      mode: ctx.mode,
+      seed: ctx.seed,
+      version: spaceWarManifest.version,
+      meta: { wave: sim.waves.wave },
+    };
     if (mode === 'coop') {
       const total = ctx.players.reduce((sum, p) => sum + sim.finalScore(p.id), 0);
       return { ...base, rows: ctx.players.map((p) => ({ playerId: p.id, score: total, place: 1 })) };
@@ -242,6 +268,13 @@ export function createSpaceWarGame(): GameModule {
     return { ...base, rows: rankByScore(ctx.players.map((p) => ({ playerId: p.id, score: sim.finalScore(p.id) }))) };
   };
   const survivedS = (id: string): number => sim.pilots.get(id)?.diedAtS ?? sim.timeS;
+
+  /** Подпись награды: число в нужной форме («37 сближений»), множитель или время. */
+  const awardValue = (v: AwardValue): string => {
+    if (v.kind === 'mult') return t('valMult', { n: v.n });
+    if (v.kind === 'time') return formatTime(v.s);
+    return t(`n_${v.kind}_${pluralForm(v.n)}`, { n: v.n });
+  };
 
   const endMatch = (): void => {
     if (ended) return;
@@ -375,20 +408,20 @@ export function createSpaceWarGame(): GameModule {
       sparks(bump.x, bump.y, RAM_SPARKS, bump.ram ? FLASH_HIT : ACCENT, DEBRIS_S);
       if (!bump.ram) continue;
       camera.shake(SHAKE_RAM);
-      ctx.fx(bump.a, { vib: VIBRATE_RAM_MS });
-      ctx.fx(bump.b, { vib: VIBRATE_RAM_MS });
+      buzz(bump.a, { vib: VIBRATE_RAM_MS });
+      buzz(bump.b, { vib: VIBRATE_RAM_MS });
     }
     for (const p of events.pickups) {
       sparks(p.x, p.y, DEBRIS_COUNT.medium, POWERUP_COLOR[p.kind], DEBRIS_S);
-      ctx.fx(p.id, { vib: VIBRATE_PICKUP });
+      buzz(p.id, { vib: VIBRATE_PICKUP });
     }
-    for (const id of events.jammed) ctx.fx(id, { vib: VIBRATE_HIT_MS });
-    for (const id of events.ghosts) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
-    for (const id of events.saboteurs) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
+    for (const id of events.jammed) buzz(id, { vib: VIBRATE_HIT_MS });
+    for (const id of events.ghosts) buzz(id, { vib: VIBRATE_GHOST_MS });
+    for (const id of events.saboteurs) buzz(id, { vib: VIBRATE_GHOST_MS });
     for (const r of events.revives) {
       const color = colors.get(r.id) ?? ACCENT;
       sparks(r.x, r.y, DEBRIS_COUNT.large, color, DEBRIS_S);
-      ctx.fx(r.id, { vib: VIBRATE_EXPLODE_MS, flash: color });
+      buzz(r.id, { vib: VIBRATE_EXPLODE_MS, flash: color });
     }
     for (const b of events.blasts) {
       const color = colors.get(b.owner) ?? ACCENT;
@@ -405,7 +438,7 @@ export function createSpaceWarGame(): GameModule {
       sparks(d.x, d.y, BOSS_EXPLOSION_SHARDS, BOSS_COLOR, MULT_SPARK_S[MULT_SPARK_S.length - 1] ?? 1);
       camera.shake(SHAKE_BOSS_DEATH);
       camera.flashScreen(FLASH_EXPLODE, FLASH_DEATH_ALPHA);
-      ctx.fx(d.by, { vib: VIBRATE_EXPLODE_MS });
+      buzz(d.by, { vib: VIBRATE_EXPLODE_MS });
     }
     for (const b of events.breaks) {
       shards(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR);
@@ -417,7 +450,7 @@ export function createSpaceWarGame(): GameModule {
       camera.shake(SHAKE_HIT);
       camera.flashScreen(FLASH_HIT, FLASH_HIT_ALPHA);
       camera.pulseChroma();
-      if (sim.pilots.get(id)?.alive) ctx.fx(id, { vib: VIBRATE_HIT_MS, flash: FLASH_HIT });
+      if (sim.pilots.get(id)?.alive) buzz(id, { vib: VIBRATE_HIT_MS, flash: FLASH_HIT });
     }
     for (const id of events.deaths) {
       const pilot = sim.pilots.get(id);
@@ -429,12 +462,12 @@ export function createSpaceWarGame(): GameModule {
       }
       camera.shake(SHAKE_DEATH);
       camera.flashScreen(FLASH_EXPLODE, FLASH_DEATH_ALPHA);
-      ctx.fx(id, { vib: VIBRATE_EXPLODE_MS, flash: FLASH_EXPLODE });
+      buzz(id, { vib: VIBRATE_EXPLODE_MS, flash: FLASH_EXPLODE });
       multFx.drop(id);
     }
   };
 
-  return {
+  const game: GameModule = {
     async init(context) {
       ctx = context;
       // Камера отъезжает на шаг за каждые 2 игрока: мир больше, пропорции те же (SPACE_WAR_SPEC §9).
@@ -565,7 +598,7 @@ export function createSpaceWarGame(): GameModule {
       sampleStart = lastFrameAt = performance.now();
     },
 
-    update(dtS) {
+    update(dtS, tick) {
       if (paused || ended) return;
       // Боты-саботажники бросают по своему решению — в начале шага, как и люди.
       for (const id of bots) {
@@ -573,6 +606,11 @@ export function createSpaceWarGame(): GameModule {
         if (shot) sim.sabotage(id, shot);
       }
       sim.step(dtS, (id) => (bots.has(id) ? brains.input(id) : ctx.input.read(id)));
+      // Метки шкалы записи: начало волны и гибель.
+      for (const w of sim.events.waves) if (w.kind === 'start') marks.push({ tick, kind: 'wave', label: t('noticeWave', { n: w.wave }) });
+      for (const id of sim.events.deaths) marks.push({ tick, kind: 'death', label: ctx.players.find((p) => p.id === id)?.nick ?? id });
+      tail.push(snapshot(sim));
+      if (tail.length > TAIL_STEPS) tail.shift();
       react();
       sound();
       announce();
@@ -726,22 +764,85 @@ export function createSpaceWarGame(): GameModule {
     },
 
     results() {
-      // В кооперативе и командном у строки — общий счёт; личный вклад — отдельной колонкой.
-      const shared = mode !== 'versus';
+      // Награды — каждому по одной из статистики; таблица — корабль, полоска дожитых волн, одна цифра.
+      const players = ctx.players.map((p) => ({
+        id: p.id,
+        stats: sim.pilots.get(p.id)?.stats ?? { hits: 0, near: 0, kills: 0, shots: 0, rams: 0, revives: 0, pickups: 0, sabShots: 0, maxMult: 1, waves: 0 },
+        survivedS: survivedS(p.id),
+        score: sim.finalScore(p.id),
+      }));
+      const hullIcon = (id: string): { icon?: string } => {
+        const player = ctx.players.find((p) => p.id === id);
+        return player ? { icon: hullSvg(hullOf(player)) } : {};
+      };
+      const awards: Award[] = pickAwards(players).map((a) => ({
+        playerId: a.id,
+        title: t(`award_${a.key}`),
+        value: awardValue(a.value),
+        ...hullIcon(a.id),
+      }));
+      const main = mode === 'teams' ? 'colTeam' : 'colScore';
       return {
-        awards: [],
+        awards,
         table: {
-          columns: shared ? [t(mode === 'coop' ? 'colTotal' : 'colTeam'), t('colScore'), t('colTime')] : [t('colScore'), t('colTime')],
-          rows: result().rows.map((r) => ({
-            playerId: r.playerId,
-            cells: [
-              ...(shared ? [String(r.score)] : []),
-              String(sim.finalScore(r.playerId)),
-              formatTime(survivedS(r.playerId)),
-            ],
-          })),
+          columns: [t(main)],
+          rows: result().rows.map((r) => {
+            const player = ctx.players.find((p) => p.id === r.playerId);
+            return {
+              playerId: r.playerId,
+              // Кооператив — личный вклад (места у всех общие), командное — очки команды, соревнование — свои.
+              cells: [String(mode === 'coop' ? sim.finalScore(r.playerId) : r.score)],
+              ...(player ? { icon: hullSvg(hullOf(player)) } : {}),
+              bar: { value: sim.pilots.get(r.playerId)?.stats.waves ?? 0, max: WAVE_LIMIT },
+            };
+          }),
         },
       };
+    },
+
+    marks() {
+      return [...marks];
+    },
+
+    replay() {
+      // Замедленный повтор последних секунд: снимки шагов подставляются вместо симуляции, частицы — по их событиям.
+      const frames = [...tail];
+      if (frames.length === 0) return Promise.resolve();
+      const live = sim;
+      replaying = true;
+      notice.hide();
+      return new Promise<void>((done) => {
+        let f = 0;
+        let shown = -1;
+        const finish = (): void => {
+          replayLoop?.stop();
+          replayLoop = null;
+          replaying = false;
+          sim = live;
+          done();
+        };
+        const loop = new FixedLoop({
+          update: (dtS) => {
+            f += REPLAY_SLOW;
+            const i = Math.min(frames.length - 1, Math.floor(f));
+            for (let k = shown + 1; k <= i; k++) {
+              sim = frames[k] as Sim;
+              react();
+            }
+            shown = i;
+            particles.update(dtS * REPLAY_SLOW);
+            camera.update(dtS * REPLAY_SLOW);
+            for (const view of views.values()) view.update(dtS * REPLAY_SLOW);
+            if (f >= frames.length - 1) finish();
+          },
+          render: () => {
+            sim = frames[Math.min(frames.length - 1, Math.floor(f))] as Sim;
+            game.render(f - Math.floor(f));
+          },
+        });
+        replayLoop = loop;
+        loop.start();
+      });
     },
 
     aim(playerId) {
@@ -779,6 +880,8 @@ export function createSpaceWarGame(): GameModule {
     },
 
     dispose() {
+      replayLoop?.stop();
+      replayLoop = null;
       audio?.dispose();
       audio = null;
       darkness?.destroy();
@@ -789,4 +892,5 @@ export function createSpaceWarGame(): GameModule {
       spareSprites.length = 0;
     },
   };
+  return game;
 }

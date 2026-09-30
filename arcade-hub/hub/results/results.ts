@@ -30,6 +30,13 @@ export interface Results {
 
 const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
+/** Аватар награды: иконка игры (корабль) или буква ника. */
+function awardAvatar(svg: string | undefined, nick: string): HTMLElement {
+  const node = h('span', { class: `award__avatar${svg ? ' award__avatar--icon' : ''}` }, svg ? '' : nick.slice(0, 1).toUpperCase());
+  if (svg) node.innerHTML = svg;
+  return node;
+}
+
 export function createResults(): Results {
   const el = h('section', { class: 'results', 'data-focus-scope': true, hidden: true });
 
@@ -71,7 +78,7 @@ export function createResults(): Results {
                 h(
                   'li',
                   { class: 'award', style: `--player: ${player?.color ?? 'var(--text)'}` },
-                  h('span', { class: 'award__avatar' }, (player?.nick ?? '?').slice(0, 1).toUpperCase()),
+                  awardAvatar(award.icon, player?.nick ?? '?'),
                   h('span', { class: 'award__title' }, award.title),
                   h('span', { class: 'award__nick' }, player?.nick ?? ''),
                   award.value && h('span', { class: 'award__value' }, award.value),

@@ -17,6 +17,24 @@ import type { Ship } from './ship';
 
 export type PilotPhase = 'alive' | 'ghost' | 'saboteur' | 'out';
 
+/** Статистика матча — для именных наград и полоски волн в итогах. */
+export interface PilotStats {
+  /** Сколько раз по кораблю попали. */
+  hits: number;
+  near: number;
+  /** Камней разбито снарядами. */
+  kills: number;
+  shots: number;
+  rams: number;
+  /** Кого вернул, собрав последний осколок. */
+  revives: number;
+  pickups: number;
+  sabShots: number;
+  maxMult: number;
+  /** Дожитые волны. */
+  waves: number;
+}
+
 export interface Pilot {
   readonly ship: Ship;
   lives: number;
@@ -34,6 +52,7 @@ export interface Pilot {
   shieldS: number;
   overloadS: number;
   jamS: number;
+  readonly stats: PilotStats;
   /** Время гибели от начала матча — для итогов. */
   diedAtS: number | null;
   score: number;
@@ -62,6 +81,7 @@ export function createPilot(ship: Ship): Pilot {
     shieldS: 0,
     overloadS: 0,
     jamS: 0,
+    stats: { hits: 0, near: 0, kills: 0, shots: 0, rams: 0, revives: 0, pickups: 0, sabShots: 0, maxMult: 1, waves: 0 },
     diedAtS: null,
     score: 0,
     ammo: AMMO_START,

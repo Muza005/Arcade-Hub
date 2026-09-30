@@ -125,6 +125,7 @@ export function createAfterlife(o: AfterlifeOptions): Afterlife {
     pilot.diedAtS = null;
     resetMult(pilot);
     by.score += SCORE_REVIVE;
+    by.stats.revives++;
     events.revives.push({ id: pilot.ship.id, by: by.ship.id, x: pilot.ship.pos.x, y: pilot.ship.pos.y });
   };
 
@@ -268,6 +269,7 @@ export function createAfterlife(o: AfterlifeOptions): Afterlife {
         bombs.push({ owner: id, pos: { x, y }, prev: { x, y }, vel: { x: vx, y: vy } });
       }
       pilot.sabS[shot.kind] = this.cooldownS(shot.kind);
+      pilot.stats.sabShots++;
       events.sabShots.push({ id, kind: shot.kind });
       return true;
     },

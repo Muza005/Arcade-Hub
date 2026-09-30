@@ -14,8 +14,8 @@ export interface GameRecords {
   best?: RecordEntry;
   /** Лучший результат по сиду дня (действует только в свой день). */
   daily?: RecordEntry;
-  /** Последний матч: строки по местам. */
-  last?: { date: string; rows: MatchRow[] };
+  /** Последний матч: строки по местам и числа игры о нём (MatchResult.meta). */
+  last?: { date: string; rows: MatchRow[]; meta?: Record<string, number> };
 }
 
 export interface MatchRow {
@@ -47,6 +47,7 @@ export function recordMatch(
   rows: readonly MatchRow[],
   daily: boolean,
   day: string = today(),
+  meta?: Record<string, number>,
 ): { best: boolean; daily: boolean } {
   const records = readRecords(gameId);
   const top = [...rows].sort((a, b) => a.place - b.place)[0];
@@ -64,7 +65,7 @@ export function recordMatch(
       beaten.daily = true;
     }
   }
-  records.last = { date: day, rows: rows.map((r) => ({ ...r })) };
+  records.last = { date: day, rows: rows.map((r) => ({ ...r })), ...(meta ? { meta: { ...meta } } : {}) };
   try {
     localStorage.setItem(PREFIX + gameId, JSON.stringify(records));
   } catch {

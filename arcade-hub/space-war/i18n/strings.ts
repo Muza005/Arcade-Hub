@@ -78,7 +78,53 @@ export type SpaceWarKey =
   | 'noticeBossFinal'
   | 'noticeBossDown'
   | 'hudBoss'
-  | 'statusBoss';
+  | 'statusBoss'
+  | 'award_livingShield'
+  | 'award_untouched'
+  | 'award_daredevil'
+  | 'award_sharpshooter'
+  | 'award_kamikaze'
+  | 'award_multHunter'
+  | 'award_collector'
+  | 'award_saboteur'
+  | 'award_survivor'
+  | 'award_onDuty'
+  | 'n_hits_one'
+  | 'n_hits_few'
+  | 'n_hits_many'
+  | 'n_hits_other'
+  | 'n_near_one'
+  | 'n_near_few'
+  | 'n_near_many'
+  | 'n_near_other'
+  | 'n_rocks_one'
+  | 'n_rocks_few'
+  | 'n_rocks_many'
+  | 'n_rocks_other'
+  | 'n_rams_one'
+  | 'n_rams_few'
+  | 'n_rams_many'
+  | 'n_rams_other'
+  | 'n_saves_one'
+  | 'n_saves_few'
+  | 'n_saves_many'
+  | 'n_saves_other'
+  | 'n_pickups_one'
+  | 'n_pickups_few'
+  | 'n_pickups_many'
+  | 'n_pickups_other'
+  | 'n_throws_one'
+  | 'n_throws_few'
+  | 'n_throws_many'
+  | 'n_throws_other'
+  | 'n_points_one'
+  | 'n_points_few'
+  | 'n_points_many'
+  | 'n_points_other'
+  | 'valMult'
+  | 'metaLast'
+  | 'metaDaily'
+  | 'metaBest';
 
 export const strings: GameStrings<SpaceWarKey> = {
   ru: {
@@ -159,6 +205,52 @@ export const strings: GameStrings<SpaceWarKey> = {
     noticeBossDown: '{boss} повержен · +{score}',
     hudBoss: '{n}/{of} · {boss}',
     statusBoss: 'Волна {n} · {boss}',
+    award_livingShield: 'Живой щит',
+    award_untouched: 'Ни царапины',
+    award_daredevil: 'Самый безрассудный',
+    award_sharpshooter: 'Меткий',
+    award_kamikaze: 'Камикадзе',
+    award_multHunter: 'Охотник за множителем',
+    award_collector: 'Собиратель',
+    award_saboteur: 'Главный саботажник',
+    award_survivor: 'Выживший',
+    award_onDuty: 'В строю',
+    n_hits_one: '{n} удар',
+    n_hits_few: '{n} удара',
+    n_hits_many: '{n} ударов',
+    n_hits_other: '{n} удара',
+    n_near_one: '{n} сближение',
+    n_near_few: '{n} сближения',
+    n_near_many: '{n} сближений',
+    n_near_other: '{n} сближения',
+    n_rocks_one: '{n} камень',
+    n_rocks_few: '{n} камня',
+    n_rocks_many: '{n} камней',
+    n_rocks_other: '{n} камня',
+    n_rams_one: '{n} таран',
+    n_rams_few: '{n} тарана',
+    n_rams_many: '{n} таранов',
+    n_rams_other: '{n} тарана',
+    n_saves_one: '{n} спасение',
+    n_saves_few: '{n} спасения',
+    n_saves_many: '{n} спасений',
+    n_saves_other: '{n} спасения',
+    n_pickups_one: '{n} усиление',
+    n_pickups_few: '{n} усиления',
+    n_pickups_many: '{n} усилений',
+    n_pickups_other: '{n} усиления',
+    n_throws_one: '{n} бросок',
+    n_throws_few: '{n} броска',
+    n_throws_many: '{n} бросков',
+    n_throws_other: '{n} броска',
+    n_points_one: '{n} очко',
+    n_points_few: '{n} очка',
+    n_points_many: '{n} очков',
+    n_points_other: '{n} очка',
+    valMult: '×{n}',
+    metaLast: 'Волна {waves} · лучший — {nick}, {score}',
+    metaDaily: 'Рекорд дня — {nick}, {score}',
+    metaBest: 'Лучший — {nick}, {score}',
   },
   en: {
     title: 'Space War',
@@ -238,5 +330,51 @@ export const strings: GameStrings<SpaceWarKey> = {
     noticeBossDown: '{boss} down · +{score}',
     hudBoss: '{n}/{of} · {boss}',
     statusBoss: 'Wave {n} · {boss}',
+    award_livingShield: 'Living shield',
+    award_untouched: 'Not a scratch',
+    award_daredevil: 'Daredevil',
+    award_sharpshooter: 'Sharpshooter',
+    award_kamikaze: 'Kamikaze',
+    award_multHunter: 'Multiplier hunter',
+    award_collector: 'Collector',
+    award_saboteur: 'Chief saboteur',
+    award_survivor: 'Survivor',
+    award_onDuty: 'On duty',
+    n_hits_one: '{n} hit',
+    n_hits_few: '{n} hits',
+    n_hits_many: '{n} hits',
+    n_hits_other: '{n} hits',
+    n_near_one: '{n} near miss',
+    n_near_few: '{n} near misses',
+    n_near_many: '{n} near misses',
+    n_near_other: '{n} near misses',
+    n_rocks_one: '{n} rock',
+    n_rocks_few: '{n} rocks',
+    n_rocks_many: '{n} rocks',
+    n_rocks_other: '{n} rocks',
+    n_rams_one: '{n} ram',
+    n_rams_few: '{n} rams',
+    n_rams_many: '{n} rams',
+    n_rams_other: '{n} rams',
+    n_saves_one: '{n} save',
+    n_saves_few: '{n} saves',
+    n_saves_many: '{n} saves',
+    n_saves_other: '{n} saves',
+    n_pickups_one: '{n} power-up',
+    n_pickups_few: '{n} power-ups',
+    n_pickups_many: '{n} power-ups',
+    n_pickups_other: '{n} power-ups',
+    n_throws_one: '{n} throw',
+    n_throws_few: '{n} throws',
+    n_throws_many: '{n} throws',
+    n_throws_other: '{n} throws',
+    n_points_one: '{n} point',
+    n_points_few: '{n} points',
+    n_points_many: '{n} points',
+    n_points_other: '{n} points',
+    valMult: '×{n}',
+    metaLast: 'Wave {waves} · best — {nick}, {score}',
+    metaDaily: 'Daily best — {nick}, {score}',
+    metaBest: 'Best — {nick}, {score}',
   },
 };

@@ -145,6 +145,8 @@ export function createDotsGame(): GameModule {
       seed: ctx.seed,
       version: dotsManifest.version,
       rows: rankByScore(sim.dots.map((d) => ({ playerId: d.id, score: d.score }))),
+      // Проверка MatchResult.meta: сколько звёзд собрали все вместе.
+      meta: { stars: sim.dots.reduce((sum, d) => sum + d.score, 0) },
     });
   };
 
@@ -416,7 +418,15 @@ export function createDotsGame(): GameModule {
           topScore > 0
             ? ranked
                 .filter((r) => r.score === topScore)
-                .map((r) => ({ playerId: r.playerId, title: t('awardStars'), value: `${r.score} ★` }))
+                .map((r) => {
+                  const player = ctx.players.find((p) => p.id === r.playerId);
+                  return {
+                    playerId: r.playerId,
+                    title: t('awardStars'),
+                    value: `${r.score} ★`,
+                    ...(player ? { icon: SHAPE_ICONS[shapeOf(player)] } : {}),
+                  };
+                })
             : [],
         // Аватар — форма игрока, полоска — доля от лучшего (проверка ResultsRow.icon и bar).
         table: {

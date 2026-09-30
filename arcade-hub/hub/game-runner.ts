@@ -81,6 +81,8 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   const pending: Array<{ playerId: string; payload: GamePayload }> = [];
   const actions: ActionEvent[] = [];
   let lastTick = 0;
+  /** Номер шага матча: идёт только вне паузы (тики цикла идут и на паузе). */
+  let simTick = 0;
 
   let resolve!: (result: MatchResult) => void;
   const result = new Promise<MatchResult>((r) => (resolve = r));
@@ -89,7 +91,10 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   let disposed = false;
 
   const loop = new FixedLoop({
-    update: (dtS, tick) => {
+    update: (dtS) => {
+      // На паузе шагов нет — иначе запись приняла бы паузу за игру и разошлась с матчем.
+      if (paused) return;
+      const tick = simTick++;
       recorder.setTick(tick);
       lastTick = tick;
       for (const { playerId, payload } of pending.splice(0)) {

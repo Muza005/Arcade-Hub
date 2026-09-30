@@ -149,6 +149,8 @@ async function play(start: LobbyStart): Promise<void> {
           return { nick: player?.nick ?? r.playerId, color: player?.color ?? '', score: r.score, place: r.place };
         }),
       daily,
+      undefined,
+      result.meta,
     );
     saveReplay({
       gameId: game.id,

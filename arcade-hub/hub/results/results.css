@@ -196,3 +196,14 @@
   color: var(--text-2);
   font-size: var(--fs-secondary);
 }
+
+/* Аватар награды — иконка игры (например, корабль) в цвете игрока. */
+.award__avatar--icon {
+  background: color-mix(in srgb, var(--player) 18%, var(--surface-2));
+  color: var(--player);
+}
+
+.award__avatar--icon svg {
+  width: 62%;
+  height: 62%;
+}

@@ -290,6 +290,7 @@ export function createSim(
   const hitShip = (pilot: Pilot, rock: Asteroid | null): void => {
     if (rock && !rock.immortal) shatter(rock);
     pilot.lives--;
+    pilot.stats.hits++;
     pilot.invulnS = HIT_INVULN_S;
     resetMult(pilot);
     events.hits.push(pilot.ship.id);
@@ -346,6 +347,8 @@ export function createSim(
         touching.add(key);
         const ram = rammable(a, b);
         if (ram) {
+          a.stats.rams++;
+          b.stats.rams++;
           resetMult(a);
           resetMult(b);
         }
@@ -384,6 +387,7 @@ export function createSim(
     if (!target) return; // стрелять не во что — патрон не тратится
     if (!bullets.fire(pilot.ship.id, pilot.ship.pos, target)) return;
     pilot.ammo--;
+    pilot.stats.shots++;
     events.shots.push(pilot.ship.id);
   };
 
@@ -434,6 +438,7 @@ export function createSim(
     for (const b of spent) bullets.remove(b);
     for (const { rock, by } of killed) {
       by.score += SCORE_ASTEROID[rock.size] * totalMult(by);
+      by.stats.kills++;
       // Выпадение усиления — из камня, разбитого снарядом.
       if (powerupsOn && rng.next() < POWERUP_DROP_CHANCE) powerups.drop(rock.pos.x, rock.pos.y);
       shatter(rock);
@@ -499,6 +504,7 @@ export function createSim(
       if (!picker) continue;
       powerups.remove(p);
       apply(picker, p.kind);
+      picker.stats.pickups++;
       events.pickups.push({ id: picker.ship.id, kind: p.kind, x: p.pos.x, y: p.pos.y });
     }
   };
@@ -553,7 +559,11 @@ export function createSim(
           // Испытание пройдено или цель ушла недобитой.
           bossCtl?.release();
           bossCtl = null;
-          for (const p of pilots.values()) if (p.alive) p.score += SCORE_WAVE * wave.wave;
+          for (const p of pilots.values()) {
+            if (!p.alive) continue;
+            p.score += SCORE_WAVE * wave.wave;
+            p.stats.waves++;
+          }
           if (waves.phase === 'done' && overInS === null) overInS = WAVE_FINISH_DELAY_S;
         }
       }
@@ -662,7 +672,11 @@ export function createSim(
           for (const rock of grid.query(pos.x, pos.y, SHIP_HITBOX_RADIUS + NEAR_MISS_DISTANCE, near)) {
             const gap = Math.hypot(rock.pos.x - pos.x, rock.pos.y - pos.y) - SHIP_HITBOX_RADIUS - rock.radius * ASTEROID_HITBOX_K;
             if (gap <= 0 || gap >= NEAR_MISS_DISTANCE) continue;
-            if (nearMiss(pilot, rock.id, timeS)) events.near.push({ id: pilot.ship.id, x: rock.pos.x, y: rock.pos.y });
+            if (nearMiss(pilot, rock.id, timeS)) {
+              pilot.stats.near++;
+              pilot.stats.maxMult = Math.max(pilot.stats.maxMult, totalMult(pilot));
+              events.near.push({ id: pilot.ship.id, x: rock.pos.x, y: rock.pos.y });
+            }
           }
         }
         checkIdle(pilot, timeS);
