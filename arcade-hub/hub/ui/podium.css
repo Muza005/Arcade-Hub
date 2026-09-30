@@ -32,6 +32,38 @@
   font-size: calc(16rem / 24);
 }
 
+/* Аватар-иконка (например, корпус корабля) в цвете игрока. */
+.rv-avatar--icon {
+  background: color-mix(in srgb, var(--player) 18%, var(--surface-2));
+  color: var(--player);
+}
+
+.rv-avatar--icon svg {
+  width: 62%;
+  height: 62%;
+}
+
+/* Полоска под ником (дожитые волны и т. п.). */
+.pbar {
+  width: 80%;
+  height: calc(8rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.pbar--chip {
+  width: calc(80rem / 24);
+}
+
+.pbar__fill {
+  display: block;
+  height: 100%;
+  width: calc(var(--fill) * 100%);
+  border-radius: inherit;
+  background: var(--player, var(--accent));
+}
+
 /* ─── Пьедестал ─── */
 .podium__steps {
   margin: 0;

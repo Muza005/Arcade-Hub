@@ -1,6 +1,7 @@
 // Меню игр (ARCADE_HUB_SPEC §6): верхняя полоса, заголовок, сетка, нижняя полоса с QR и игроками.
 // В простое ничего не рисуется: движение — только в ответ на действие.
 import { CONTROLLER_PATH, QR_SIZE_PX } from '../../shared/config';
+import type { Replay } from '../../shared/replays';
 import type { GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import type { Room } from '../room';
@@ -17,6 +18,8 @@ export interface MenuOptions {
   history: () => readonly string[];
   sound: { get(): boolean; set(on: boolean): void };
   onPlay(game: GameManifest): void;
+  /** Посмотреть запись матча (из «Рекордов и записей»). */
+  onWatch(game: GameManifest, replay: Replay): void;
   onSettings(): void;
   /** Убрать отключённого игрока из комнаты. */
   onRemovePlayer(id: string): void;
@@ -115,10 +118,13 @@ export function createMenu(options: MenuOptions): Menu {
     h('div', { class: 'players' }, inRoom, avatarsSlot),
   );
 
-  const gameWindow = createGameWindow((game) => {
-    gameWindow.close();
-    options.onPlay(game);
-  });
+  const gameWindow = createGameWindow(
+    (game) => {
+      gameWindow.close();
+      options.onPlay(game);
+    },
+    (game, replay) => options.onWatch(game, replay),
+  );
 
   const el = h('main', { class: 'menu', 'data-focus-scope': true }, topBar, heading, grid, bottomBar, gameWindow.el);
 

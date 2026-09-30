@@ -138,6 +138,12 @@ export const ru = {
   'records.none': 'Пока пусто',
   'records.incompatible': 'другая версия',
   'records.dailyMark': 'расклад дня',
+  'records.watch': 'Смотреть запись',
+  'replay.play': 'Играть',
+  'replay.pause': 'Пауза',
+  'replay.close': 'Закрыть',
+  'replay.speed': 'Скорость',
+  'replay.seeking': 'Перематываем…',
 
   'set.title': 'Настройки',
   'set.sound': 'Звук',

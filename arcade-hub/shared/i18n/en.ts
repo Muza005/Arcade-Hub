@@ -137,6 +137,12 @@ export const en: Dictionary = {
   'records.replays': 'Match replays',
   'records.none': 'Nothing yet',
   'records.incompatible': 'other version',
+  'records.watch': 'Watch replay',
+  'replay.play': 'Play',
+  'replay.pause': 'Pause',
+  'replay.close': 'Close',
+  'replay.speed': 'Speed',
+  'replay.seeking': 'Seeking…',
   'records.dailyMark': 'daily seed',
 
   'set.title': 'Settings',

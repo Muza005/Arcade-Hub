@@ -8,7 +8,7 @@ import { createStage, cssVar, loadFonts, type Stage } from '../engine/stage';
 import { parseAimShot } from '../shared/aim';
 import { FIXED_STEP_HZ } from '../shared/config';
 import { createTranslator } from '../shared/i18n';
-import { rankByScore, type GameContext, type GameModule, type GamePlayer } from '../shared/game-manifest';
+import { rankByScore, type GameContext, type GameModule, type GamePlayer, type ReplayMark } from '../shared/game-manifest';
 import {
   DASH_ENABLED_DEFAULT,
   DOT_RADIUS,
@@ -56,6 +56,7 @@ import {
   fieldFor,
   worldWidth,
   CATCH_VIBRATE_PATTERN,
+  SHAPE_ICONS,
   THROW_COOLDOWN_S,
   THROW_ENABLED_DEFAULT,
   THROW_STAR_COLOR,
@@ -106,6 +107,8 @@ export function createDotsGame(): GameModule {
   let ended = false;
   /** Боты управляются самой игрой: платформа для них ввода не даёт. */
   let bots = new Set<string>();
+  /** Метки на шкале записи (проверка ReplayMark): «осталось 10 с». */
+  const marks: ReplayMark[] = [];
   /** Бросок звёзд включён: телефоны получают «прицел» и не летают (проверка раскладки). */
   let throwers = new Set<string>();
 
@@ -343,7 +346,7 @@ export function createDotsGame(): GameModule {
       pendingLeft = NOTICE_LEFT_AT_S.filter((s) => s < sim.timeLeftS);
     },
 
-    update(dtS) {
+    update(dtS, tick) {
       if (paused || ended) return;
       sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : throwers.has(id) ? IDLE_INPUT : ctx.input.read(id)));
       for (const id of sim.pickups) {
@@ -364,6 +367,7 @@ export function createDotsGame(): GameModule {
       if (due !== undefined) {
         pendingLeft = pendingLeft.filter((s) => s < due);
         notice.show(t('noticeLeft', { s: due }));
+        marks.push({ tick, kind: 'time', label: t('noticeLeft', { s: due }) });
       }
       if (sim.over) endMatch();
     },
@@ -414,7 +418,19 @@ export function createDotsGame(): GameModule {
                 .filter((r) => r.score === topScore)
                 .map((r) => ({ playerId: r.playerId, title: t('awardStars'), value: `${r.score} ★` }))
             : [],
-        table: { columns: [t('colStars')], rows: ranked.map((r) => ({ playerId: r.playerId, cells: [String(r.score)] })) },
+        // Аватар — форма игрока, полоска — доля от лучшего (проверка ResultsRow.icon и bar).
+        table: {
+          columns: [t('colStars')],
+          rows: ranked.map((r) => {
+            const player = ctx.players.find((p) => p.id === r.playerId);
+            return {
+              playerId: r.playerId,
+              cells: [String(r.score)],
+              ...(player ? { icon: SHAPE_ICONS[shapeOf(player)] } : {}),
+              bar: { value: r.score, max: topScore },
+            };
+          }),
+        },
       };
     },
 
@@ -461,6 +477,10 @@ export function createDotsGame(): GameModule {
     finish() {
       sim.stop();
       endMatch();
+    },
+
+    marks() {
+      return [...marks];
     },
 
     mainButton(playerId) {

@@ -188,3 +188,11 @@
     0 0 0 var(--focus-offset) var(--bg),
     0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
 }
+
+/* Рекорд дня — строкой над местами. */
+.results__daily {
+  margin: 0;
+  text-align: center;
+  color: var(--text-2);
+  font-size: var(--fs-secondary);
+}

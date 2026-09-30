@@ -2,6 +2,7 @@
 // Хранит платформа; воспроизведение, перемотку и метки делает игра.
 import type { ActionEvent, InputEvent } from '../engine/replay';
 import { REPLAYS_KEPT } from './config';
+import type { ReplayMark } from './game-manifest';
 import type { LobbyValue } from './protocol';
 
 export interface Replay {
@@ -15,10 +16,14 @@ export interface Replay {
   settings: Record<string, LobbyValue>;
   /** Соотношение сторон мира матча (ctx.aspect); в старых записях нет — 16:9. */
   aspect?: number;
-  players: Array<{ id: string; nick: string; color: string; kind: string }>;
+  players: Array<{ id: string; nick: string; color: string; kind: string; fields?: Record<string, LobbyValue> }>;
   inputs: InputEvent[];
   /** Особые действия (выстрелы саботажника и т. п.); в старых записях нет. */
   actions?: ActionEvent[];
+  /** Длина матча в тиках — для шкалы; в старых записях нет. */
+  ticks?: number;
+  /** Метки игры на шкале (волны, гибели). */
+  marks?: ReplayMark[];
 }
 
 const PREFIX = 'arcade-hub:replays:';

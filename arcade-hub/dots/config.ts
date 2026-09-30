@@ -38,6 +38,12 @@ export const THROW_STAR_COLOR = '#8FF0C4';
 export const SHAPES = ['circle', 'square'] as const;
 export type Shape = (typeof SHAPES)[number];
 export const SHAPE_DEFAULT: Shape = 'circle';
+/** Иконки формы — в лобби и аватаром в итогах (цвет — currentColor). */
+export const SHAPE_ICONS: Record<Shape, string> = {
+  circle: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/></svg>',
+  square:
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="currentColor"/></svg>',
+};
 export const SQUARE_K = 0.9; // квадрат чуть меньше описанного — на глаз той же величины, что круг
 export const SQUARE_CORNER_K = 0.25;
 

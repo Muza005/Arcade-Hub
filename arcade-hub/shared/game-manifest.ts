@@ -145,7 +145,23 @@ export interface ResultsTable {
   /** Заголовки своих колонок игры (место и игрок оболочка рисует сама). */
   columns: string[];
   /** Строки в порядке мест. */
-  rows: Array<{ playerId: string; cells: string[] }>;
+  rows: ResultsRow[];
+}
+
+export interface ResultsRow {
+  playerId: string;
+  cells: string[];
+  /** Аватар — SVG-иконка в цвете игрока (например, корпус корабля); нет — буква ника. */
+  icon?: string;
+  /** Полоска под ником (например, дожитые волны): value из max. */
+  bar?: { value: number; max: number };
+}
+
+/** Метка на шкале записи: тик и короткая подпись (уже переведённая). */
+export interface ReplayMark {
+  tick: number;
+  kind: string;
+  label: string;
 }
 
 export interface MatchResults {
@@ -197,6 +213,8 @@ export interface GameModule {
   replay?(): Promise<void>;
   /** Шаги 2–3 итогов: награды и строки таблицы. */
   results?(): MatchResults;
+  /** Метки на шкале записи (волны, гибели) — платформа сохраняет их вместе с записью. */
+  marks?(): ReplayMark[];
 }
 
 /** Места по очкам: больше — выше, равные делят место. */

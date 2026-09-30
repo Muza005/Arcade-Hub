@@ -11,6 +11,7 @@ import type {
   MatchResult,
   MatchResults,
   MatchSettings,
+  ReplayMark,
 } from '../shared/game-manifest';
 import type { AimLayout, GamePayload, MainButtonState } from '../shared/protocol';
 import { ASPECT_RANGE, DEFAULT_ASPECT } from '../shared/config';
@@ -39,6 +40,10 @@ export interface Match {
   readonly inputs: readonly InputEvent[];
   /** Записанные особые действия. */
   readonly actions: readonly ActionEvent[];
+  /** Сколько тиков прошло (длина матча для шкалы записи). */
+  readonly ticks: number;
+  /** Метки игры для шкалы записи. */
+  marks(): ReplayMark[];
   pause(): void;
   resume(): void;
   /** «Завершить матч»: к итогам, счёт сохраняется. */
@@ -75,6 +80,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   const humanIds = options.players.filter((p) => p.kind !== 'bot').map((p) => p.id);
   const pending: Array<{ playerId: string; payload: GamePayload }> = [];
   const actions: ActionEvent[] = [];
+  let lastTick = 0;
 
   let resolve!: (result: MatchResult) => void;
   const result = new Promise<MatchResult>((r) => (resolve = r));
@@ -85,6 +91,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   const loop = new FixedLoop({
     update: (dtS, tick) => {
       recorder.setTick(tick);
+      lastTick = tick;
       for (const { playerId, payload } of pending.splice(0)) {
         const i = humanIds.indexOf(playerId);
         if (i === -1) continue;
@@ -138,6 +145,10 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     players: options.players.map((p) => p.id),
     inputs: recorder.events,
     actions,
+    get ticks() {
+      return lastTick + 1;
+    },
+    marks: () => (disposed ? [] : (game.marks?.() ?? [])),
     get paused() {
       return paused;
     },

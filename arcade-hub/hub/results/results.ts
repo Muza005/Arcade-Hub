@@ -2,7 +2,7 @@
 // Содержимое шагов присылает игра; оболочка отвечает за порядок, анимацию и кнопки.
 // После итогов фокус на «Ещё раз»; рядом «К игре» и «В меню».
 import { RESULTS_AWARD_STEP_MS, RESULTS_AWARDS_HOLD_MS } from '../../shared/config';
-import type { GamePlayer, MatchResult, MatchResults } from '../../shared/game-manifest';
+import type { GamePlayer, MatchResult, MatchResults, ResultsTable } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import { h, icon } from '../ui/dom';
 import { ICONS } from '../ui/icons';
@@ -18,6 +18,8 @@ export interface ResultsInput {
   replay?: () => Promise<void>;
   beaten: { best: boolean; daily: boolean };
   accent: string;
+  /** Рекорд дня этой игры (строка из meta()) — над таблицей. */
+  daily?: string;
 }
 
 export interface Results {
@@ -84,7 +86,7 @@ export function createResults(): Results {
 
       // 3. Таблица по строке на игрока и кнопки.
       el.dataset.step = 'table';
-      const table = content?.table ?? {
+      const table: ResultsTable = content?.table ?? {
         columns: [t('results.score')],
         rows: result.rows.map((r) => ({ playerId: r.playerId, cells: [String(r.score)] })),
       };
@@ -105,6 +107,7 @@ export function createResults(): Results {
             table.columns[0] && h('span', { class: 'results__column' }, table.columns[0]),
             note && h('span', { class: 'results__note' }, note),
           ),
+          input.daily && h('p', { class: 'results__daily' }, input.daily),
           podium(
             table.rows.map((row) => {
               const player = byId.get(row.playerId);
@@ -114,6 +117,8 @@ export function createResults(): Results {
                 place: placeOf.get(row.playerId) ?? 0,
                 // Счёт — первая колонка игры; её заголовок стоит рядом с «Итоги».
                 score: row.cells[0] ?? '',
+                ...(row.icon ? { icon: row.icon } : {}),
+                ...(row.bar ? { bar: row.bar } : {}),
               };
             }),
           ),

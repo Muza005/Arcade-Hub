@@ -171,3 +171,9 @@ export const AIM_FRAME_MIN_HEIGHT = 0.6; // рамка поля — не мен�
 export const AIM_TICK_MS = 100; // как часто телефон досчитывает кулдауны
 export const VIBRATE_AIM_SHOT_MS = 35; // самая длинная на этом экране
 export const VIBRATE_AIM_READY_MS = 4; // самая короткая: щелчок готовности
+
+// ─── Просмотр записей (§12) ─────────────────────────────────────────
+export const REPLAY_SPEEDS = [1, 0.5, 0.25] as const; // замедление
+export const REPLAY_SEEK_STEP_S = 10; // ← / → перематывают на столько
+export const REPLAY_SEEK_BUDGET_MS = 12; // перемотка считает не дольше за кадр — интерфейс не замирает
+export const REPLAY_MAX_STEPS_PER_FRAME = 8; // догоняющих шагов за кадр при воспроизведении

@@ -8,7 +8,28 @@ export interface PodiumRow {
   color?: string;
   place: number;
   score: number | string;
+  /** SVG-аватар в цвете игрока вместо буквы. */
+  icon?: string;
+  /** Полоска под ником: value из max. */
+  bar?: { value: number; max: number };
 }
+
+const barOf = (r: PodiumRow, className: string): HTMLElement | false =>
+  r.bar !== undefined &&
+  h(
+    'span',
+    { class: className, style: `--fill: ${r.bar.max > 0 ? Math.min(1, Math.max(0, r.bar.value / r.bar.max)) : 0}` },
+    h('span', { class: 'pbar__fill' }),
+  );
+
+const avatarOf = (r: PodiumRow, className: string): HTMLElement => {
+  const node = avatar(r.nick, r.color, className);
+  if (r.icon) {
+    node.classList.add('rv-avatar--icon');
+    node.innerHTML = r.icon;
+  }
+  return node;
+};
 
 const PODIUM_ORDER = [2, 1, 3];
 const PODIUM_SIZE = PODIUM_ORDER.length;
@@ -31,8 +52,9 @@ export function podium(rows: readonly PodiumRow[]): HTMLElement {
       h(
         'li',
         { class: `pstep pstep--${Math.min(r.place, PODIUM_SIZE)}` },
-        avatar(r.nick, r.color, 'rv-avatar pstep__avatar'),
+        avatarOf(r, 'rv-avatar pstep__avatar'),
         h('span', { class: 'pstep__nick' }, r.nick),
+        barOf(r, 'pbar'),
         h('span', { class: 'pstep__score' }, String(r.score)),
         h('span', { class: 'pstep__block' }, h('span', { class: 'pstep__place' }, String(r.place))),
       ),
@@ -50,8 +72,9 @@ export function podium(rows: readonly PodiumRow[]): HTMLElement {
             'li',
             { class: 'rest-chip' },
             h('span', { class: 'rest-chip__place' }, String(r.place)),
-            avatar(r.nick, r.color, 'rv-avatar rv-avatar--sm'),
+            avatarOf(r, 'rv-avatar rv-avatar--sm'),
             r.nick,
+            barOf(r, 'pbar pbar--chip'),
             h('span', { class: 'rest-chip__score' }, String(r.score)),
           ),
         ),

@@ -177,3 +177,106 @@ body {
   letter-spacing: 0.14em;
   color: var(--text-2);
 }
+
+/* ─── Просмотр записи (§12): сцена игры и полоса управления внизу ─── */
+.rplayer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+}
+
+.rplayer__bar {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  opacity: 0.85;
+}
+
+.rplayer__btn,
+.rplayer__speed {
+  flex: none;
+  height: calc(48rem / 24);
+  min-width: calc(48rem / 24);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 var(--fs-caption) var(--font-display);
+  cursor: pointer;
+}
+
+.rplayer__btn .icon {
+  font-size: calc(24rem / 24);
+}
+
+.rplayer__track {
+  position: relative;
+  flex: 1;
+  height: calc(10rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.rplayer__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--accent, var(--text));
+}
+
+.rplayer__marks {
+  position: absolute;
+  inset: 0;
+}
+
+.rplayer__mark {
+  position: absolute;
+  top: 50%;
+  translate: -50% -50%;
+  width: calc(2rem / 24);
+  height: calc(22rem / 24);
+  background: var(--text-2);
+}
+
+/* Волны — тонкие линии, гибели — красные точки. */
+.rplayer__mark--wave {
+  width: calc(2rem / 24);
+  height: calc(22rem / 24);
+  background: var(--text-2);
+}
+
+.rplayer__mark--death {
+  width: calc(10rem / 24);
+  height: calc(10rem / 24);
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.rplayer__time {
+  flex: none;
+  font: 700 var(--fs-caption) var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.rplayer__seeking {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  translate: -50% 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--text-2);
+}

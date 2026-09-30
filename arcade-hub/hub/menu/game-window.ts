@@ -6,6 +6,7 @@ import { h, icon } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
 import { ICONS } from '../ui/icons';
 import { accentStyle, gameText, minutesLabel, playersLabel } from './game-card';
+import type { Replay } from '../../shared/replays';
 import { recordsView } from './records-view';
 
 export interface GameWindow {
@@ -121,7 +122,7 @@ function content(
   );
 }
 
-export function createGameWindow(onPlay: (game: GameManifest) => void): GameWindow {
+export function createGameWindow(onPlay: (game: GameManifest) => void, onWatch: (game: GameManifest, replay: Replay) => void): GameWindow {
   const el = h('dialog', { class: 'gw-dialog' });
   let current: { game: GameManifest; returnFocus: HTMLElement } | null = null;
 
@@ -159,7 +160,12 @@ export function createGameWindow(onPlay: (game: GameManifest) => void): GameWind
             () => (failed ? (close(), failed.retry()) : onPlay(game)),
             () => close(),
             () => {
-              el.replaceChildren(recordsView(game, showMain));
+              el.replaceChildren(
+                recordsView(game, showMain, (replay) => {
+                  close();
+                  onWatch(game, replay);
+                }),
+              );
               el.querySelector<HTMLElement>('[autofocus]')?.focus();
             },
             failed !== undefined,

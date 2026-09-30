@@ -7,14 +7,10 @@ import cardArt from './assets/card.svg';
 import cover from './assets/cover.svg';
 import logo from './assets/logo.svg';
 import modeFfaIcon from './assets/mode-ffa.svg';
-import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS, SHAPE_DEFAULT, THROW_ENABLED_DEFAULT } from './config';
+import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS, SHAPE_DEFAULT, THROW_ENABLED_DEFAULT, SHAPE_ICONS } from './config';
 import { strings } from './strings';
 
 const GAME_ID = 'dots';
-/** Иконки формы для лобби (цвет — currentColor). */
-const ICON_CIRCLE = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="currentColor"/></svg>';
-const ICON_SQUARE =
-  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4" fill="currentColor"/></svg>';
 const t = createTranslator(strings);
 
 export const dotsManifest: GameManifest = {
@@ -67,8 +63,8 @@ export const dotsManifest: GameManifest = {
         label: 'setShape',
         kind: 'select',
         options: [
-          { value: 'circle', label: 'shapeCircle', icon: ICON_CIRCLE },
-          { value: 'square', label: 'shapeSquare', icon: ICON_SQUARE },
+          { value: 'circle', label: 'shapeCircle', icon: SHAPE_ICONS.circle },
+          { value: 'square', label: 'shapeSquare', icon: SHAPE_ICONS.square },
         ],
         default: SHAPE_DEFAULT,
       },

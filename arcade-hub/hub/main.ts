@@ -14,6 +14,7 @@ import { dailySeed, today } from '../shared/daily';
 import { recordMatch } from '../shared/records';
 import { saveReplay } from '../shared/replays';
 import { runGame, type Match } from './game-runner';
+import { createReplayPlayer } from './replay-player';
 import { createResults, type ResultsChoice } from './results/results';
 import { createLobby, type LobbyStart } from './lobby/lobby';
 import { createMenu } from './menu/menu';
@@ -61,6 +62,8 @@ gameMount.className = 'game-mount';
 gameMount.hidden = true;
 const pause = createPauseOverlay({ resume: () => phones?.resume(), end: () => phones?.end() });
 const results = createResults();
+// Быстрая перемотка записи — без звука (кнопка звука хаба при этом не меняется).
+const replayPlayer = createReplayPlayer({ mute: (on) => sounds.setEnabled(!on && soundEnabled()) });
 
 const sounds = createUiSounds(soundEnabled());
 const focus = createFocusManager(sounds);
@@ -156,9 +159,11 @@ async function play(start: LobbyStart): Promise<void> {
       mode,
       settings: { ...settings },
       aspect: match.aspect,
-      players: players.map(({ id, nick, color, kind }) => ({ id, nick, color, kind })),
+      players: players.map(({ id, nick, color, kind, fields }) => ({ id, nick, color, kind, ...(fields ? { fields: { ...fields } } : {}) })),
       inputs: [...match.inputs],
       ...(match.actions.length > 0 ? { actions: [...match.actions] } : {}),
+      ticks: match.ticks,
+      marks: match.marks(),
     });
 
     choice = await results.run({
@@ -168,6 +173,7 @@ async function play(start: LobbyStart): Promise<void> {
       ...(hubSettings.replay ? { replay: () => match.replay() } : {}),
       beaten,
       accent: game.accent,
+      ...dailyLine(game),
     });
     match.dispose();
   } catch (err) {
@@ -231,6 +237,11 @@ const menu = createMenu({
     settingsScreen.show();
   },
   onRemovePlayer: (id) => room?.remove(id),
+  onWatch: (game, replay) => {
+    // Запись смотрят поверх меню: музыка меню уходит, звук игры — как в матче.
+    sounds.music(false);
+    void replayPlayer.play(game, replay).then(() => sounds.music(true));
+  },
 });
 
 const settingsScreen = createSettingsScreen({
@@ -263,7 +274,7 @@ const attract = createAttract({
   onStop: () => undefined,
 });
 
-root.append(menu.el, lobby.el, settingsScreen.el, gameMount, results.el, pause.el, attract.el, toast.el);
+root.append(menu.el, lobby.el, settingsScreen.el, gameMount, results.el, pause.el, attract.el, replayPlayer.el, toast.el);
 
 if (fixtureRoom) {
   menu.setRoom(fixtureRoom);
@@ -329,4 +340,10 @@ async function enableTestPhones(code: () => string | null): Promise<void> {
     if (e.shiftKey) list.pop()?.close();
     else list.push(connectTestPhone(current, t('dev.testPlayer', { n: ++count })));
   });
+}
+
+/** Рекорд дня игры — строкой над местами в итогах (§12). */
+function dailyLine(game: GameManifest): { daily?: string } {
+  const daily = game.meta?.().dailyBest;
+  return daily ? { daily } : {};
 }

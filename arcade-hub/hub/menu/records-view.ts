@@ -1,5 +1,5 @@
 // «Рекорды и записи» в окне игры (§7, §12): карточки рекордов, пьедестал последнего матча, записи матчей.
-// Воспроизведение записи — дело игры; здесь только то, что хранит платформа.
+// Запись открывается в проигрывателе хаба (hub/replay-player.ts): пересчёт матча игрой по сиду и вводу.
 import type { GameManifest } from '../../shared/game-manifest';
 import { getLang, t } from '../../shared/i18n';
 import { dailyBest, readRecords, type RecordEntry } from '../../shared/records';
@@ -39,13 +39,17 @@ function recordCard(kind: 'best' | 'daily', svg: string, label: string, entry: R
   );
 }
 
-function replayCard(replay: Replay, version: string): HTMLElement {
+function replayCard(replay: Replay, version: string, onWatch: (replay: Replay) => void): HTMLElement {
   const compatible = isCompatible(replay, version);
   const shown = replay.players.slice(0, REPLAY_AVATARS);
   const more = replay.players.length - shown.length;
-  return h(
-    'li',
-    { class: `replay${compatible ? '' : ' replay--old'}` },
+  // Совместимую запись можно посмотреть: карточка — кнопка.
+  const card = h(
+    compatible ? 'button' : 'div',
+    {
+      class: `replay${compatible ? ' replay--watch' : ' replay--old'}`,
+      ...(compatible ? { type: 'button', title: t('records.watch') } : {}),
+    },
     h('span', { class: 'replay__icon' }, icon(ICONS.film)),
     h('span', { class: 'replay__date' }, formatDate(replay.date)),
     h(
@@ -61,9 +65,11 @@ function replayCard(replay: Replay, version: string): HTMLElement {
       !compatible && h('span', { class: 'tag tag--old' }, icon(ICONS.alert), t('records.incompatible')),
     ),
   );
+  if (compatible) card.addEventListener('click', () => onWatch(replay));
+  return h('li', { class: 'replay-item' }, card);
 }
 
-export function recordsView(game: GameManifest, onBack: () => void): HTMLElement {
+export function recordsView(game: GameManifest, onBack: () => void, onWatch: (replay: Replay) => void): HTMLElement {
   const records = readRecords(game.id);
   const replays = listReplays(game.id);
   const back = h(
@@ -121,7 +127,7 @@ export function recordsView(game: GameManifest, onBack: () => void): HTMLElement
           { class: 'rv__section' },
           sectionTitle(ICONS.film, t('records.replays')),
           replays.length > 0
-            ? h('ul', { class: 'replays' }, ...replays.map((r) => replayCard(r, game.version)))
+            ? h('ul', { class: 'replays' }, ...replays.map((r) => replayCard(r, game.version, onWatch)))
             : h('p', { class: 'rv__none' }, t('records.none')),
         ),
       ),
