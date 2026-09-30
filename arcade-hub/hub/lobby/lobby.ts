@@ -241,6 +241,12 @@ export function createLobby(options: LobbyOptions): Lobby {
     });
   };
 
+  /** «Цвет — команда»: товарищи рядом, в порядке появления команды. */
+  const byTeam = (list: readonly RosterEntry[]): RosterEntry[] => {
+    const order = [...new Set(list.map((p) => p.color))];
+    return [...list].sort((a, b) => order.indexOf(a.color) - order.indexOf(b.color));
+  };
+
   const card = (entry: RosterEntry, state: 'playing' | 'waiting' | 'benched'): HTMLElement => {
     const hullIcon = entry.kind === 'bot' ? undefined : iconOf(entry);
     const avatar = h('span', { class: `lcard__avatar${hullIcon ? ' lcard__avatar--icon' : ''}` });
@@ -262,7 +268,10 @@ export function createLobby(options: LobbyOptions): Lobby {
     };
     return h(
       'li',
-      { class: `lcard lcard--${entry.kind}${state === 'playing' ? '' : ' lcard--waiting'}`, style: `--player: ${entry.color}` },
+      {
+        class: `lcard lcard--${entry.kind}${state === 'playing' ? '' : ' lcard--waiting'}${state === 'playing' && sharedMode() ? ' lcard--team' : ''}`,
+        style: `--player: ${entry.color}`,
+      },
       entry.kind === 'keyboard' &&
         state === 'playing' &&
         (() => {
@@ -351,7 +360,7 @@ export function createLobby(options: LobbyOptions): Lobby {
         h(
           'section',
           { class: 'lobby__players' },
-          h('ul', { class: 'lobby__cards' }, ...r.playing.map((p) => card(p, 'playing')), ...keyboardSlots()),
+          h('ul', { class: 'lobby__cards' }, ...(sharedMode() ? byTeam(r.playing) : r.playing).map((p) => card(p, 'playing')), ...keyboardSlots()),
           r.waiting.length > 0 &&
             h(
               'div',

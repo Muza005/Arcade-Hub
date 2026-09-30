@@ -139,6 +139,23 @@
   opacity: 0.5;
 }
 
+/* «Цвет — команда»: карточки одной команды — одной подсветкой (рамка, оттенок и полоска её цвета). */
+.lcard--team {
+  background: color-mix(in srgb, var(--player) 14%, var(--surface));
+  box-shadow: inset 0 0 0 calc(3rem / 24) color-mix(in srgb, var(--player) 75%, transparent);
+}
+
+.lcard--team::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: calc(6rem / 24);
+  border-radius: 0 0 var(--radius-full) var(--radius-full);
+  background: var(--player);
+}
+
 .lcard__remove {
   position: absolute;
   top: var(--space-1);
