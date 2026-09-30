@@ -4,6 +4,8 @@ import { INPUT_QUANT } from '../shared/config';
 import { IDLE_INPUT, type InputState } from './input';
 
 export type InputEvent = [tick: number, player: number, x: number, y: number, btn: 0 | 1];
+/** Особое действие игрока (`g`), применённое в начале тика. */
+export type ActionEvent = [tick: number, player: number, payload: Record<string, unknown>];
 
 const quant = (v: number): number => Math.round(v * INPUT_QUANT) / INPUT_QUANT;
 

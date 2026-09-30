@@ -1,6 +1,6 @@
 // Записи матчей (§12): сид и поток ввода, последние REPLAYS_KEPT на игру, с версией правил.
 // Хранит платформа; воспроизведение, перемотку и метки делает игра.
-import type { InputEvent } from '../engine/replay';
+import type { ActionEvent, InputEvent } from '../engine/replay';
 import { REPLAYS_KEPT } from './config';
 import type { LobbyValue } from './protocol';
 
@@ -17,6 +17,8 @@ export interface Replay {
   aspect?: number;
   players: Array<{ id: string; nick: string; color: string; kind: string }>;
   inputs: InputEvent[];
+  /** Особые действия (выстрелы саботажника и т. п.); в старых записях нет. */
+  actions?: ActionEvent[];
 }
 
 const PREFIX = 'arcade-hub:replays:';

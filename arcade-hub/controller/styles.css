@@ -858,3 +858,226 @@ button {
   width: 100%;
   height: 100%;
 }
+
+/* ─── Раскладка «прицел» (§10 «Особые раскладки»): карточки снарядов и рамка поля ───
+   Контраст от обратного: фон почти чёрный, карточки и рамка светятся. */
+.aim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+  touch-action: none;
+  background: #04050a;
+  --card: 96px;
+}
+
+.aim__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.aim__body {
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+
+[data-hand='left'] .aim__body {
+  flex-direction: row-reverse;
+}
+
+.aim__cards {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Зона нажатия шире рисунка на 12 точек: рисунок — внутренний квадрат. */
+.aim-card {
+  position: relative;
+  width: calc(var(--card) + 12px);
+  height: calc(var(--card) + 12px);
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--player);
+  --left: 0;
+}
+
+.aim-card::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  background: #0d1020;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--player) 25%, transparent);
+  border: 2px solid color-mix(in srgb, var(--player) 45%, transparent);
+  transition: opacity var(--dur-fast, 0.15s);
+}
+
+/* Выбранная — рамкой в цвет игрока. */
+.aim-card.is-selected::before {
+  border: 4px solid var(--player);
+}
+
+/* Индикатор кулдауна по рамке: стирается против часовой стрелки. */
+.aim-card::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  padding: 4px;
+  background: conic-gradient(var(--player) calc(var(--left) * 360deg), transparent 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+}
+
+.aim-card.is-cooling::after {
+  opacity: 1;
+}
+
+.aim-card__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+.aim-card__icon svg {
+  width: 56%;
+  height: 56%;
+}
+
+.aim-card.is-cooling .aim-card__icon {
+  opacity: 0.2;
+}
+
+.aim-card__secs {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 32px;
+  color: var(--text);
+}
+
+.aim-card.is-ready-flash::before {
+  animation: aim-ready 0.4s ease-out;
+}
+
+@keyframes aim-ready {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.aim__area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.aim__area.is-muted .aim__frame {
+  opacity: 0.35;
+}
+
+.aim__frame {
+  position: absolute;
+  border: 2px solid var(--player);
+  border-radius: 16px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--player) 30%, transparent);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aim__diag {
+  width: 100%;
+  height: 100%;
+}
+
+.aim__diag line {
+  stroke: color-mix(in srgb, var(--player) 45%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.aim__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.aim__line {
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.aim__anchor {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+}
+
+.aim__finger {
+  fill: none;
+  stroke: #ff4d5e;
+  stroke-width: 3;
+}
+
+.aim__shot {
+  fill: none;
+  stroke: #ffd23f;
+  stroke-width: 4;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.aim__shot.is-on {
+  animation: aim-shot 0.35s ease-out;
+}
+
+@keyframes aim-shot {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+.aim__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text-3);
+}
+
+.aim--paused .aim__body {
+  filter: grayscale(1);
+  opacity: 0.3;
+}

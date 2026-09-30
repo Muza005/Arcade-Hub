@@ -19,6 +19,7 @@ export type DotsKey =
   | 'dur60'
   | 'dur90'
   | 'setDash'
+  | 'setThrow'
   | 'setShape'
   | 'shapeCircle'
   | 'shapeSquare'
@@ -47,6 +48,7 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 с',
     dur90: '90 с',
     setDash: 'Рывок',
+    setThrow: 'Бросок звёзд с телефона',
     setShape: 'Форма',
     shapeCircle: 'Круг',
     shapeSquare: 'Квадрат',
@@ -74,6 +76,7 @@ export const strings: GameStrings<DotsKey> = {
     dur60: '60 s',
     dur90: '90 s',
     setDash: 'Dash',
+    setThrow: 'Throw stars from phones',
     setShape: 'Shape',
     shapeCircle: 'Circle',
     shapeSquare: 'Square',

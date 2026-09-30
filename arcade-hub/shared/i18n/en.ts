@@ -33,6 +33,8 @@ export const en: Dictionary = {
   'ctrl.sens.mid': 'Medium',
   'ctrl.sens.high': 'High',
   'ctrl.recalibrate': 'Reset calibration',
+  'ctrl.aim.hint': 'Drag a line — the shot enters from the edge',
+  'ctrl.aim.wait': '{s} s left',
   'ctrl.invertX': 'Invert ← →',
   'ctrl.invertY': 'Invert ↑ ↓',
   'ctrl.hand': 'Hand',

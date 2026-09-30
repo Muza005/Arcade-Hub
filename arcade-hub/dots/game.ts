@@ -1,9 +1,11 @@
 // Модуль «Точек» по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Шаблон для новой игры: симуляция — sim.ts, отрисовка — здесь, числа — config.ts, строки — strings.ts.
 import { Container, Graphics, Text } from 'pixi.js';
+import { IDLE_INPUT } from '../engine/input';
 import { FixedLoop } from '../engine/loop';
 import { createNotice, type Notice } from '../engine/notice';
 import { createStage, cssVar, loadFonts, type Stage } from '../engine/stage';
+import { parseAimShot } from '../shared/aim';
 import { FIXED_STEP_HZ } from '../shared/config';
 import { createTranslator } from '../shared/i18n';
 import { rankByScore, type GameContext, type GameModule, type GamePlayer } from '../shared/game-manifest';
@@ -53,6 +55,9 @@ import {
   WORLD_H,
   fieldFor,
   worldWidth,
+  THROW_COOLDOWN_S,
+  THROW_ENABLED_DEFAULT,
+  THROW_STAR_COLOR,
 } from './config';
 import { dotsManifest } from './manifest';
 import { botInput } from './bot';
@@ -60,6 +65,9 @@ import { createSim, type Sim, type Vec } from './sim';
 import { strings } from './strings';
 
 const t = createTranslator(strings);
+/** Иконка карточки броска (цвет — currentColor). */
+const ICON_STAR =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7L12 17.3 5.8 21l1.6-7L2 9.2l7.1-.6z" fill="currentColor"/></svg>';
 
 const FONT_UI = 'Golos Text';
 const FONT_DISPLAY = 'Unbounded';
@@ -97,6 +105,8 @@ export function createDotsGame(): GameModule {
   let ended = false;
   /** Боты управляются самой игрой: платформа для них ввода не даёт. */
   let bots = new Set<string>();
+  /** Бросок звёзд включён: телефоны получают «прицел» и не летают (проверка раскладки). */
+  let throwers = new Set<string>();
 
   /** Кадры последних REPLAY_TAIL_S секунд — для повтора в итогах (кольцевой буфер). */
   interface Frame {
@@ -151,7 +161,13 @@ export function createDotsGame(): GameModule {
       .stroke({ color: cssVar('--line'), width: FIELD_LINE_PX });
   };
 
-  const drawStars = (): void => drawStarsAt(sim.stars);
+  const drawStars = (): void => {
+    drawStarsAt(sim.stars);
+    for (const star of sim.flying) {
+      starsLayer.star(star.pos.x, star.pos.y, STAR_POINTS, STAR_RADIUS, STAR_RADIUS * STAR_INNER_RATIO);
+    }
+    starsLayer.fill(THROW_STAR_COLOR);
+  };
   const drawStarsAt = (stars: readonly Vec[]): void => {
     starsLayer.clear();
     for (const star of stars) {
@@ -241,6 +257,7 @@ export function createDotsGame(): GameModule {
     async init(context) {
       ctx = context;
       bots = new Set(ctx.players.filter((p) => p.kind === 'bot').map((p) => p.id));
+      if (settingBool('throw', THROW_ENABLED_DEFAULT)) throwers = new Set(ctx.players.filter((p) => p.kind === 'phone').map((p) => p.id));
       const worldW = worldWidth(ctx.aspect);
       sim = createSim(
         ctx.players.map((p) => p.id),
@@ -327,7 +344,7 @@ export function createDotsGame(): GameModule {
 
     update(dtS) {
       if (paused || ended) return;
-      sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : ctx.input.read(id)));
+      sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : throwers.has(id) ? IDLE_INPUT : ctx.input.read(id)));
       for (const id of sim.pickups) {
         ctx.fx(id, { vib: PICKUP_VIBRATE_MS, flash: STAR_COLOR });
         const view = views.get(id);
@@ -447,6 +464,16 @@ export function createDotsGame(): GameModule {
 
     mainButton(playerId) {
       return { progress: sim.dashReady(playerId) };
+    },
+
+    aim(playerId) {
+      if (!throwers.has(playerId)) return undefined;
+      return { cards: [{ id: 'star', icon: ICON_STAR, readyInS: sim.throwReadyInS(playerId), cooldownS: THROW_COOLDOWN_S }] };
+    },
+
+    action(playerId, payload) {
+      const shot = parseAimShot(payload);
+      if (shot && throwers.has(playerId)) sim.throwStar(playerId, shot);
     },
 
     status() {

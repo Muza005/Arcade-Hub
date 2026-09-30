@@ -10,7 +10,7 @@ import {
 } from '../shared/config';
 import type { GameControl, GameManifest } from '../shared/game-manifest';
 import { createTranslator } from '../shared/i18n';
-import type { ControlMode, ControllerLayout, LobbyPanel, MainButtonState, StMsg } from '../shared/protocol';
+import type { AimLayout, ControlMode, ControllerLayout, LobbyPanel, MainButtonState, StMsg } from '../shared/protocol';
 import type { Match } from './game-runner';
 import type { RoomClient } from './room-client';
 import type { Direction } from './ui/spatial';
@@ -77,11 +77,12 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
     const mainButton = match?.mainButton(playerId);
     const status = match?.status();
     const panel = layout.screen === 'menu' ? lobby.panelFor(playerId) : undefined;
+    const aim = layout.screen === 'game' ? match?.aim(playerId) : undefined;
     return {
       t: 'st',
       alive: true,
       paused,
-      layout,
+      layout: aim ? { ...layout, aim } : layout,
       ...(mainButton ? { mainButton } : {}),
       ...(pausedBy ? { pausedBy } : {}),
       ...(status && playerId === room.leaderId() ? { status } : {}),
@@ -147,6 +148,9 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
   };
 
   room.onLobby((playerId, key, value) => lobby.setPlayerField(playerId, key, value));
+  room.onGame((playerId, payload) => {
+    if (layout.screen === 'game' && !paused) match?.action(playerId, payload);
+  });
 
   room.onCmd((playerId, msg, leader) => {
     if (!leader) return;
@@ -164,8 +168,8 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
   setInterval(() => {
     if (!match || layout.screen !== 'game') return;
     for (const playerId of match.players) {
-      const state = match.mainButton(playerId);
-      const key = quantize(state);
+      // Шлём, когда заметно сдвинулся ободок, появилась или ушла раскладка «прицел», карточка стала готова.
+      const key = `${quantize(match.mainButton(playerId))}|${aimKey(match.aim(playerId))}`;
       if (sentButton.get(playerId) === key) continue;
       sentButton.set(playerId, key);
       room.send(playerId, stFor(playerId));
@@ -203,4 +207,10 @@ function quantize(state: MainButtonState | undefined): string {
   if (!state) return '';
   const progress = state.progress === undefined ? '' : Math.round(state.progress / MAIN_BUTTON_STEP);
   return `${state.value ?? ''}|${progress}`;
+}
+
+/** Что в «прицеле» стоит отправить сразу: есть ли он и какие карточки готовы (секунды телефон считает сам). */
+function aimKey(aim: AimLayout | undefined): string {
+  if (!aim) return '';
+  return aim.cards.map((c) => `${c.id}:${c.readyInS > 0 ? 'wait' : 'ready'}`).join(',');
 }

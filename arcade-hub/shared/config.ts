@@ -155,3 +155,19 @@ export const TOAST_MS = 3500;
 // Игровой интерфейс (§16, «Интерфейс матча»): уведомление в игре появляется и само уходит
 export const NOTICE_S = 2.5; // столько видно целиком
 export const NOTICE_FADE_S = 0.3; // появление и исчезновение
+
+// ─── Раскладка «прицел» (§10 «Особые раскладки») ────────────────────
+/** Ступени силы по длине линии — доли диагонали рамки поля: < 0,25 — 1, < 0,5 — 2, < 0,75 — 3, дальше — 4. */
+export const AIM_STEP_THRESHOLDS = [0.25, 0.5, 0.75] as const;
+export const AIM_STEPS = AIM_STEP_THRESHOLDS.length + 1;
+/** Цвет конца линии по ступеням: зелёный, жёлтый, оранжевый, красный. */
+export const AIM_STEP_COLORS = ['#3DDC97', '#FFD23F', '#FF9F43', '#FF4D5E'] as const;
+/** Короче — отмена (тап тоже отмена). */
+export const AIM_CANCEL_CM = 1.5;
+export const CSS_PX_PER_CM = 96 / 2.54;
+export const AIM_CARD_MIN_PX = 96;
+export const AIM_CARD_HEIGHT_K = 1 / 3; // сторона карточки — не меньше трети высоты экрана
+export const AIM_FRAME_MIN_HEIGHT = 0.6; // рамка поля — не меньше 60 % высоты телефона
+export const AIM_TICK_MS = 100; // как часто телефон досчитывает кулдауны
+export const VIBRATE_AIM_SHOT_MS = 35; // самая длинная на этом экране
+export const VIBRATE_AIM_READY_MS = 4; // самая короткая: щелчок готовности

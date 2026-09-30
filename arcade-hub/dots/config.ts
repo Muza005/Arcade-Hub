@@ -28,6 +28,12 @@ export const FIELD_RADIUS = 28;
 export const MATCH_S_DEFAULT = 60;
 export const MATCH_S_OPTIONS = [30, 60, 90] as const; // схема лобби — этап А6
 export const DASH_ENABLED_DEFAULT = true;
+/** Бросок звёзд с телефона (проверка раскладки «прицел»): телефоны не летают, а бросают звёзды с края поля. */
+export const THROW_ENABLED_DEFAULT = false;
+export const THROW_COOLDOWN_S = 3;
+export const THROW_SPEED = 500; // px/с на второй ступени
+export const THROW_STEP_K = [0.5, 1, 2, 3] as const; // × скорость по ступеням силы
+export const THROW_STAR_COLOR = '#8FF0C4';
 /** Поле игрока в лобби (проверка полей на телефоне): форма точки и её фишки в счёте. */
 export const SHAPES = ['circle', 'square'] as const;
 export type Shape = (typeof SHAPES)[number];

@@ -1,6 +1,6 @@
 // Контракт игры (ARCADE_HUB_SPEC §16). Хаб ничего не знает об играх, кроме манифеста и модуля.
 import type { GameStrings } from './i18n';
-import type { FxMsg, InputState, LobbyValue, MainButtonState } from './protocol';
+import type { AimLayout, FxMsg, GamePayload, InputState, LobbyValue, MainButtonState } from './protocol';
 
 export type GameControl = 'keyboard' | 'phone-buttons' | 'phone-gyro' | 'phone-joystick';
 
@@ -187,6 +187,10 @@ export interface GameModule {
   mainButton?(playerId: string): MainButtonState | undefined;
   /** Строка состояния матча для окна паузы («Осталось 0:42»). */
   status?(): string;
+  /** Особая раскладка «прицел» для игрока (например, саботажник) или undefined — обычный контроллер. */
+  aim?(playerId: string): AimLayout | undefined;
+  /** Особое действие игрока (`g` с телефона). Платформа вызывает его в начале шага и пишет в запись матча. */
+  action?(playerId: string, payload: GamePayload): void;
   /** Игрок сменил ник или цвет посреди матча (настройки телефона) — перерисовать его. */
   updatePlayer?(player: GamePlayer): void;
   /** Шаг 1 итогов: короткий повтор конца матча на своей сцене. Вызывается после end, до dispose. */

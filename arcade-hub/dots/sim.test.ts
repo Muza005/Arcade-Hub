@@ -104,3 +104,21 @@ describe('Точки: бот', () => {
     expect(sim.dots[0]!.score).toBeGreaterThan(3);
   });
 });
+
+describe('бросок звезды (раскладка «прицел»)', () => {
+  it('летит с края по линии; поймавший и бросивший получают по очку; кулдаун', () => {
+    const sim = createSim(['a', 'b'], 1, { durationS: 60, dashEnabled: true });
+    const b = sim.dots[1]!;
+    // Бросаем с левого края на высоте точки b — прямо в неё.
+    const y = (b.pos.y - FIELD.top) / (FIELD.bottom - FIELD.top);
+    expect(sim.throwStar('a', { card: 'star', x: 0, y, dx: 1, dy: 0, step: 4 })).toBe(true);
+    expect(sim.throwStar('a', { card: 'star', x: 0, y, dx: 1, dy: 0, step: 4 })).toBe(false);
+    const idle = () => ({ x: 0, y: 0, btn: false });
+    for (let i = 0; i < 240 && sim.flying.length > 0; i++) sim.step(1 / 60, idle);
+    expect(sim.flying).toHaveLength(0);
+    expect(b.score).toBeGreaterThanOrEqual(1);
+    expect(sim.dots[0]!.score).toBeGreaterThanOrEqual(1);
+    for (let i = 0; i < 180; i++) sim.step(1 / 60, idle);
+    expect(sim.throwReadyInS('a')).toBe(0);
+  });
+});

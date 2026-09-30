@@ -15,6 +15,7 @@ import { t } from '../shared/i18n';
 import type {
   CmdMsg,
   FromMsg,
+  GamePayload,
   HostToServer,
   ScreenToPhone,
   ServerToHost,
@@ -43,6 +44,8 @@ export interface RoomClient {
   onInput(cb: (playerId: string, input: InputState) => void): void;
   /** Поле игрока из лобби, выбранное на телефоне. */
   onLobby(cb: (playerId: string, key: string, value: unknown) => void): void;
+  /** Особое действие игры с телефона (`g`). */
+  onGame(cb: (playerId: string, payload: GamePayload) => void): void;
   /** Команда с телефона (pause, back, …); `leader` — прислал ли её ведущий. */
   onCmd(cb: (playerId: string, msg: CmdMsg, leader: boolean) => void): void;
   /** Последний ввод игрока с телефона. */
@@ -109,6 +112,7 @@ export function connectRoom(): RoomClient {
   const inputListeners: Array<(playerId: string, input: InputState) => void> = [];
   const cmdListeners: Array<(playerId: string, msg: CmdMsg, leader: boolean) => void> = [];
   const lobbyListeners: Array<(playerId: string, key: string, value: unknown) => void> = [];
+  const gameListeners: Array<(playerId: string, payload: GamePayload) => void> = [];
   const leaderListeners: Array<(player: RoomPlayer) => void> = [];
   const statusListeners: Array<(online: boolean) => void> = [];
   let ws: WebSocket | null = null;
@@ -239,8 +243,13 @@ export function connectRoom(): RoomClient {
         for (const cb of lobbyListeners) cb(String(slot.id), msg.key, msg.value);
         return;
       }
+      case 'g': {
+        const slot = state.bySid(from);
+        if (!slot || typeof msg.game !== 'object' || msg.game === null) return;
+        for (const cb of gameListeners) cb(String(slot.id), msg.game);
+        return;
+      }
       default:
-        // g — особые действия игр, следующие этапы.
         return;
     }
   };
@@ -320,6 +329,7 @@ export function connectRoom(): RoomClient {
     },
     onCmd: (cb) => void cmdListeners.push(cb),
     onLobby: (cb) => void lobbyListeners.push(cb),
+    onGame: (cb) => void gameListeners.push(cb),
     inputOf: (id) => inputs.get(id) ?? { ...IDLE_INPUT },
     leaderId: () => {
       const leader = state.leader();

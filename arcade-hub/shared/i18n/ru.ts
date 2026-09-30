@@ -33,6 +33,8 @@ export const ru = {
   'ctrl.sens.mid': 'Средняя',
   'ctrl.sens.high': 'Высокая',
   'ctrl.recalibrate': 'Сбросить калибровку',
+  'ctrl.aim.hint': 'Тяни линию — снаряд влетит с края поля',
+  'ctrl.aim.wait': 'Ещё {s} с',
   'ctrl.invertX': 'Инвертировать ← →',
   'ctrl.invertY': 'Инвертировать ↑ ↓',
   'ctrl.hand': 'Рука',

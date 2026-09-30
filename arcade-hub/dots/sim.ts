@@ -14,7 +14,11 @@ import {
   STAR_RADIUS,
   STARS_BASE,
   STARS_PER_PLAYER,
+  THROW_COOLDOWN_S,
+  THROW_SPEED,
+  THROW_STEP_K,
 } from './config';
+import type { AimShot } from '../shared/protocol';
 
 export interface Vec {
   x: number;
@@ -34,6 +38,13 @@ export interface Dot {
   prevBtn: boolean;
 }
 
+/** Брошенная звезда: летит по прямой, пока её не поймают или она не уйдёт за край. */
+export interface FlyingStar {
+  pos: Vec;
+  vel: Vec;
+  owner: string;
+}
+
 export interface SimOptions {
   durationS: number;
   dashEnabled: boolean;
@@ -45,10 +56,15 @@ export interface Sim {
   readonly field: Field;
   readonly dots: readonly Dot[];
   readonly stars: readonly Vec[];
+  readonly flying: readonly FlyingStar[];
   readonly timeLeftS: number;
   readonly over: boolean;
   /** Кто собрал звезду на последнем шаге — для обратной связи на телефоне. */
   readonly pickups: readonly string[];
+  /** Бросок звезды с «прицела»: false — ещё кулдаун. */
+  throwStar(id: string, shot: AimShot): boolean;
+  /** Сколько ждать до следующего броска, с. */
+  throwReadyInS(id: string): number;
   /** Досрочный конец матча («Завершить матч» у ведущего). */
   stop(): void;
   /** Прогресс перезарядки рывка 0…1 (1 — готов). Для ободка главной кнопки (st.mainButton, этап А5). */
@@ -82,6 +98,8 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
   const starCount = STARS_BASE + STARS_PER_PLAYER * playerIds.length;
   const stars: Vec[] = Array.from({ length: starCount }, () => randomStar(rng, field));
 
+  const flying: FlyingStar[] = [];
+  const throwCooldown = new Map<string, number>();
   let timeLeftS = options.durationS;
   let over = false;
   const pickups: string[] = [];
@@ -130,10 +148,46 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
     }
   };
 
+  /** Брошенные звёзды: летят; кто поймал — +1, бросившему тоже +1 (если поймал не он). */
+  const stepFlying = (dtS: number): void => {
+    const reach = DOT_RADIUS + STAR_RADIUS;
+    for (let i = flying.length - 1; i >= 0; i--) {
+      const star = flying[i] as FlyingStar;
+      star.pos.x += star.vel.x * dtS;
+      star.pos.y += star.vel.y * dtS;
+      const catcher = dots.find((d) => Math.hypot(star.pos.x - d.pos.x, star.pos.y - d.pos.y) < reach);
+      const out =
+        star.pos.x < field.left - STAR_RADIUS ||
+        star.pos.x > field.right + STAR_RADIUS ||
+        star.pos.y < field.top - STAR_RADIUS ||
+        star.pos.y > field.bottom + STAR_RADIUS;
+      if (catcher) {
+        catcher.score += STAR_POINTS_SCORE;
+        pickups.push(catcher.id);
+        const owner = dots.find((d) => d.id === star.owner);
+        if (owner && owner !== catcher) owner.score += STAR_POINTS_SCORE;
+      }
+      if (catcher || out) flying.splice(i, 1);
+    }
+  };
+
   return {
     field,
     dots,
     stars,
+    flying,
+    throwStar(id, shot) {
+      if (over || (throwCooldown.get(id) ?? 0) > 0) return false;
+      const speed = THROW_SPEED * (THROW_STEP_K[shot.step - 1] ?? 1);
+      flying.push({
+        pos: { x: field.left + shot.x * (field.right - field.left), y: field.top + shot.y * (field.bottom - field.top) },
+        vel: { x: shot.dx * speed, y: shot.dy * speed },
+        owner: id,
+      });
+      throwCooldown.set(id, THROW_COOLDOWN_S);
+      return true;
+    },
+    throwReadyInS: (id) => throwCooldown.get(id) ?? 0,
     get timeLeftS() {
       return timeLeftS;
     },
@@ -154,6 +208,8 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       for (const dot of dots) moveDot(dot, read(dot.id), dtS);
       // Звёзды собираются по порядку игроков — порядок фиксирован, результат детерминирован.
       for (const dot of dots) collect(dot);
+      stepFlying(dtS);
+      for (const [id, left] of throwCooldown) throwCooldown.set(id, Math.max(0, left - dtS));
       timeLeftS = Math.max(0, timeLeftS - dtS);
       if (timeLeftS === 0) over = true;
     },

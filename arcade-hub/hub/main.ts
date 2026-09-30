@@ -158,6 +158,7 @@ async function play(start: LobbyStart): Promise<void> {
       aspect: match.aspect,
       players: players.map(({ id, nick, color, kind }) => ({ id, nick, color, kind })),
       inputs: [...match.inputs],
+      ...(match.actions.length > 0 ? { actions: [...match.actions] } : {}),
     });
 
     choice = await results.run({

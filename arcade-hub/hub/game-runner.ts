@@ -2,7 +2,7 @@
 // Хаб знает об игре только манифест и контракт GameModule.
 import { InputHub, type InputSource } from '../engine/input';
 import { FixedLoop } from '../engine/loop';
-import { createInputRecorder, type InputEvent } from '../engine/replay';
+import { createInputRecorder, type ActionEvent, type InputEvent } from '../engine/replay';
 import type {
   GameContext,
   GameManifest,
@@ -12,7 +12,7 @@ import type {
   MatchResults,
   MatchSettings,
 } from '../shared/game-manifest';
-import type { MainButtonState } from '../shared/protocol';
+import type { AimLayout, GamePayload, MainButtonState } from '../shared/protocol';
 import { ASPECT_RANGE, DEFAULT_ASPECT } from '../shared/config';
 
 export interface LaunchOptions {
@@ -37,11 +37,17 @@ export interface Match {
   readonly aspect: number;
   /** Записанный поток ввода (для записи матча). */
   readonly inputs: readonly InputEvent[];
+  /** Записанные особые действия. */
+  readonly actions: readonly ActionEvent[];
   pause(): void;
   resume(): void;
   /** «Завершить матч»: к итогам, счёт сохраняется. */
   finish(): void;
   mainButton(playerId: string): MainButtonState | undefined;
+  /** Раскладка «прицел» игрока, если игра её заказала. */
+  aim(playerId: string): AimLayout | undefined;
+  /** Особое действие с телефона: уйдёт в игру в начале следующего шага. */
+  action(playerId: string, payload: GamePayload): void;
   status(): string | undefined;
   /** Ник или цвет игрока поменялся посреди матча. */
   updatePlayer(player: GamePlayer): void;
@@ -65,6 +71,11 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     (id) => input.read(id),
   );
 
+  // Особые действия ждут начала шага: так они попадают в тот же тик и при повторе.
+  const humanIds = options.players.filter((p) => p.kind !== 'bot').map((p) => p.id);
+  const pending: Array<{ playerId: string; payload: GamePayload }> = [];
+  const actions: ActionEvent[] = [];
+
   let resolve!: (result: MatchResult) => void;
   const result = new Promise<MatchResult>((r) => (resolve = r));
   let paused = false;
@@ -74,6 +85,12 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
   const loop = new FixedLoop({
     update: (dtS, tick) => {
       recorder.setTick(tick);
+      for (const { playerId, payload } of pending.splice(0)) {
+        const i = humanIds.indexOf(playerId);
+        if (i === -1) continue;
+        actions.push([tick, i, payload]);
+        game.action?.(playerId, payload);
+      }
       game.update(dtS, tick);
     },
     render: (alpha) => game.render(alpha),
@@ -120,6 +137,7 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
     result,
     players: options.players.map((p) => p.id),
     inputs: recorder.events,
+    actions,
     get paused() {
       return paused;
     },
@@ -138,6 +156,10 @@ export async function runGame(manifest: GameManifest, mount: HTMLElement, option
       if (!over) game.finish();
     },
     mainButton: (playerId) => (over ? undefined : game.mainButton?.(playerId)),
+    aim: (playerId) => (over ? undefined : game.aim?.(playerId)),
+    action: (playerId, payload) => {
+      if (!over && !paused && game.action) pending.push({ playerId, payload });
+    },
     status: () => (over ? undefined : game.status?.()),
     updatePlayer: (player) => {
       if (!disposed) game.updatePlayer?.(player);

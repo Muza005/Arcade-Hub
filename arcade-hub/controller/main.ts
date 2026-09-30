@@ -7,6 +7,7 @@ import '@fontsource/golos-text/600.css';
 import '@fontsource/unbounded/700.css';
 import './styles.css';
 import {
+  DEFAULT_ASPECT,
   INPUT_REFRESH_S,
   RECONNECT_DELAYS_S,
   ROOM_CODE_ALPHABET,
@@ -26,6 +27,7 @@ import type {
   SlotMsg,
   StMsg,
 } from '../shared/protocol';
+import { createAim } from './aim';
 import { createDirectLink } from './direct';
 import { createGyro, requestGyroPermission } from './gyro';
 import { createPad } from './pad';
@@ -140,6 +142,18 @@ const settings = createSettings({
   },
 });
 
+// Раскладка «прицел» (особая, по заказу игры): вместо джойстика и кнопки.
+const aim = createAim({
+  shot: (shot) => send({ t: 'g', game: { aim: shot } }),
+  pause: () => send({ t: 'cmd', cmd: 'pause' }),
+  settings() {
+    aim.release();
+    settings.show(settingsContext());
+    render();
+  },
+  vibrate: (ms) => vibrate(ms),
+});
+
 // Окно паузы у ведущего
 const pauseModal = el('div', 'pause-modal');
 const pauseStatus = el('p', 'muted');
@@ -170,7 +184,7 @@ const screens: Record<Screen, HTMLElement> = {
   pad: pad.el,
   error: errorScreen,
 };
-app.append(...Object.values(screens), pauseModal, settings.el, flash, banner);
+app.append(...Object.values(screens), aim.el, pauseModal, settings.el, flash, banner);
 let screen: Screen = 'connecting';
 
 function show(next: Screen): void {
@@ -205,7 +219,7 @@ function activeMode(): ControlMode {
 
 /** Можно ли сейчас управлять: гость в меню и все на паузе — нельзя. */
 function controlsLive(): boolean {
-  if (screen !== 'pad' || settings.open || st.paused) return false;
+  if (screen !== 'pad' || settings.open || st.paused || aiming()) return false;
   return st.layout.screen === 'game' || isLeader();
 }
 
@@ -236,8 +250,18 @@ function settingsContext() {
   };
 }
 
+/** Игра заказала «прицел» (например, экран саботажника). */
+function aiming(): boolean {
+  return st.layout.screen === 'game' && st.layout.aim !== undefined;
+}
+
 function render(): void {
   for (const [name, node] of Object.entries(screens)) node.hidden = name !== screen;
+  const aimLayout = screen === 'pad' && st.layout.screen === 'game' ? st.layout.aim : undefined;
+  if (aimLayout) pad.el.hidden = true;
+  aim.el.hidden = !aimLayout;
+  if (aimLayout) aim.setView({ layout: aimLayout, aspect: slot?.aspect ?? DEFAULT_ASPECT, leader: isLeader(), paused: st.paused });
+  else aim.release();
   const leader = isLeader();
   const inMenu = st.layout.screen === 'menu';
   const mode = activeMode();
@@ -438,6 +462,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') {
     wakeLock = null;
     pad.release();
+    aim.release();
   }
 });
 

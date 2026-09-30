@@ -7,7 +7,7 @@ import cardArt from './assets/card.svg';
 import cover from './assets/cover.svg';
 import logo from './assets/logo.svg';
 import modeFfaIcon from './assets/mode-ffa.svg';
-import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS, SHAPE_DEFAULT } from './config';
+import { ACCENT, DASH_ENABLED_DEFAULT, MATCH_S_DEFAULT, MATCH_S_OPTIONS, SHAPE_DEFAULT, THROW_ENABLED_DEFAULT } from './config';
 import { strings } from './strings';
 
 const GAME_ID = 'dots';
@@ -31,7 +31,7 @@ export const dotsManifest: GameManifest = {
   controls: ['keyboard', 'phone-joystick', 'phone-gyro', 'phone-buttons'],
   modes: [{ id: 'ffa', title: 'modeFfa', description: 'modeFfaDesc', icon: modeFfaIcon }],
   status: 'available',
-  version: '2', // 2 — поле под ширину экрана
+  version: '3', // 2 — поле под ширину экрана; 3 — бросок звёзд
   load: async () => (await import('./game')).createDotsGame(),
   strings,
   controllerLayout: { mainButton: true },
@@ -58,6 +58,8 @@ export const dotsManifest: GameManifest = {
         default: MATCH_S_DEFAULT,
       },
       { key: 'dash', label: 'setDash', kind: 'toggle', default: DASH_ENABLED_DEFAULT },
+      // Проверка раскладки «прицел» (расширение платформы для Space War).
+      { key: 'throw', label: 'setThrow', kind: 'toggle', default: THROW_ENABLED_DEFAULT },
     ],
     playerFields: [
       {
