@@ -55,6 +55,7 @@ import {
   WORLD_H,
   fieldFor,
   worldWidth,
+  CATCH_VIBRATE_PATTERN,
   THROW_COOLDOWN_S,
   THROW_ENABLED_DEFAULT,
   THROW_STAR_COLOR,
@@ -346,7 +347,7 @@ export function createDotsGame(): GameModule {
       if (paused || ended) return;
       sim.step(dtS, (id) => (bots.has(id) ? botInput(sim, id) : throwers.has(id) ? IDLE_INPUT : ctx.input.read(id)));
       for (const id of sim.pickups) {
-        ctx.fx(id, { vib: PICKUP_VIBRATE_MS, flash: STAR_COLOR });
+        ctx.fx(id, { vib: sim.caught.includes(id) ? CATCH_VIBRATE_PATTERN : PICKUP_VIBRATE_MS, flash: STAR_COLOR });
         const view = views.get(id);
         if (view) view.pop = 1;
         spawnPlus(id);
@@ -463,6 +464,8 @@ export function createDotsGame(): GameModule {
     },
 
     mainButton(playerId) {
+      // Рывок выключен в лобби — кнопка погашена (проверка MainButtonState.off).
+      if (!settingBool('dash', DASH_ENABLED_DEFAULT)) return { off: true };
       return { progress: sim.dashReady(playerId) };
     },
 

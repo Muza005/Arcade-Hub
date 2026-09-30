@@ -444,6 +444,21 @@ button {
   color: var(--text-3);
 }
 
+/* Кнопка погашена игрой (Глушилка): серая и перечёркнута. */
+.main-btn__off {
+  display: none;
+  position: absolute;
+  width: 70%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--danger, #ff4d5e);
+  transform: rotate(-45deg);
+}
+
+.main-btn.is-off .main-btn__off {
+  display: block;
+}
+
 /* Три сигнала нажатия: заливка белеет, кнопка сжимается, вспыхивает кольцо. */
 .main-btn.is-pressed {
   background: var(--text);

@@ -206,7 +206,7 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
 function quantize(state: MainButtonState | undefined): string {
   if (!state) return '';
   const progress = state.progress === undefined ? '' : Math.round(state.progress / MAIN_BUTTON_STEP);
-  return `${state.value ?? ''}|${progress}`;
+  return `${state.value ?? ''}|${progress}|${state.off ? 'off' : ''}`;
 }
 
 /** Что в «прицеле» стоит отправить сразу: есть ли он и какие карточки готовы (секунды телефон считает сам). */

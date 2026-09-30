@@ -61,6 +61,8 @@ export interface Sim {
   readonly over: boolean;
   /** Кто собрал звезду на последнем шаге — для обратной связи на телефоне. */
   readonly pickups: readonly string[];
+  /** Кто из них поймал брошенную звезду. */
+  readonly caught: readonly string[];
   /** Бросок звезды с «прицела»: false — ещё кулдаун. */
   throwStar(id: string, shot: AimShot): boolean;
   /** Сколько ждать до следующего броска, с. */
@@ -103,6 +105,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
   let timeLeftS = options.durationS;
   let over = false;
   const pickups: string[] = [];
+  const caught: string[] = [];
 
   const moveDot = (dot: Dot, input: InputState, dtS: number): void => {
     dot.prev.x = dot.pos.x;
@@ -164,6 +167,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       if (catcher) {
         catcher.score += STAR_POINTS_SCORE;
         pickups.push(catcher.id);
+        caught.push(catcher.id);
         const owner = dots.find((d) => d.id === star.owner);
         if (owner && owner !== catcher) owner.score += STAR_POINTS_SCORE;
       }
@@ -195,6 +199,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
       return over;
     },
     pickups,
+    caught,
     stop() {
       over = true;
     },
@@ -204,6 +209,7 @@ export function createSim(playerIds: readonly string[], seed: number, options: S
     },
     step(dtS, read) {
       pickups.length = 0;
+      caught.length = 0;
       if (over) return;
       for (const dot of dots) moveDot(dot, read(dot.id), dtS);
       // Звёзды собираются по порядку игроков — порядок фиксирован, результат детерминирован.

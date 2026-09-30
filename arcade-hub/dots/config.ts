@@ -58,6 +58,8 @@ export const STAR_POINTS_SCORE = 1;
 
 // Обратная связь на телефоне при сборе звезды
 export const PICKUP_VIBRATE_MS = 25;
+/** Поймал брошенную звезду — два коротких импульса (проверка узора вибрации). */
+export const CATCH_VIBRATE_PATTERN = [20, 60, 20];
 export const SECONDS_PER_MINUTE = 60;
 
 // Итоги: повтор последних секунд матча (DOTS_SPEC)

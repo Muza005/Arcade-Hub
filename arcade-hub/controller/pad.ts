@@ -75,7 +75,8 @@ export function createPad(cb: PadCallbacks): Pad {
   // Главная кнопка: число и ободок — если их шлёт игра
   const main = button('main-btn');
   const mainValue = el('span', 'main-btn__value');
-  main.append(mainValue);
+  const mainOff = el('span', 'main-btn__off');
+  main.append(mainValue, mainOff);
 
   root.append(top, notice, stick, dpad, tilt, recal, main);
 
@@ -211,7 +212,8 @@ export function createPad(cb: PadCallbacks): Pad {
         main.classList.add('is-flash');
       }
       lastValue = value;
-      main.classList.toggle('is-empty', value === 0);
+      main.classList.toggle('is-empty', value === 0 || state?.off === true);
+      main.classList.toggle('is-off', state?.off === true);
       mainValue.textContent = value === undefined ? '' : String(value);
       const progress = state?.progress;
       main.classList.toggle('has-ring', progress !== undefined);

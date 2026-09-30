@@ -228,7 +228,7 @@ function pushInput(): void {
   else sender.release();
 }
 
-function vibrate(ms: number): void {
+function vibrate(ms: number | number[]): void {
   if (prefs.vibration && 'vibrate' in navigator) navigator.vibrate(ms);
 }
 
@@ -371,6 +371,7 @@ function onMessage(msg: ScreenToPhone | ServerToPhone): void {
       return;
     case 'fx':
       if (typeof msg.vib === 'number') vibrate(msg.vib);
+      else if (Array.isArray(msg.vib) && msg.vib.every((v) => typeof v === 'number')) vibrate(msg.vib);
       if (typeof msg.flash === 'string') playFlash(msg.flash);
       return;
     case 'err':
