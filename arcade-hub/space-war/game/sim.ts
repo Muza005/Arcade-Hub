@@ -1,11 +1,21 @@
 // Симуляция Space War без графики: по сиду и потоку ввода матч воспроизводится один в один.
-// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки; Б8 — волны; Б9 — боссы.
+// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки; Б8 — волны; Б9 — боссы; Б10 — призрак и саботаж; Б11 — усиления.
 import type { InputState } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import {
   ASTEROID_HITBOX_K,
   ASTEROID_RADIUS,
+  AMMO_MAX,
   ASTEROID_SPAWN_PER_S,
+  FREEZE_S,
+  JAMMER_S,
+  JAMMER_TARGETS,
+  OVERLOAD_S,
+  POWERUP_DROP_CHANCE,
+  POWERUP_RADIUS,
+  SHIELD_S,
+  SHIP_LIVES,
+  type PowerupKind,
   BOSS_FLOW,
   BOSS_HITBOX_K,
   BULLET_RADIUS,
@@ -47,9 +57,10 @@ import { FEATURES } from '../features';
 import { createAsteroidField, type Asteroid } from './asteroids';
 import { createAfterlife, type AfterlifeEvents, type Bomb, type SabShot, type Shard } from './afterlife';
 import { createBoss, type Boss, type BossControl } from './bosses';
+import { createPowerups, type Powerup } from './powerups';
 import { createBullets, type Bullet, type Mover } from './bullets';
 import { Grid } from './grid';
-import { checkIdle, createPilot, nearMiss, regenAmmo, resetMult, type Pilot } from './pilot';
+import { checkIdle, createPilot, nearMiss, regenAmmo, resetMult, totalMult, type Pilot } from './pilot';
 import { clampToBounds, createShip, stepShip, type Bounds, type Ship } from './ship';
 import { createWaves, type WaveEvent, type Waves } from './waves';
 
@@ -72,6 +83,10 @@ export interface SimEvents extends AfterlifeEvents {
   waves: WaveEvent[];
   /** Цель-босс убита: кем и где. */
   bossDown: Array<{ kind: BossKind; by: string; x: number; y: number }>;
+  /** Подобранные усиления. */
+  pickups: Array<{ id: string; kind: PowerupKind; x: number; y: number }>;
+  /** Кого заглушили. */
+  jammed: string[];
 }
 
 export interface SimOptions {
@@ -88,6 +103,8 @@ export interface SimOptions {
   ghostS?: number;
   /** Настройка лобби «Саботаж погибших». */
   sabotage?: boolean;
+  /** Настройка лобби «Усиления». */
+  powerups?: boolean;
 }
 
 export interface Sim {
@@ -102,6 +119,10 @@ export interface Sim {
   /** Осколки погибших (кооператив, командное) и бомбы саботажников. */
   readonly shards: readonly Shard[];
   readonly bombs: readonly Bomb[];
+  /** Усиления на поле. */
+  readonly powerups: readonly Powerup[];
+  /** Заморозка: сколько ещё камни стоят, с. */
+  readonly freezeS: number;
   /** Выстрел саботажника; false — не саботажник или снаряд ещё не готов. */
   sabotage(id: string, shot: SabShot): boolean;
   /** Полный кулдаун снаряда сейчас (база + за погибших). */
@@ -159,8 +180,11 @@ export function createSim(
   const spent: Bullet[] = [];
   const events: SimEvents = {
     hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [], bossDown: [],
-    ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [],
+    ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [], pickups: [], jammed: [],
   };
+  const powerupsOn = (options.powerups ?? true) && FEATURES.powerups;
+  const powerups = createPowerups(rng, mode);
+  let freezeS = 0;
   let bossCtl: BossControl | null = null;
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
   const waves = createWaves(seed, WAVE_LIMIT, options.startWave);
@@ -234,6 +258,9 @@ export function createSim(
     hitStopS = Math.max(hitStopS, HIT_STOP_S);
     if (pilot.lives > 0) return;
     hitStopS = Math.max(hitStopS, HIT_STOP_DEATH_S);
+    pilot.shieldS = 0;
+    pilot.overloadS = 0;
+    pilot.jamS = 0;
     pilot.diedAtS = timeS;
     events.deaths.push(pilot.ship.id);
     afterlife.die(pilot);
@@ -314,7 +341,7 @@ export function createSim(
   const fire = (pilot: Pilot, btn: boolean): void => {
     const pressed = btn && !pilot.prevBtn;
     pilot.prevBtn = btn;
-    if (!FEATURES.shooting || !pressed || pilot.ammo <= 0) return;
+    if (!FEATURES.shooting || !pressed || pilot.ammo <= 0 || pilot.jamS > 0) return;
     const target = nearestRock(pilot.ship.pos);
     if (!target) return; // стрелять не во что — патрон не тратится
     if (!bullets.fire(pilot.ship.id, pilot.ship.pos, target)) return;
@@ -368,8 +395,73 @@ export function createSim(
     }
     for (const b of spent) bullets.remove(b);
     for (const { rock, by } of killed) {
-      by.score += SCORE_ASTEROID[rock.size] * by.mult;
+      by.score += SCORE_ASTEROID[rock.size] * totalMult(by);
+      // Выпадение усиления — из камня, разбитого снарядом.
+      if (powerupsOn && rng.next() < POWERUP_DROP_CHANCE) powerups.drop(rock.pos.x, rock.pos.y);
       shatter(rock);
+    }
+  };
+
+  /** Союзник ли: в кооперативе все, в командном — своя команда. */
+  const ally = (a: string, b: string): boolean => a === b || mode === 'coop' || (mode === 'teams' && teamOf(a) === teamOf(b));
+
+  /** Подбор усиления пролётом (SPACE_WAR_SPEC §5 «Усиления»). Таймеры при повторном подборе только сбрасываются. */
+  const apply = (pilot: Pilot, kind: PowerupKind): void => {
+    const alive = [...pilots.values()].filter((p) => p.alive);
+    switch (kind) {
+      case 'repair': {
+        // Лично; в кооперативе и командном — в общий пул: тому из своих, у кого жизней меньше всех.
+        const pool = mode === 'versus' ? [pilot] : alive.filter((p) => ally(p.ship.id, pilot.ship.id));
+        const target = pool.reduce((best, p) => (p.lives < best.lives ? p : best), pilot);
+        target.lives = Math.min(SHIP_LIVES, target.lives + 1);
+        return;
+      }
+      case 'ammo':
+        pilot.ammo = AMMO_MAX;
+        pilot.ammoProgress = 0;
+        return;
+      case 'shield':
+        pilot.shieldS = SHIELD_S;
+        return;
+      case 'freeze':
+        freezeS = FREEZE_S;
+        return;
+      case 'clear':
+        for (let i = field.list.length - 1; i >= 0; i--) {
+          const a = field.list[i] as Asteroid;
+          if (a.size === 'small' && !a.immortal && !a.held) shatter(a);
+        }
+        return;
+      case 'overload':
+        pilot.overloadS = OVERLOAD_S;
+        return;
+      case 'jammer': {
+        // Три ближайших соперника (если их меньше — все) не стреляют.
+        const { pos } = pilot.ship;
+        const dist = (p: Pilot): number => Math.hypot(p.ship.pos.x - pos.x, p.ship.pos.y - pos.y);
+        const rivals = alive
+          .filter((p) => !ally(p.ship.id, pilot.ship.id))
+          .sort((a, b) => dist(a) - dist(b))
+          .slice(0, JAMMER_TARGETS);
+        for (const r of rivals) {
+          r.jamS = JAMMER_S;
+          events.jammed.push(r.ship.id);
+        }
+        return;
+      }
+    }
+  };
+
+  const collectPowerups = (): void => {
+    for (let i = powerups.list.length - 1; i >= 0; i--) {
+      const p = powerups.list[i] as Powerup;
+      const picker = [...pilots.values()].find(
+        (pilot) => pilot.alive && Math.hypot(pilot.ship.pos.x - p.pos.x, pilot.ship.pos.y - p.pos.y) < SHIP_HITBOX_RADIUS + POWERUP_RADIUS,
+      );
+      if (!picker) continue;
+      powerups.remove(p);
+      apply(picker, p.kind);
+      events.pickups.push({ id: picker.ship.id, kind: p.kind, x: p.pos.x, y: p.pos.y });
     }
   };
 
@@ -382,6 +474,10 @@ export function createSim(
     waves,
     get boss() {
       return bossCtl?.boss ?? null;
+    },
+    powerups: powerups.list,
+    get freezeS() {
+      return freezeS;
     },
     shards: afterlife.shards,
     bombs: afterlife.bombs,
@@ -440,8 +536,18 @@ export function createSim(
       // Воронка: осложнение или босс. Ядро босса глотает камни.
       const rockPull = comp === 'vortex' ? VORTEX_ROCK_PULL : (bossCtl?.boss.rockPull ?? 0);
       const shipPull = comp === 'vortex' ? VORTEX_SHIP_PULL : (bossCtl?.boss.shipPull ?? 0);
-      if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
-      field.step(dtS);
+      // Заморозка: камни стоят (новые всё так же появляются за краем).
+      freezeS = Math.max(0, freezeS - dtS);
+      if (freezeS === 0) {
+        if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
+        field.step(dtS);
+      } else {
+        for (const a of field.list) {
+          a.prev.x = a.pos.x;
+          a.prev.y = a.pos.y;
+        }
+      }
+      powerups.step(dtS);
       afterlife.moveGhosts(dtS, read);
       afterlife.step(dtS);
       if (bossCtl?.boss.kind === 'vortex') {
@@ -460,6 +566,9 @@ export function createSim(
         const input = read(pilot.ship.id);
         stepShip(pilot.ship, input, dtS, bounds);
         pilot.invulnS = Math.max(0, pilot.invulnS - dtS);
+        pilot.shieldS = Math.max(0, pilot.shieldS - dtS);
+        pilot.overloadS = Math.max(0, pilot.overloadS - dtS);
+        pilot.jamS = Math.max(0, pilot.jamS - dtS);
         if (shipPull > 0) pull(pilot.ship, shipPull, dtS);
         fire(pilot, input.btn);
         // Глушение: патроны не копятся.
@@ -488,12 +597,18 @@ export function createSim(
           break;
         }
       }
-      for (const { pilot, rock } of hits) hitShip(pilot, rock);
+      // Щит: камень разбивается о него, жизнь и множитель целы.
+      for (const { pilot, rock } of hits) {
+        if (pilot.shieldS > 0) {
+          if (!rock.immortal) shatter(rock);
+        } else hitShip(pilot, rock);
+      }
+      collectPowerups();
       // Тело босса: минус жизнь, босс цел; неуязвимость даёт выбраться.
       const body = bossCtl?.boss;
       if (body && body.radius > 0) {
         for (const pilot of pilots.values()) {
-          if (!pilot.alive || pilot.invulnS > 0) continue;
+          if (!pilot.alive || pilot.invulnS > 0 || pilot.shieldS > 0) continue;
           const { pos } = pilot.ship;
           if (Math.hypot(body.pos.x - pos.x, body.pos.y - pos.y) < SHIP_HITBOX_RADIUS + body.radius * BOSS_HITBOX_K) hitShip(pilot, null);
         }

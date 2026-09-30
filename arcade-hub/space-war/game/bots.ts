@@ -21,6 +21,7 @@ import {
   BOT_HUNT_GAP_K,
   BOT_HUNT_RANGE,
   BOT_LOOKAHEAD_S,
+  BOT_POWERUP_RANGE,
   BOT_REACTION_S,
   BOT_SAB_LEAD_S,
   BOT_SAB_ROCK_CHANCE,
@@ -164,6 +165,19 @@ export function createBots(
     return { x: best.pos.x + px * r, y: best.pos.y + py * r };
   };
 
+  const nearestPowerup = (p: Vec): Vec | null => {
+    let best: Vec | null = null;
+    let bestD = BOT_POWERUP_RANGE;
+    for (const up of sim.powerups) {
+      const d = Math.hypot(up.pos.x - p.x, up.pos.y - p.y);
+      if (d < bestD) {
+        bestD = d;
+        best = up.pos;
+      }
+    }
+    return best;
+  };
+
   const nearestRock = (p: Vec): { rock: Asteroid; d: number } | null => {
     let best: { rock: Asteroid; d: number } | null = null;
     for (const rock of sim.asteroids) {
@@ -181,7 +195,10 @@ export function createBots(
 
     // Куда хочется.
     let target: Vec;
+    // Средний и сильный подбирают усиление, если оно рядом.
+    const bonus = level === 'weak' ? null : nearestPowerup(pos);
     if (level === 'weak') target = edgeHome(pos);
+    else if (bonus) target = bonus;
     else {
       const hunt = level === 'strong' ? huntPoint(pilot) : null;
       if (hunt) target = hunt;

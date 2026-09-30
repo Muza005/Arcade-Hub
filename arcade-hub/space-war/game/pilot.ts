@@ -8,6 +8,7 @@ import {
   MULT_MAX,
   MULT_STEPS,
   NEAR_MISS_COOLDOWN_S,
+  OVERLOAD_FACTOR,
   SCORE_NEAR_MISS,
   SHIP_LIVES,
   type SabKind,
@@ -29,6 +30,10 @@ export interface Pilot {
   ghostS: number;
   /** Кулдауны саботажника по снарядам, с. */
   readonly sabS: Record<SabKind, number>;
+  /** Усиления с таймером, с: щит, Перегрузка, Глушилка (стрелять нельзя). */
+  shieldS: number;
+  overloadS: number;
+  jamS: number;
   /** Время гибели от начала матча — для итогов. */
   diedAtS: number | null;
   score: number;
@@ -54,6 +59,9 @@ export function createPilot(ship: Ship): Pilot {
     phase: 'alive',
     ghostS: 0,
     sabS: { rock: 0, bomb: 0 },
+    shieldS: 0,
+    overloadS: 0,
+    jamS: 0,
     diedAtS: null,
     score: 0,
     ammo: AMMO_START,
@@ -64,6 +72,11 @@ export function createPilot(ship: Ship): Pilot {
     nearIds: new Set(),
     prevBtn: false,
   };
+}
+
+/** Итоговый множитель: накопленный × OVERLOAD_FACTOR, пока горит Перегрузка (удар её не сжигает). */
+export function totalMult(p: Pilot): number {
+  return p.mult * (p.overloadS > 0 ? OVERLOAD_FACTOR : 1);
 }
 
 /** Секунд на патрон при множителе m: AMMO_BASE_S / (1 + AMMO_MULT_K · (m − 1)). */
@@ -77,7 +90,7 @@ export function regenAmmo(p: Pilot, dtS: number): boolean {
     p.ammoProgress = 0;
     return false;
   }
-  p.ammoProgress += dtS / ammoTimeS(p.mult);
+  p.ammoProgress += dtS / ammoTimeS(totalMult(p));
   if (p.ammoProgress < 1) return false;
   p.ammo++;
   p.ammoProgress = p.ammo >= AMMO_MAX ? 0 : p.ammoProgress - 1;
@@ -96,7 +109,7 @@ export function nearMiss(p: Pilot, rockId: number, nowS: number): boolean {
   if (p.lastNearS > 0 && nowS - p.lastNearS < NEAR_MISS_COOLDOWN_S) return false;
   p.nearIds.add(rockId);
   p.lastNearS = nowS;
-  p.score += SCORE_NEAR_MISS * p.mult;
+  p.score += SCORE_NEAR_MISS * totalMult(p);
   if (p.mult < MULT_MAX) {
     p.multProgress++;
     if (p.multProgress >= (MULT_STEPS[p.mult - 1] ?? Infinity)) {

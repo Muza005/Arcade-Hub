@@ -1,7 +1,7 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
-// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне).
+// Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
@@ -81,6 +81,12 @@ import {
   GHOST_S,
   SAB_KINDS,
   SHAKE_BOMB,
+  FREEZE_TINT,
+  OVERLOAD_COLOR,
+  OVERLOAD_FADE_S,
+  POWERUP_COLOR,
+  SHIELD_BLINK_S,
+  VIBRATE_PICKUP,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
   WAVE_HUD_FONT_PX,
   WAVE_LIMIT,
@@ -94,6 +100,8 @@ import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
 import { createCamera, type Camera } from '../render/camera';
 import { createAfterlifeView, type AfterlifeView } from '../render/afterlife-view';
 import { createBossView, type BossView } from '../render/boss-view';
+import { mixColor } from '../render/color';
+import { createPowerupView, type PowerupView } from '../render/powerup-view';
 import { createDarkness, type Darkness } from '../render/darkness';
 import { createVortexFx, type VortexFx } from '../render/vortex-fx';
 import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
@@ -104,7 +112,7 @@ import { createScoreHud, type ScoreHud } from '../render/score-hud';
 import { createShipView, type ShipView } from '../render/ship-view';
 import { angleDelta } from './ship';
 import { createBots, type Bots } from './bots';
-import { createSim, type Sim } from './sim';
+import { createSim, type Pilot, type Sim } from './sim';
 
 const t = createTranslator(strings);
 
@@ -188,6 +196,7 @@ export function createSpaceWarGame(): GameModule {
   let vortexFx: VortexFx;
   let bossView: BossView;
   let afterView: AfterlifeView;
+  let powerupView: PowerupView;
   let ghostTotalS = GHOST_S;
   const phones = new Set<string>();
   let bossBar: Graphics;
@@ -247,6 +256,12 @@ export function createSpaceWarGame(): GameModule {
     if (quality.level !== 'low') particles.burst(x, y, { texture: atlas.spark, color, count, speed: [0, SPARK_SPEED * 3], life });
   };
 
+  /** Перегрузка: бордовый корабль и след; за OVERLOAD_FADE_S до конца тускнеет к цвету игрока. */
+  const overloadTint = (pilot: Pilot): string | null => {
+    if (pilot.overloadS <= 0) return null;
+    return mixColor(colors.get(pilot.ship.id) ?? ACCENT, OVERLOAD_COLOR, pilot.overloadS / OVERLOAD_FADE_S);
+  };
+
   const syncRocks = (alpha: number): void => {
     const seen = new Set<number>();
     for (const rock of sim.asteroids) {
@@ -261,7 +276,13 @@ export function createSpaceWarGame(): GameModule {
       const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
       sprite.texture = shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!;
       // Камни Роя — другим оттенком: их не разбить; камень саботажника — в цвет бросившего.
-      sprite.tint = rock.immortal ? SWARM_TINT : rock.owner ? (colors.get(rock.owner) ?? 0xffffff) : 0xffffff;
+      sprite.tint = rock.immortal
+        ? SWARM_TINT
+        : rock.owner
+          ? (colors.get(rock.owner) ?? 0xffffff)
+          : sim.freezeS > 0
+            ? FREEZE_TINT
+            : 0xffffff;
       sprite.position.set(rock.prev.x + (rock.pos.x - rock.prev.x) * alpha, rock.prev.y + (rock.pos.y - rock.prev.y) * alpha);
       sprite.rotation = rock.angle;
     }
@@ -323,6 +344,11 @@ export function createSpaceWarGame(): GameModule {
       ctx.fx(bump.a, { vib: VIBRATE_RAM_MS });
       ctx.fx(bump.b, { vib: VIBRATE_RAM_MS });
     }
+    for (const p of events.pickups) {
+      sparks(p.x, p.y, DEBRIS_COUNT.medium, POWERUP_COLOR[p.kind], DEBRIS_S);
+      ctx.fx(p.id, { vib: VIBRATE_PICKUP });
+    }
+    for (const id of events.jammed) ctx.fx(id, { vib: VIBRATE_HIT_MS });
     for (const id of events.ghosts) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
     for (const id of events.saboteurs) ctx.fx(id, { vib: VIBRATE_GHOST_MS });
     for (const r of events.revives) {
@@ -401,6 +427,7 @@ export function createSpaceWarGame(): GameModule {
           startWave: Number(new URLSearchParams(location.search).get('wave')) || 1,
           ghostS: ghostTotalS,
           sabotage: ctx.settings.sabotage !== false,
+          powerups: ctx.settings.powerups !== false,
         },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
@@ -452,7 +479,8 @@ export function createSpaceWarGame(): GameModule {
       bossView = createBossView(vfx);
       glowLayer.addChildAt(bossView.view, 0);
       afterView = createAfterlifeView();
-      glowLayer.addChild(afterView.view);
+      powerupView = createPowerupView();
+      glowLayer.addChild(afterView.view, powerupView.view);
       scene.addChild(field, vortexFx.view, rocksLayer, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
@@ -521,7 +549,7 @@ export function createSpaceWarGame(): GameModule {
       for (const pilot of sim.pilots.values()) {
         if (!pilot.alive) continue;
         const { id, pos } = pilot.ship;
-        multFx.track(id, pos.x, pos.y, pilot.mult, colors.get(id) ?? ACCENT, dtS);
+        multFx.track(id, pos.x, pos.y, pilot.mult, overloadTint(pilot) ?? colors.get(id) ?? ACCENT, dtS);
         views.get(id)?.update(dtS);
       }
       multFx.update(dtS);
@@ -560,6 +588,8 @@ export function createSpaceWarGame(): GameModule {
         );
         view.setLives(pilot.lives, SHIP_LIVES);
         view.setMult(pilot.mult);
+        view.setOverload(overloadTint(pilot));
+        view.setShield(pilot.shieldS > 0, pilot.shieldS < SHIELD_BLINK_S && Math.floor(pilot.shieldS * INVULN_BLINK_HZ * 2) % 2 === 0);
         // Мигание от времени неуязвимости: на паузе замирает вместе с игрой.
         view.setBlink(pilot.invulnS > 0 && Math.floor(pilot.invulnS * INVULN_BLINK_HZ * 2) % 2 === 0);
       }
@@ -576,6 +606,7 @@ export function createSpaceWarGame(): GameModule {
       multFx.draw();
       scoreHud.draw();
       vortexFx.draw();
+      powerupView.draw(sim.powerups, fxTimeS, bg);
       afterView.draw(
         sim.shards,
         sim.bombs,
@@ -693,7 +724,8 @@ export function createSpaceWarGame(): GameModule {
       // Power: число патронов и ободок накопления следующего; полный запас — полный ободок.
       const pilot = sim.pilots.get(playerId);
       if (!pilot) return undefined;
-      return { value: pilot.ammo, progress: pilot.ammo >= AMMO_MAX ? 1 : pilot.ammoProgress };
+      // Под Глушилкой Power погашен с пометкой; патроны копятся как обычно.
+      return { value: pilot.ammo, progress: pilot.ammo >= AMMO_MAX ? 1 : pilot.ammoProgress, ...(pilot.jamS > 0 ? { off: true } : {}) };
     },
 
     updatePlayer(player: GamePlayer) {

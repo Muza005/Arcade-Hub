@@ -345,6 +345,36 @@ export const OVERLOAD_S = 5;
 export const OVERLOAD_FACTOR = 2; // максимум итогового множителя ×10
 export const JAMMER_S = 5;
 export const JAMMER_TARGETS = 3; // всегда 3 ближайших соперника, даже если их меньше
+export const POWERUPS = ['repair', 'ammo', 'shield', 'freeze', 'clear', 'overload', 'jammer'] as const;
+export type PowerupKind = (typeof POWERUPS)[number];
+/** По 5 на режим: три общих и два своих (SPACE_WAR_SPEC §5 «Усиления»). */
+export const POWERUPS_OF_MODE: Record<Mode, readonly PowerupKind[]> = {
+  coop: ['repair', 'ammo', 'shield', 'freeze', 'clear'],
+  versus: ['repair', 'ammo', 'shield', 'overload', 'jammer'],
+  teams: ['repair', 'ammo', 'shield', 'overload', 'jammer'],
+};
+export const POWERUP_RADIUS = 24;
+export const POWERUP_BLINK_S = 2; // последние секунды на поле — мигает
+export const POWERUP_BLINK_HZ = 4;
+export const POWERUP_COLOR: Record<PowerupKind, string> = {
+  repair: '#3DDC97',
+  ammo: '#FFD23F',
+  shield: '#3DE0FF',
+  freeze: '#A8EEFF',
+  clear: '#FFFFFF',
+  overload: '#C2185B',
+  jammer: '#FF9F43',
+};
+/** Перегрузка: корабль и след ярко-бордовые (не красный палитры); за 1 с до конца тускнеет. */
+export const OVERLOAD_COLOR = '#C2185B';
+export const OVERLOAD_FADE_S = 1;
+export const SHIELD_RADIUS_K = 1.5; // пузырь щита — столько размеров корабля
+export const SHIELD_LINE_PX = 3;
+export const SHIELD_ALPHA = 0.7;
+export const SHIELD_BLINK_S = 1.5;
+export const FREEZE_TINT = '#BDF3FF';
+export const VIBRATE_PICKUP = [25, 70, 25]; // два коротких импульса
+export const BOT_POWERUP_RANGE = 420; // средний и сильный бот летит к усилению, если оно близко
 
 // ─── Саботаж ─────────────────────────────────────────────────────
 export const SAB_COOLDOWN_S = { rock: 5, bomb: 8 } as const; // + 1 с за каждого погибшего
