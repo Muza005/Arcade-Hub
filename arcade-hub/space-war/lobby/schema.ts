@@ -8,6 +8,8 @@ import {
   DIFFICULTIES,
   DIFFICULTY_DEFAULT,
   ROCK_BOUNCE_DEFAULT,
+  POWERUP_RATE_DEFAULT,
+  POWERUP_RATE_KEYS,
   GHOST_S,
   GHOST_S_RANGE,
   HULL_DEFAULT,
@@ -33,6 +35,14 @@ export const lobbySchema: LobbySchema = {
     { key: 'rockBounce', label: 'setRockBounce', kind: 'toggle', default: ROCK_BOUNCE_DEFAULT },
     // Усиления — Б11.
     { key: 'powerups', label: 'setPowerups', kind: 'toggle', default: true },
+    // Частота усилений — решение заказчика после Б13.
+    {
+      key: 'powerupRate',
+      label: 'setPowerupRate',
+      kind: 'select',
+      options: POWERUP_RATE_KEYS.map((r) => ({ value: r, label: `rate_${r}` })),
+      default: POWERUP_RATE_DEFAULT,
+    },
     // Саботаж погибших — Б10.
     { key: 'sabotage', label: 'setSabotage', kind: 'toggle', default: true },
     // Стартовая сложность волн — Б8.

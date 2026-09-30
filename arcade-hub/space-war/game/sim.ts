@@ -14,6 +14,8 @@ import {
   JAMMER_TARGETS,
   OVERLOAD_S,
   POWERUP_DROP_CHANCE,
+  POWERUP_RATE_DEFAULT,
+  POWERUP_RATES,
   POWERUP_RADIUS,
   SHIELD_S,
   SHIP_LIVES,
@@ -107,6 +109,8 @@ export interface SimOptions {
   sabotage?: boolean;
   /** Настройка лобби «Усиления». */
   powerups?: boolean;
+  /** Настройка лобби «Частота усилений»: множитель шанса выпадения. */
+  powerupRate?: number;
   /** Настройка лобби «Камни отскакивают друг от друга». */
   rockBounce?: boolean;
 }
@@ -187,6 +191,7 @@ export function createSim(
     ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [], pickups: [], jammed: [],
   };
   const powerupsOn = (options.powerups ?? true) && FEATURES.powerups;
+  const dropChance = POWERUP_DROP_CHANCE * (options.powerupRate ?? POWERUP_RATES[POWERUP_RATE_DEFAULT]);
   const powerups = createPowerups(rng, mode);
   let freezeS = 0;
   let bossCtl: BossControl | null = null;
@@ -440,7 +445,7 @@ export function createSim(
       by.score += SCORE_ASTEROID[rock.size] * totalMult(by);
       by.stats.kills++;
       // Выпадение усиления — из камня, разбитого снарядом.
-      if (powerupsOn && rng.next() < POWERUP_DROP_CHANCE) powerups.drop(rock.pos.x, rock.pos.y);
+      if (powerupsOn && rng.next() < dropChance) powerups.drop(rock.pos.x, rock.pos.y);
       shatter(rock);
     }
   };

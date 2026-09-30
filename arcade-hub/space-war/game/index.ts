@@ -92,6 +92,9 @@ import {
   REPLAY_SLOW,
   REPLAY_TAIL_S,
   ROCK_BOUNCE_DEFAULT,
+  POWERUP_RATE_DEFAULT,
+  POWERUP_RATE_KEYS,
+  POWERUP_RATES,
   VIBRATE_PICKUP,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
   WAVE_HUD_FONT_PX,
@@ -495,6 +498,7 @@ export function createSpaceWarGame(): GameModule {
           ghostS: ghostTotalS,
           sabotage: ctx.settings.sabotage !== false,
           powerups: ctx.settings.powerups !== false,
+          powerupRate: POWERUP_RATES[POWERUP_RATE_KEYS.find((r) => r === ctx.settings.powerupRate) ?? POWERUP_RATE_DEFAULT],
           rockBounce: typeof ctx.settings.rockBounce === 'boolean' ? ctx.settings.rockBounce : ROCK_BOUNCE_DEFAULT,
         },
       );

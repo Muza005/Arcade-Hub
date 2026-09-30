@@ -340,7 +340,12 @@ export const VORTEX_ARM_TURNS = 1.2;
 export const VORTEX_SPIN = 1.4;
 
 // ─── Усиления ────────────────────────────────────────────────────
-export const POWERUP_DROP_CHANCE = 1 / 20; // с разрушенного астероида
+export const POWERUP_DROP_CHANCE = 1 / 20; // с разрушенного астероида — «Редко»
+/** Настройка лобби «Частота усилений» (решение заказчика): множитель шанса выпадения. «Редко» — как было, «Очень часто» — в 6 раз чаще. */
+export const POWERUP_RATES = { rare: 1, normal: 2, often: 4, max: 6 } as const;
+export type PowerupRate = keyof typeof POWERUP_RATES;
+export const POWERUP_RATE_KEYS = Object.keys(POWERUP_RATES) as PowerupRate[];
+export const POWERUP_RATE_DEFAULT: PowerupRate = 'normal';
 export const POWERUP_LIFETIME_S = 10;
 export const SHIELD_S = 8;
 export const FREEZE_S = 3;

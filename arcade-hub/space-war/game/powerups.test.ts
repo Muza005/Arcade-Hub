@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../engine/rng';
 import { FIXED_STEP_HZ } from '../../shared/config';
-import { AMMO_MAX, OVERLOAD_FACTOR, POWERUP_LIFETIME_S, POWERUPS_OF_MODE, SHIP_LIVES, type Mode, type PowerupKind } from '../config';
+import { AMMO_MAX, OVERLOAD_FACTOR, POWERUP_LIFETIME_S, POWERUP_RATES, POWERUPS_OF_MODE, SHIP_LIVES, type Mode, type PowerupKind } from '../config';
 import { resetMult, totalMult } from './pilot';
 import { createPowerups, type Powerup } from './powerups';
 import { createSim } from './sim';
@@ -86,5 +86,27 @@ describe('усиления', () => {
     expect(sim.asteroids.filter((r) => before.some((b) => b[0] === r.id)).map((r) => [r.id, r.pos.x, r.pos.y])).toEqual(
       before.filter((b) => sim.asteroids.some((r) => r.id === b[0])),
     );
+  });
+});
+
+describe('частота усилений (настройка лобби)', () => {
+  const drops = (powerupRate: number): number => {
+    const sim = createSim(['a'], 1920, 5, undefined, { mode: 'versus', powerupRate });
+    const a = sim.pilots.get('a')!;
+    a.lives = 1e6;
+    const seen = new Set<number>();
+    let fire = false;
+    for (let i = 0; i < FIXED_STEP_HZ * 120; i++) {
+      fire = !fire;
+      a.ammo = AMMO_MAX;
+      sim.step(DT, () => ({ ...IDLE, btn: fire }));
+      for (const p of sim.powerups) seen.add(p.id);
+    }
+    return seen.size;
+  };
+  it('«Очень часто» — заметно чаще, чем «Редко»', () => {
+    const rare = drops(POWERUP_RATES.rare);
+    const max = drops(POWERUP_RATES.max);
+    expect(max).toBeGreaterThan(rare * 3);
   });
 });
