@@ -1,7 +1,8 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
-// Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Волны — Б8.
+// Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
 import { createStage, cssVar, loadFonts, type Stage } from '../../engine/stage';
 import { rankByScore, type GameContext, type GameModule, type GamePlayer, type MatchResult } from '../../shared/game-manifest';
@@ -58,6 +59,17 @@ import {
   VIBRATE_HIT_MS,
   BOT_LEVEL_DEFAULT,
   BOT_LEVELS,
+  DIFFICULTIES,
+  DIFFICULTY_DEFAULT,
+  HUD_ALPHA,
+  NOTICE_FONT_PX,
+  NOTICE_PAD_X,
+  NOTICE_PAD_Y,
+  NOTICE_PLATE_ALPHA,
+  NOTICE_Y,
+  SCORE_WAVE,
+  WAVE_HUD_FONT_PX,
+  WAVE_LIMIT,
   WORLD_H,
   worldWidth,
   worldZoom,
@@ -66,6 +78,8 @@ import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
 import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
 import { createCamera, type Camera } from '../render/camera';
+import { createDarkness, type Darkness } from '../render/darkness';
+import { createVortexFx, type VortexFx } from '../render/vortex-fx';
 import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
 import { createMultFx, type MultFx } from '../render/mult-fx';
 import { createParticles, type Particles } from '../render/particles';
@@ -99,6 +113,8 @@ const formatTime = (seconds: number): string => {
   const total = Math.floor(seconds);
   return t('time', { m: Math.floor(total / SECONDS_PER_MINUTE), s: String(total % SECONDS_PER_MINUTE).padStart(2, '0') });
 };
+/** Обратный отсчёт: 0:01 держится до самого конца, 0:00 не показывается. */
+const formatLeft = (seconds: number): string => formatTime(Math.ceil(Math.max(0, seconds)));
 
 export function createSpaceWarGame(): GameModule {
   let ctx: GameContext;
@@ -141,6 +157,11 @@ export function createSpaceWarGame(): GameModule {
   let fxTimeS = 0;
   let lastFrameAt = 0;
   let fpsText: Text | null = null;
+  let notice: Notice;
+  let waveText: Text;
+  let darkness: Darkness;
+  let vortexFx: VortexFx;
+  const holes: Array<{ x: number; y: number }> = [];
   let frames = 0;
   let sampleStart = 0;
 
@@ -216,6 +237,29 @@ export function createSpaceWarGame(): GameModule {
     }
   };
 
+  /** Номер волны и что усложнилось — уведомлением; конец волны — бонус; после 20-й — финиш. */
+  const announce = (): void => {
+    for (const e of sim.events.waves) {
+      if (e.kind === 'start') {
+        const c = sim.waves.complication;
+        if (e.wave === WAVE_LIMIT) notice.show(t('noticeFinal', { n: e.wave }));
+        else if (c) notice.show(t('noticeWaveComp', { n: e.wave, c: t(`comp_${c}`) }));
+        else notice.show(t('noticeWave', { n: e.wave }));
+      } else if (sim.waves.phase === 'done') {
+        notice.show(t('noticeFinish'));
+      } else if ([...sim.pilots.values()].some((p) => p.alive)) {
+        notice.show(t('noticeCleared', { n: e.wave, score: SCORE_WAVE * e.wave }));
+      }
+    }
+  };
+
+  const waveLine = (): string => {
+    const w = sim.waves;
+    if (w.phase === 'done') return t('noticeFinish');
+    if (w.phase === 'break') return t('hudBreak', { time: formatLeft(w.leftS) });
+    return t('hudWave', { n: w.wave, of: WAVE_LIMIT, time: formatLeft(w.leftS) });
+  };
+
   /** События шага → частицы, тряска, вспышки и обратная связь на телефоне. */
   const react = (): void => {
     const { events } = sim;
@@ -269,7 +313,12 @@ export function createSpaceWarGame(): GameModule {
         worldW,
         ctx.seed,
         worldH,
-        { mode, collisions: ctx.settings.collisions !== false, teamOf: (id) => teamOf.get(id) ?? id },
+        {
+          mode,
+          collisions: ctx.settings.collisions !== false,
+          teamOf: (id) => teamOf.get(id) ?? id,
+          difficulty: DIFFICULTIES.find((d) => d === ctx.settings.difficulty) ?? DIFFICULTY_DEFAULT,
+        },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
       brains = createBots(sim, [...bots], botLevel, ctx.seed);
@@ -315,7 +364,8 @@ export function createSpaceWarGame(): GameModule {
         tagsLayer.addChild(view.tag);
       }
       glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
-      scene.addChild(field, rocksLayer, glowLayer, tagsLayer);
+      vortexFx = createVortexFx((sim.bounds.left + sim.bounds.right) / 2, (sim.bounds.top + sim.bounds.bottom) / 2, ACCENT);
+      scene.addChild(field, vortexFx.view, rocksLayer, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
       const hud = new Container();
@@ -324,7 +374,28 @@ export function createSpaceWarGame(): GameModule {
       const chips = mode === 'teams' ? [...new Set(teamOf.values())].map((c) => ({ id: c, color: c })) : ctx.players;
       scoreHud = createScoreHud(chips, FIELD_INSET + HUD_PAD_PX, FIELD_INSET + HUD_PAD_PX, textColor);
       hud.addChild(scoreHud.view);
-      stage.world.addChild(starsSprite, scene, hud, camera.flash);
+      // Номер волны и время — мелко вверху по центру; уведомления — под ними.
+      waveText = new Text({
+        text: '',
+        style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: WAVE_HUD_FONT_PX, fill: textColor },
+      });
+      waveText.alpha = HUD_ALPHA;
+      waveText.anchor.set(0.5);
+      waveText.position.set(worldW / zoom / 2, FIELD_INSET + HUD_PAD_PX);
+      notice = createNotice(
+        {
+          text: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: NOTICE_FONT_PX, fill: textColor },
+          fill: cssVar('--bg'),
+          fillAlpha: NOTICE_PLATE_ALPHA,
+          padX: NOTICE_PAD_X,
+          padY: NOTICE_PAD_Y,
+        },
+        worldW / zoom / 2,
+        NOTICE_Y,
+      );
+      hud.addChild(waveText, notice.view);
+      darkness = createDarkness(stage.app.renderer, worldW, worldH, cssVar('--bg'));
+      stage.world.addChild(starsSprite, scene, darkness.view, hud, camera.flash);
       // Счётчик FPS — по переключателю в настройках хаба (или ?fps в адресе).
       if (settings.showFps || new URLSearchParams(location.search).has('fps')) {
         fpsText = new Text({
@@ -344,6 +415,10 @@ export function createSpaceWarGame(): GameModule {
       if (paused || ended) return;
       sim.step(dtS, (id) => (bots.has(id) ? brains.input(id) : ctx.input.read(id)));
       react();
+      announce();
+      notice.update(dtS);
+      darkness.update(sim.waves.complication === 'dark', dtS);
+      vortexFx.update(sim.waves.complication === 'vortex', dtS);
       camera.update(dtS);
       // Hit-stop: мир на мгновение замер — замирают и частицы, и следы; тряска и вспышка идут.
       if (sim.frozen) return;
@@ -403,6 +478,18 @@ export function createSpaceWarGame(): GameModule {
       }
       multFx.draw();
       scoreHud.draw();
+      vortexFx.draw();
+      waveText.text = waveLine();
+      holes.length = 0;
+      for (const pilot of sim.pilots.values()) {
+        if (!pilot.alive) continue;
+        const { pos, prev } = pilot.ship;
+        holes.push({
+          x: prev.x + (pos.x - prev.x) * alpha + camera.offsetX,
+          y: prev.y + (pos.y - prev.y) * alpha + camera.offsetY,
+        });
+      }
+      darkness.draw(holes);
       stars?.set(fxTimeS, stage.world.scale.x, -camera.offsetX, -camera.offsetY);
       const pulse = chromaOn && chroma && camera.chroma > 0 ? chroma : null;
       pulse?.set(CHROMA_HIT_PX * camera.chroma);
@@ -436,6 +523,14 @@ export function createSpaceWarGame(): GameModule {
 
     finish() {
       endMatch();
+    },
+
+    status() {
+      // Строка на паузе (SPACE_WAR_SPEC §6): «Волна N · до конца м:сс».
+      const w = sim.waves;
+      if (w.phase === 'done') return t('statusFinish');
+      if (w.phase === 'break') return t('statusBreak', { time: formatLeft(w.leftS) });
+      return t('statusWave', { n: w.wave, time: formatLeft(w.leftS) });
     },
 
     results() {
@@ -476,6 +571,7 @@ export function createSpaceWarGame(): GameModule {
     },
 
     dispose() {
+      darkness?.destroy();
       stage?.destroy();
       atlas?.destroy();
       views.clear();

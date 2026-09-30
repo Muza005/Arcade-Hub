@@ -224,8 +224,53 @@ export const WAVE_DURATION_MAX_S = 60;
 export const waveDurationS = (wave: number): number =>
   Math.min(WAVE_DURATION_BASE_S + WAVE_DURATION_STEP_S * (wave - 1), WAVE_DURATION_MAX_S);
 export const FLOW_PLAYER_K = 0.5; // поток = база · (1 + 0.5 · (N − 1))
-export const WAVE_DENSITY_GROWTH = 0.08; // TUNE: +8 % камней за волну
-export const WAVE_SPEED_GROWTH = 0.04; // TUNE: +4 % скорости за волну
+export const WAVE_DENSITY_GROWTH = 0.06; // TUNE: +6 % камней за волну (к 20-й — ×2,1)
+export const WAVE_SPEED_GROWTH = 0.03; // TUNE: +3 % скорости за волну (к 20-й — ×1,6)
+/** Нижний предел роста на лёгкой стартовой сложности: поток не падает ниже половины базы. */
+export const WAVE_GROWTH_MIN = 0.5;
+/** Стартовая сложность из лобби — сдвиг по волнам: лёгкая начинает как «волна −3», сложная — как пятая. */
+export const DIFFICULTY_WAVE_SHIFT = { easy: -3, normal: 0, hard: 4 } as const;
+/** Места под боссов (Б9): в этих волнах осложнений нет. */
+export const BOSS_WAVES: readonly number[] = [5, 10, 15, 20];
+/** После 20-й волны — финиш: пауза, чтобы увидеть уведомление. */
+export const WAVE_FINISH_DELAY_S = 3;
+export const WAVES_SEED_SALT = 0x3a7e5; // своя случайность осложнений, из сида матча
+
+// Осложнения (SPACE_WAR_SPEC §5 «Волны»): случайно, не в каждой волне, на всю волну.
+export const COMPLICATIONS = ['dark', 'fast', 'dense', 'vortex', 'jam', 'small', 'large'] as const;
+export type Complication = (typeof COMPLICATIONS)[number];
+export const COMPLICATION_FROM_WAVE = 3; // первые волны — без осложнений, чтобы освоиться
+export const COMPLICATION_CHANCE = 0.5; // TUNE
+/** Множитель потока камней. */
+export const COMPLICATION_FLOW: Record<Complication, number> = {
+  dark: 1, fast: 1, dense: 2, vortex: 1, jam: 1, small: 3,
+  large: 0.6, // TUNE: одни крупные при том же потоке — стена
+};
+/** Множитель скорости камней. */
+export const COMPLICATION_SPEED: Record<Complication, number> = {
+  dark: 1, fast: 1.5, dense: 0.6, vortex: 1, jam: 1, small: 1, large: 1,
+};
+export const VORTEX_SHIP_PULL = 420; // TUNE: px/с² к центру; с сопротивлением корабль сносит ~140 px/с
+export const VORTEX_ROCK_PULL = 90; // TUNE: px/с², только пока камень летит к центру — потом уходит
+export const DARK_RADIUS = 260; // TUNE: круг видимости вокруг корабля
+export const DARK_ALPHA = 0.96;
+export const DARK_EDGE = 0.45; // доля радиуса на мягкий край
+export const DARK_FADE_S = 1; // темнота наплывает и уходит
+export const DARK_TEXTURE_RES = 0.25; // темноту рисуем в четверть разрешения — края всё равно мягкие
+// Воронка: к центру сходятся бледные кольца — видно, куда тянет.
+export const VORTEX_RINGS = 3;
+export const VORTEX_RING_MAX = 420; // радиус, с которого кольцо начинает сходиться
+export const VORTEX_RING_S = 2.4; // за столько кольцо доходит до центра
+export const VORTEX_RING_ALPHA = 0.22;
+export const VORTEX_RING_PX = 3;
+
+// Интерфейс волн: номер и время — мелко вверху по центру; уведомления — под ними.
+export const WAVE_HUD_FONT_PX = 22;
+export const NOTICE_FONT_PX = 34;
+export const NOTICE_Y = 140;
+export const NOTICE_PAD_X = 32;
+export const NOTICE_PAD_Y = 14;
+export const NOTICE_PLATE_ALPHA = 0.7;
 export const CAMERA_ZOOM_STEP_PLAYERS = 2; // шаг отдаления на каждые 2 игрока
 export const CAMERA_ZOOM_STEP = 0.15; // TUNE: на столько мир шире и выше за шаг (10 игроков — ×1,6)
 /** Размер мира под экран и число игроков: камера отъезжает, пропорции поля не меняются. */
@@ -269,7 +314,8 @@ export const HULL_DEFAULT: Hull = 'arrow';
 /** У ботов один статичный корпус. */
 export const HULL_BOT: Hull = 'delta';
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
-export const DIFFICULTY_DEFAULT = 'normal';
+export type Difficulty = (typeof DIFFICULTIES)[number];
+export const DIFFICULTY_DEFAULT: Difficulty = 'normal';
 export const BOT_LEVELS = ['weak', 'mid', 'strong'] as const;
 export const BOT_LEVEL_DEFAULT = 'mid';
 export const QUALITY_CHOICES = ['auto', 'low', 'mid', 'high'] as const;

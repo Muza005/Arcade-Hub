@@ -55,13 +55,20 @@ function pickSize(rng: Rng): AsteroidSize {
 
 export interface Field {
   readonly list: Asteroid[];
-  /** Новый камень с края поля. */
-  spawn(): Asteroid | null;
+  /** Новый камень с края поля: размер — случайный или заданный, скорость — × speedK. */
+  spawn(options?: SpawnOptions): Asteroid | null;
   /** Раскол: дети встают на место родителя. Возвращает детей (у мелкого — пусто). */
   split(a: Asteroid): Asteroid[];
   remove(a: Asteroid): void;
   /** Дрейф и уход за границу. */
   step(dtS: number): void;
+  /** Воронка: камни, летящие к точке, ускоряются к ней; пролетевшие — уходят. */
+  attract(x: number, y: number, accel: number, dtS: number): void;
+}
+
+export interface SpawnOptions {
+  size?: AsteroidSize;
+  speedK?: number;
 }
 
 export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
@@ -116,8 +123,10 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
 
   return {
     list,
-    spawn() {
-      const size = pickSize(rng);
+    spawn(options = {}) {
+      // Бросок размера — всегда: заданный размер не сдвигает остальную случайность.
+      const rolled = pickSize(rng);
+      const size = options.size ?? rolled;
       const r = ASTEROID_RADIUS[size];
       const out = r + ASTEROID_SPAWN_GAP;
       // Сторона — пропорционально её длине: на широком экране чаще слева и справа не будет.
@@ -142,7 +151,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       const tx = rng.range(bounds.left + w * ASTEROID_AIM_INSET, bounds.right - w * ASTEROID_AIM_INSET);
       const ty = rng.range(bounds.top + h * ASTEROID_AIM_INSET, bounds.bottom - h * ASTEROID_AIM_INSET);
       const [min, max] = ASTEROID_SPEED[size];
-      const speed = rng.range(min, max);
+      const speed = rng.range(min, max) * (options.speedK ?? 1);
       const d = Math.hypot(tx - x, ty - y) || 1;
       return make(size, x, y, ((tx - x) / d) * speed, ((ty - y) / d) * speed);
     },
@@ -180,6 +189,16 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
           (a.pos.y < bounds.top - out && a.vel.y <= 0) ||
           (a.pos.y > bounds.bottom + out && a.vel.y >= 0);
         if (gone) remove(a);
+      }
+    },
+    attract(x, y, accel, dtS) {
+      for (const a of list) {
+        const dx = x - a.pos.x;
+        const dy = y - a.pos.y;
+        const d = Math.hypot(dx, dy);
+        if (d === 0 || a.vel.x * dx + a.vel.y * dy <= 0) continue;
+        a.vel.x += (dx / d) * accel * dtS;
+        a.vel.y += (dy / d) * accel * dtS;
       }
     },
   };

@@ -1,5 +1,5 @@
 // Симуляция Space War без графики: по сиду и потоку ввода матч воспроизводится один в один.
-// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки.
+// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки; Б8 — волны.
 import type { InputState } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import {
@@ -7,6 +7,10 @@ import {
   ASTEROID_RADIUS,
   ASTEROID_SPAWN_PER_S,
   BULLET_RADIUS,
+  COMPLICATION_FLOW,
+  COMPLICATION_SPEED,
+  DIFFICULTY_DEFAULT,
+  DIFFICULTY_WAVE_SHIFT,
   FIELD_INSET,
   FLOW_PLAYER_K,
   GAME_OVER_DELAY_S,
@@ -17,12 +21,20 @@ import {
   NEAR_MISS_DISTANCE,
   SCORE_ASTEROID,
   SCORE_LIFE_LEFT,
+  SCORE_WAVE,
+  VORTEX_ROCK_PULL,
+  VORTEX_SHIP_PULL,
+  WAVE_DENSITY_GROWTH,
+  WAVE_FINISH_DELAY_S,
+  WAVE_GROWTH_MIN,
+  WAVE_SPEED_GROWTH,
   SHIP_BOUNCE,
   SHIP_PUSH_MIN,
   SHIP_HITBOX_RADIUS,
   SPAWN_RING_RADIUS,
   WORLD_H,
   type AsteroidSize,
+  type Difficulty,
   type Mode,
 } from '../config';
 import { FEATURES } from '../features';
@@ -31,6 +43,7 @@ import { createBullets, type Bullet } from './bullets';
 import { Grid } from './grid';
 import { checkIdle, createPilot, nearMiss, regenAmmo, resetMult, type Pilot } from './pilot';
 import { clampToBounds, createShip, stepShip, type Bounds, type Ship } from './ship';
+import { createWaves, type WaveEvent, type Waves } from './waves';
 
 export type { Pilot } from './pilot';
 
@@ -47,6 +60,8 @@ export interface SimEvents {
   reloads: string[];
   /** Корабли столкнулись: точка удара и был ли это таран (множитель сброшен обоим). */
   bumps: Array<{ a: string; b: string; x: number; y: number; ram: boolean }>;
+  /** Волна началась или кончилась (в конце — бонус SCORE_WAVE × номер живым). */
+  waves: WaveEvent[];
 }
 
 export interface SimOptions {
@@ -55,6 +70,8 @@ export interface SimOptions {
   collisions?: boolean;
   /** Команда игрока (в командном режиме — его цвет). */
   teamOf?: (id: string) => string;
+  /** Стартовая сложность из лобби. */
+  difficulty?: Difficulty;
 }
 
 export interface Sim {
@@ -63,9 +80,10 @@ export interface Sim {
   readonly pilots: ReadonlyMap<string, Pilot>;
   readonly asteroids: readonly Asteroid[];
   readonly bullets: readonly Bullet[];
+  readonly waves: Waves;
   readonly events: SimEvents;
   readonly timeS: number;
-  /** Все погибли и пауза на взрыв прошла. */
+  /** Все погибли или пройдена последняя волна — и пауза после этого прошла. */
   readonly over: boolean;
   /** Hit-stop: мир замер на мгновение после удара — шаг ничего не двигает. */
   readonly frozen: boolean;
@@ -114,8 +132,12 @@ export function createSim(
   const claimed = new Set<Asteroid>();
   const killed: Array<{ rock: Asteroid; by: Pilot }> = [];
   const spent: Bullet[] = [];
-  const events: SimEvents = { hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [] };
+  const events: SimEvents = { hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [] };
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
+  const waves = createWaves(seed);
+  const shift = DIFFICULTY_WAVE_SHIFT[options.difficulty ?? DIFFICULTY_DEFAULT];
+  /** Рост с номером волны, сдвинутый стартовой сложностью. */
+  const growth = (k: number): number => Math.max(WAVE_GROWTH_MIN, 1 + k * (waves.wave - 1 + shift));
   let spawnDebt = 0;
   let timeS = 0;
   let overInS: number | null = null;
@@ -212,6 +234,16 @@ export function createSim(
     }
   };
 
+  /** Воронка тянет корабль к центру поля; тяга и сопротивление корабля с ней спорят. */
+  const pull = (ship: Ship, dtS: number): void => {
+    const dx = cx - ship.pos.x;
+    const dy = cy - ship.pos.y;
+    const d = Math.hypot(dx, dy);
+    if (d === 0) return;
+    ship.vel.x += (dx / d) * VORTEX_SHIP_PULL * dtS;
+    ship.vel.y += (dy / d) * VORTEX_SHIP_PULL * dtS;
+  };
+
   const fire = (pilot: Pilot, btn: boolean): void => {
     const pressed = btn && !pilot.prevBtn;
     pilot.prevBtn = btn;
@@ -262,6 +294,7 @@ export function createSim(
     pilots,
     asteroids: field.list,
     bullets: bullets.list,
+    waves,
     events,
     get timeS() {
       return timeS;
@@ -284,11 +317,27 @@ export function createSim(
       }
       timeS += dtS;
 
-      spawnDebt += spawnPerS * dtS;
-      while (spawnDebt >= 1) {
-        spawnDebt--;
-        field.spawn();
+      const wave = waves.step(dtS);
+      if (wave) {
+        events.waves.push(wave);
+        if (wave.kind === 'end') {
+          for (const p of pilots.values()) if (p.alive) p.score += SCORE_WAVE * wave.wave;
+          if (waves.phase === 'done' && overInS === null) overInS = WAVE_FINISH_DELAY_S;
+        }
       }
+
+      // Камни идут только во время волны; на передышке и после финиша поле пустеет.
+      const comp = waves.complication;
+      if (waves.phase === 'wave') {
+        spawnDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * (comp ? COMPLICATION_FLOW[comp] : 1) * dtS;
+        const speedK = growth(WAVE_SPEED_GROWTH) * (comp ? COMPLICATION_SPEED[comp] : 1);
+        const size = comp === 'small' || comp === 'large' ? comp : undefined;
+        while (spawnDebt >= 1) {
+          spawnDebt--;
+          field.spawn(size ? { size, speedK } : { speedK });
+        }
+      }
+      if (comp === 'vortex') field.attract(cx, cy, VORTEX_ROCK_PULL, dtS);
       field.step(dtS);
 
       for (const pilot of pilots.values()) {
@@ -296,8 +345,10 @@ export function createSim(
         const input = read(pilot.ship.id);
         stepShip(pilot.ship, input, dtS, bounds);
         pilot.invulnS = Math.max(0, pilot.invulnS - dtS);
+        if (comp === 'vortex') pull(pilot.ship, dtS);
         fire(pilot, input.btn);
-        if (regenAmmo(pilot, dtS)) events.reloads.push(pilot.ship.id);
+        // Глушение: патроны не копятся.
+        if (comp !== 'jam' && regenAmmo(pilot, dtS)) events.reloads.push(pilot.ship.id);
       }
 
       collideShips();

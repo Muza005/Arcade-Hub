@@ -52,7 +52,24 @@ export type SpaceWarKey =
   | 'setBots'
   | 'bot_weak'
   | 'bot_mid'
-  | 'bot_strong';
+  | 'bot_strong'
+  | 'noticeWave'
+  | 'noticeWaveComp'
+  | 'noticeFinal'
+  | 'noticeCleared'
+  | 'noticeFinish'
+  | 'comp_dark'
+  | 'comp_fast'
+  | 'comp_dense'
+  | 'comp_vortex'
+  | 'comp_jam'
+  | 'comp_small'
+  | 'comp_large'
+  | 'hudWave'
+  | 'hudBreak'
+  | 'statusWave'
+  | 'statusBreak'
+  | 'statusFinish';
 
 export const strings: GameStrings<SpaceWarKey> = {
   ru: {
@@ -62,7 +79,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     howTo2: 'Пролетай вплотную — растёт множитель',
     howTo3: 'Power сам стреляет по камням',
     modeCoop: 'Кооператив',
-    modeCoopDesc: 'Общие жизни, держитесь вместе',
+    modeCoopDesc: 'Общий счёт, держитесь вместе',
     modeVersus: 'Соревнование',
     modeVersusDesc: 'Каждый сам за себя',
     modeTeams: 'Командное',
@@ -107,6 +124,23 @@ export const strings: GameStrings<SpaceWarKey> = {
     bot_mid: 'Средние',
     bot_strong: 'Сильные',
     time: '{m}:{s}',
+    noticeWave: 'Волна {n}',
+    noticeWaveComp: 'Волна {n} · {c}',
+    noticeFinal: 'Волна {n} · финал',
+    noticeCleared: 'Волна {n} пройдена · +{score}',
+    noticeFinish: 'Финиш',
+    comp_dark: 'Затемнение',
+    comp_fast: 'Ускоренный поток',
+    comp_dense: 'Плотное поле',
+    comp_vortex: 'Воронка — центр тянет',
+    comp_jam: 'Глушение — патроны не копятся',
+    comp_small: 'Мелкий калибр',
+    comp_large: 'Крупный калибр',
+    hudWave: '{n}/{of} · {time}',
+    hudBreak: 'Передышка · {time}',
+    statusWave: 'Волна {n} · до конца {time}',
+    statusBreak: 'Передышка · {time}',
+    statusFinish: 'Финиш',
   },
   en: {
     title: 'Space War',
@@ -115,7 +149,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     howTo2: 'Fly close — the multiplier grows',
     howTo3: 'Power auto-aims at rocks',
     modeCoop: 'Co-op',
-    modeCoopDesc: 'Shared lives, stick together',
+    modeCoopDesc: 'Shared score, stick together',
     modeVersus: 'Versus',
     modeVersusDesc: 'Every pilot for themselves',
     modeTeams: 'Teams',
@@ -160,5 +194,22 @@ export const strings: GameStrings<SpaceWarKey> = {
     bot_mid: 'Medium',
     bot_strong: 'Strong',
     time: '{m}:{s}',
+    noticeWave: 'Wave {n}',
+    noticeWaveComp: 'Wave {n} · {c}',
+    noticeFinal: 'Wave {n} · final',
+    noticeCleared: 'Wave {n} cleared · +{score}',
+    noticeFinish: 'Finish',
+    comp_dark: 'Blackout',
+    comp_fast: 'Fast stream',
+    comp_dense: 'Dense field',
+    comp_vortex: 'Vortex — the center pulls',
+    comp_jam: 'Jamming — no ammo refill',
+    comp_small: 'Small caliber',
+    comp_large: 'Large caliber',
+    hudWave: '{n}/{of} · {time}',
+    hudBreak: 'Break · {time}',
+    statusWave: 'Wave {n} · {time} left',
+    statusBreak: 'Break · {time}',
+    statusFinish: 'Finish',
   },
 };
