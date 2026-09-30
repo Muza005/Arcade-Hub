@@ -115,6 +115,9 @@ export const ASTEROID_SPAWN_GAP = 8; // рождается за краем по�
 export const ASTEROIDS_MAX = 160; // размер пула
 /** Хитбокс камня чуть меньше рисунка: задевание краем контура прощается. */
 export const ASTEROID_HITBOX_K = 0.85;
+/** Настройка лобби «Камни отскакивают»: упругий удар, масса ∝ площади; выкл. — пролетают насквозь. */
+export const ROCK_BOUNCE_DEFAULT = false;
+export const ROCK_RESTITUTION = 0.9;
 // Раскол: крупный → 2 средних, средний → 2 мелких, мелкий рассыпается в безвредные осколки
 export const SPLIT_COUNT = 2;
 export const SPLIT_SPREAD_RAD = 0.6;
@@ -176,8 +179,8 @@ export const FLASH_EXPLODE = '#FFFFFF'; // взрыв — белая
 // ─── Стрельба и патроны ──────────────────────────────────────────
 export const AMMO_MAX = 10;
 /** Патрон копится за t = AMMO_BASE_S / (1 + AMMO_MULT_K · (m − 1)), m — итоговый множитель. */
-export const AMMO_BASE_S = 3;
-export const AMMO_MULT_K = 0.4;
+export const AMMO_BASE_S = 2; // решение заказчика (было 3)
+export const AMMO_MULT_K = 0.8; // ×2 — 1,1 с, ×3 — 0,77, ×4 — 0,59, ×5 — 0,48 (решение заказчика: на ×5 ≈ 0,5 с)
 export const ASTEROID_HP = { small: 1, medium: [4, 5], large: 8 } as const; // заказчик: мелкий — с одного выстрела
 export const AMMO_START = 10; // TUNE: с чем начинается матч
 // Выстрел Power: снаряд летит с упреждением в ближайший камень на поле

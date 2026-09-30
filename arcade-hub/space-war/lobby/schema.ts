@@ -7,6 +7,7 @@ import {
   BOT_LEVELS,
   DIFFICULTIES,
   DIFFICULTY_DEFAULT,
+  ROCK_BOUNCE_DEFAULT,
   GHOST_S,
   GHOST_S_RANGE,
   HULL_DEFAULT,
@@ -28,6 +29,8 @@ export const lobbySchema: LobbySchema = {
   settings: [
     // Столкновения и таран — Б7.
     { key: 'collisions', label: 'setCollisions', kind: 'toggle', default: true },
+    // Камни отскакивают друг от друга — решение заказчика после Б11.
+    { key: 'rockBounce', label: 'setRockBounce', kind: 'toggle', default: ROCK_BOUNCE_DEFAULT },
     // Усиления — Б11.
     { key: 'powerups', label: 'setPowerups', kind: 'toggle', default: true },
     // Саботаж погибших — Б10.

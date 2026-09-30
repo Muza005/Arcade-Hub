@@ -19,8 +19,10 @@ describe('патроны', () => {
     expect(p.ammo).toBe(AMMO_MAX);
   });
 
-  it('множитель ускоряет накопление: ×5 — в 2,6 раза быстрее', () => {
-    expect(ammoTimeS(1) / ammoTimeS(5)).toBeCloseTo(2.6, 5);
+  it('множитель ускоряет накопление: ×1 — 2 с, ×5 — около 0,5 с (решение заказчика)', () => {
+    expect(ammoTimeS(1)).toBeCloseTo(2, 5);
+    expect(ammoTimeS(5)).toBeLessThanOrEqual(0.5);
+    expect(ammoTimeS(5)).toBeGreaterThan(0.4);
   });
 });
 

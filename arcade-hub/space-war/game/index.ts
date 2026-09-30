@@ -86,6 +86,7 @@ import {
   OVERLOAD_FADE_S,
   POWERUP_COLOR,
   SHIELD_BLINK_S,
+  ROCK_BOUNCE_DEFAULT,
   VIBRATE_PICKUP,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
   WAVE_HUD_FONT_PX,
@@ -428,6 +429,7 @@ export function createSpaceWarGame(): GameModule {
           ghostS: ghostTotalS,
           sabotage: ctx.settings.sabotage !== false,
           powerups: ctx.settings.powerups !== false,
+          rockBounce: typeof ctx.settings.rockBounce === 'boolean' ? ctx.settings.rockBounce : ROCK_BOUNCE_DEFAULT,
         },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;

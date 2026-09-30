@@ -37,6 +37,7 @@ export type SpaceWarKey =
   | 'hull_star5'
   | 'hull_star4'
   | 'setCollisions'
+  | 'setRockBounce'
   | 'setPowerups'
   | 'setSabotage'
   | 'setDifficulty'
@@ -115,6 +116,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     hull_star5: 'Звезда',
     hull_star4: 'Звезда-4',
     setCollisions: 'Столкновения кораблей',
+    setRockBounce: 'Камни отскакивают друг от друга',
     setPowerups: 'Усиления',
     setSabotage: 'Саботаж погибших',
     setDifficulty: 'Стартовая сложность',
@@ -193,6 +195,7 @@ export const strings: GameStrings<SpaceWarKey> = {
     hull_star5: 'Star',
     hull_star4: 'Star-4',
     setCollisions: 'Ship collisions',
+    setRockBounce: 'Rocks bounce off each other',
     setPowerups: 'Power-ups',
     setSabotage: 'Sabotage by the fallen',
     setDifficulty: 'Starting difficulty',

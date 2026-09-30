@@ -4,6 +4,8 @@ import type { InputState } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import {
   ASTEROID_HITBOX_K,
+  ROCK_BOUNCE_DEFAULT,
+  ROCK_RESTITUTION,
   ASTEROID_RADIUS,
   AMMO_MAX,
   ASTEROID_SPAWN_PER_S,
@@ -105,6 +107,8 @@ export interface SimOptions {
   sabotage?: boolean;
   /** Настройка лобби «Усиления». */
   powerups?: boolean;
+  /** Настройка лобби «Камни отскакивают друг от друга». */
+  rockBounce?: boolean;
 }
 
 export interface Sim {
@@ -211,6 +215,40 @@ export function createSim(
   const rebuildGrid = (): void => {
     grid.clear();
     for (const a of field.list) grid.insert(a);
+  };
+
+  /** Камни отскакивают друг от друга: упругий удар, масса ∝ площади. Камни Роя идут своим строем. */
+  const rockBounce = options.rockBounce ?? ROCK_BOUNCE_DEFAULT;
+  const bounceRocks = (): void => {
+    rebuildGrid();
+    for (const a of field.list) {
+      if (a.held) continue;
+      for (const b of grid.query(a.pos.x, a.pos.y, a.radius, near)) {
+        if (b.id <= a.id || b.held) continue;
+        const dx = b.pos.x - a.pos.x;
+        const dy = b.pos.y - a.pos.y;
+        const d = Math.hypot(dx, dy);
+        const min = (a.radius + b.radius) * ASTEROID_HITBOX_K;
+        if (d >= min) continue;
+        const nx = d > 0 ? dx / d : 1;
+        const ny = d > 0 ? dy / d : 0;
+        const ma = a.radius * a.radius;
+        const mb = b.radius * b.radius;
+        // Раздвинуть: лёгкий уходит больше.
+        const overlap = min - d;
+        a.pos.x -= nx * overlap * (mb / (ma + mb));
+        a.pos.y -= ny * overlap * (mb / (ma + mb));
+        b.pos.x += nx * overlap * (ma / (ma + mb));
+        b.pos.y += ny * overlap * (ma / (ma + mb));
+        const closing = (a.vel.x - b.vel.x) * nx + (a.vel.y - b.vel.y) * ny;
+        if (closing <= 0) continue;
+        const j = ((1 + ROCK_RESTITUTION) * closing) / (1 / ma + 1 / mb);
+        a.vel.x -= (j / ma) * nx;
+        a.vel.y -= (j / ma) * ny;
+        b.vel.x += (j / mb) * nx;
+        b.vel.y += (j / mb) * ny;
+      }
+    }
   };
 
   /** Камень разбился: мелкий рассыпается, крупные раскалываются. */
@@ -541,6 +579,7 @@ export function createSim(
       if (freezeS === 0) {
         if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
         field.step(dtS);
+        if (rockBounce) bounceRocks();
       } else {
         for (const a of field.list) {
           a.prev.x = a.pos.x;

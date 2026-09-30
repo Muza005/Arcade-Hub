@@ -194,3 +194,27 @@ describe('столкновения кораблей', () => {
     expect(a.ship.pos.x).toBeGreaterThan(b.ship.pos.x);
   });
 });
+
+describe('камни отскакивают (настройка лобби)', () => {
+  const run = (rockBounce: boolean) => {
+    const sim = createSim(['p'], W, 1, undefined, { rockBounce });
+    const list = sim.asteroids as import('./asteroids').Asteroid[];
+    // Два камня лоб в лоб посреди поля.
+    sim.step(DT, () => IDLE);
+    list.length = 0;
+    const field = createAsteroidField(createRng(2), fieldBounds(W));
+    const a = field.launch('large', 800, 300, 200, 0)!;
+    const b = field.launch('large', 1100, 300, -200, 0)!;
+    list.push(a, b);
+    for (let i = 0; i < 60; i++) sim.step(DT, () => IDLE);
+    return { a, b };
+  };
+  it('вкл. — разлетаются обратно; выкл. — проходят насквозь', () => {
+    const on = run(true);
+    expect(on.a.vel.x).toBeLessThan(0);
+    expect(on.b.vel.x).toBeGreaterThan(0);
+    const off = run(false);
+    expect(off.a.vel.x).toBeGreaterThan(0);
+    expect(off.a.pos.x).toBeGreaterThan(off.b.pos.x);
+  });
+});
