@@ -230,8 +230,6 @@ export const WAVE_SPEED_GROWTH = 0.03; // TUNE: +3 % скорости за во�
 export const WAVE_GROWTH_MIN = 0.5;
 /** Стартовая сложность из лобби — сдвиг по волнам: лёгкая начинает как «волна −3», сложная — как пятая. */
 export const DIFFICULTY_WAVE_SHIFT = { easy: -3, normal: 0, hard: 4 } as const;
-/** Места под боссов (Б9): в этих волнах осложнений нет. */
-export const BOSS_WAVES: readonly number[] = [5, 10, 15, 20];
 /** После 20-й волны — финиш: пауза, чтобы увидеть уведомление. */
 export const WAVE_FINISH_DELAY_S = 3;
 export const WAVES_SEED_SALT = 0x3a7e5; // своя случайность осложнений, из сида матча
@@ -282,6 +280,61 @@ export const BOSS_HP_PLAYER_K = 0.7; // прочность = база · (1 + 0.
 export const BOSS_BASE_HP = { seeder: 25, giant: 30 } as const;
 export const SWARM_DURATION_S = 25;
 export const VORTEX_DURATION_S = 30;
+export type BossKind = 'seeder' | 'swarm' | 'giant' | 'vortex';
+/** Волна → босс. Цели (seeder, giant) идут, пока живы; испытания (swarm, vortex) — ровно своё время. */
+export const BOSS_OF_WAVE: Readonly<Record<number, BossKind>> = { 5: 'seeder', 10: 'swarm', 15: 'giant', 20: 'vortex' };
+/** Волны боссов: в них осложнений нет. */
+export const BOSS_WAVES: readonly number[] = Object.keys(BOSS_OF_WAVE).map(Number);
+export const BOSS_HITBOX_K = 0.9; // тело босса чуть меньше рисунка
+/** Цель, которую никто не добивает (одни слабые боты), уходит через столько секунд — без очков за босса. */
+export const BOSS_TARGET_MAX_S = 120;
+/** Поток камней с краёв в волне босса (доля обычного). */
+export const BOSS_FLOW: Record<BossKind, number> = { seeder: 0.3, swarm: 0.3, giant: 0.5, vortex: 1 };
+export const BOSS_ENTRY_SPEED = 160; // цель вплывает из-за верхнего края
+export const BOSS_ROAM_INSET = 0.25; // цель бродит по середине поля
+export const BOSS_ROAM_S = 5; // и меняет точку, к которой плывёт
+export const BOSS_STEER = 0.8; // 1/с: насколько быстро цель поворачивает к точке
+export const BOSS_COLOR = '#FF5DA2';
+export const BOSS_LINE_PX = 5;
+export const BOSS_HP_RING_PX = 6;
+export const BOSS_HP_RING_GAP = 14;
+export const BOSS_EXPLOSION_SHARDS = 60;
+export const SHAKE_BOSS_DEATH = 1;
+export const BOSS_BAR_W = 360; // полоска прочности вверху — вместо таймера
+export const BOSS_BAR_H = 8;
+// Сеятель: не атакует, выбрасывает камни, пока жив.
+export const SEEDER_RADIUS = 90;
+export const SEEDER_SPEED = 70;
+export const SEEDER_EMIT_PER_S = 0.9; // TUNE; × (1 + FLOW_PLAYER_K · (N − 1))
+export const SEEDER_MEDIUM_CHANCE = 0.35; // остальное — мелкие
+export const SEEDER_SPIN = 0.4;
+// Гигант: от каждого попадания откалывается живой кусок.
+export const GIANT_RADIUS = 150;
+export const GIANT_SPEED = 45;
+export const GIANT_CHUNK: AsteroidSize = 'medium';
+export const GIANT_CHUNK_SPREAD_RAD = 0.6;
+export const GIANT_SPIN = 0.15;
+export const GIANT_SHAPE_POINTS = 14;
+export const GIANT_SHAPE_JITTER = 0.18;
+// Рой: камни стеной проходят поле, перестраиваются; убить нельзя.
+export const SWARM_ROCKS = 40;
+export const SWARM_PLAYER_K = 0.15; // камней × (1 + 0.15 · (N − 1))
+export const SWARM_PER_WALL = 40;
+export const SWARM_WALL_SPEED = 380; // TUNE: px/с, с какой стена идёт через поле
+export const SWARM_REFORM_S = 1.2; // перед проходом стена собирается за краем
+export const SWARM_GAP = 240; // проход в стене
+export const SWARM_WALL_SPACING = 360; // следующая стена — позади
+export const SWARM_OUTSIDE = 80; // стена начинает и кончает за краем
+export const SWARM_STIFFNESS = 4; // 1/с: камень догоняет своё место
+export const SWARM_SPEED_MAX = 520;
+export const SWARM_TINT = '#FF8A8A';
+// Воронка-босс: неуязвимое ядро в центре, тянет сильнее осложнения.
+export const VORTEX_BOSS_K = 1.8;
+export const VORTEX_PLAYER_K = 0.06; // тяга × (1 + 0.06 · (N − 1))
+export const VORTEX_CORE_RADIUS = 60;
+export const VORTEX_ARMS = 4;
+export const VORTEX_ARM_TURNS = 1.2;
+export const VORTEX_SPIN = 1.4;
 
 // ─── Усиления ────────────────────────────────────────────────────
 export const POWERUP_DROP_CHANCE = 1 / 20; // с разрушенного астероида

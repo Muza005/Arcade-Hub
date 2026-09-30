@@ -9,6 +9,7 @@ import { FIXED_STEP_HZ } from '../../shared/config';
 import {
   AMMO_MAX,
   ASTEROID_HITBOX_K,
+  BOSS_HITBOX_K,
   BOT_ARRIVE_PX,
   BOT_AVOID_WEIGHT,
   BOT_BRAKE_SPEED,
@@ -87,18 +88,19 @@ export function createBots(sim: Sim, ids: readonly string[], level: BotLevel, se
     let ax = 0;
     let ay = 0;
     let level = 0;
-    for (const rock of sim.asteroids) {
-      const dx = rock.pos.x - pos.x;
-      const dy = rock.pos.y - pos.y;
-      const vx = rock.vel.x - vel.x;
-      const vy = rock.vel.y - vel.y;
+    /** Тело (камень или босс) с радиусом удара reach. */
+    const consider = (p: Vec, v: Vec, reach: number): void => {
+      const dx = p.x - pos.x;
+      const dy = p.y - pos.y;
+      const vx = v.x - vel.x;
+      const vy = v.y - vel.y;
       const vv = vx * vx + vy * vy;
       const t = vv > 0 ? Math.min(lookaheadS, Math.max(0, -(dx * vx + dy * vy) / vv)) : 0;
       const cx = dx + vx * t;
       const cy = dy + vy * t;
       const closest = Math.hypot(cx, cy);
-      const danger = SHIP_HITBOX_RADIUS + rock.radius * ASTEROID_HITBOX_K + BOT_SAFE_MARGIN;
-      if (closest >= danger) continue;
+      const danger = reach + BOT_SAFE_MARGIN;
+      if (closest >= danger) return;
       const urgency = (1 - t / lookaheadS) * (1 - closest / danger);
       // Уходим от точки встречи; прямо в лоб — в сторону, поперёк движения камня.
       let ux = -cx;
@@ -111,7 +113,10 @@ export function createBots(sim: Sim, ids: readonly string[], level: BotLevel, se
       ax += (ux / n) * urgency;
       ay += (uy / n) * urgency;
       level = Math.max(level, urgency);
-    }
+    };
+    for (const rock of sim.asteroids) consider(rock.pos, rock.vel, SHIP_HITBOX_RADIUS + rock.radius * ASTEROID_HITBOX_K);
+    const boss = sim.boss;
+    if (boss && boss.radius > 0) consider(boss.pos, boss.vel, SHIP_HITBOX_RADIUS + boss.radius * BOSS_HITBOX_K);
     return { x: ax, y: ay, level };
   };
 

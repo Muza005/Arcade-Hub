@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_HZ } from '../../shared/config';
 import { BOSS_WAVES, COMPLICATION_FROM_WAVE, SCORE_WAVE, WAVE_LIMIT, WAVE_PAUSE_S, waveDurationS } from '../config';
 import { createSim } from './sim';
-import { createWaves, rollComplications, type WaveEvent } from './waves';
+import { createWaves, rollComplications, waveLengthS, type WaveEvent } from './waves';
 
 const DT = 1 / FIXED_STEP_HZ;
 const IDLE = { x: 0, y: 0, btn: false };
@@ -37,7 +37,7 @@ describe('волны', () => {
     for (let n = 1; n <= WAVE_LIMIT; n++) {
       const start = starts[n - 1]!;
       const end = ends[n - 1]!;
-      expect(end.atS - start.atS).toBeCloseTo(waveDurationS(n), 1);
+      expect(end.atS - start.atS).toBeCloseTo(waveLengthS(n), 1);
       const next = starts[n];
       if (next) expect(next.atS - end.atS).toBeCloseTo(WAVE_PAUSE_S, 1);
     }

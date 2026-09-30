@@ -1,8 +1,13 @@
 // Снаряды Power: летят прямо, с упреждением в выбранный камень; попадают в любой камень на пути.
 import { Pool } from '../../engine/pool';
 import { BULLET_LIFE_S, BULLET_SPEED, BULLETS_MAX } from '../config';
-import type { Asteroid } from './asteroids';
 import type { Vec } from './ship';
+
+/** Во что можно целиться: камень или босс. */
+export interface Mover {
+  pos: Vec;
+  vel: Vec;
+}
 
 export interface Bullet {
   owner: string;
@@ -13,7 +18,7 @@ export interface Bullet {
 }
 
 /** Точка встречи с камнем, летящим прямо: |p + v·t − s| = BULLET_SPEED · t. Нет решения — в текущую точку. */
-export function leadDirection(from: Vec, rock: Asteroid): Vec {
+export function leadDirection(from: Vec, rock: Mover): Vec {
   const rx = rock.pos.x - from.x;
   const ry = rock.pos.y - from.y;
   const { x: vx, y: vy } = rock.vel;
@@ -37,7 +42,7 @@ export function leadDirection(from: Vec, rock: Asteroid): Vec {
 
 export interface Bullets {
   readonly list: Bullet[];
-  fire(owner: string, from: Vec, target: Asteroid): Bullet | null;
+  fire(owner: string, from: Vec, target: Mover): Bullet | null;
   remove(b: Bullet): void;
   step(dtS: number): void;
 }

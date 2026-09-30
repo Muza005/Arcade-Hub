@@ -1,6 +1,6 @@
 // Модуль Space War по контракту платформы (ARCADE_HUB_SPEC §16, «Модуль игры»).
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
-// Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения.
+// Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
 import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
@@ -67,7 +67,14 @@ import {
   NOTICE_PAD_Y,
   NOTICE_PLATE_ALPHA,
   NOTICE_Y,
+  SCORE_BOSS,
   SCORE_WAVE,
+  BOSS_BAR_H,
+  BOSS_BAR_W,
+  BOSS_COLOR,
+  BOSS_EXPLOSION_SHARDS,
+  SHAKE_BOSS_DEATH,
+  SWARM_TINT,
   WAVE_HUD_FONT_PX,
   WAVE_LIMIT,
   WORLD_H,
@@ -78,6 +85,7 @@ import { strings } from '../i18n/strings';
 import { spaceWarManifest } from '../manifest';
 import { bakeAtlas, rockState, type Atlas } from '../render/atlas';
 import { createCamera, type Camera } from '../render/camera';
+import { createBossView, type BossView } from '../render/boss-view';
 import { createDarkness, type Darkness } from '../render/darkness';
 import { createVortexFx, type VortexFx } from '../render/vortex-fx';
 import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
@@ -161,6 +169,12 @@ export function createSpaceWarGame(): GameModule {
   let waveText: Text;
   let darkness: Darkness;
   let vortexFx: VortexFx;
+  let bossView: BossView;
+  let bossBar: Graphics;
+  let waveTextY = 0;
+  /** Цель этой волны уже повержена — вместо «волна пройдена» остаётся уведомление о победе. */
+  let bossDownWave = 0;
+  let bg = '';
   const holes: Array<{ x: number; y: number }> = [];
   let frames = 0;
   let sampleStart = 0;
@@ -226,6 +240,8 @@ export function createSpaceWarGame(): GameModule {
       }
       const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
       sprite.texture = shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!;
+      // Камни Роя — другим оттенком: их не разбить.
+      sprite.tint = rock.immortal ? SWARM_TINT : 0xffffff;
       sprite.position.set(rock.prev.x + (rock.pos.x - rock.prev.x) * alpha, rock.prev.y + (rock.pos.y - rock.prev.y) * alpha);
       sprite.rotation = rock.angle;
     }
@@ -242,14 +258,19 @@ export function createSpaceWarGame(): GameModule {
     for (const e of sim.events.waves) {
       if (e.kind === 'start') {
         const c = sim.waves.complication;
-        if (e.wave === WAVE_LIMIT) notice.show(t('noticeFinal', { n: e.wave }));
+        const boss = sim.waves.boss;
+        if (boss) notice.show(t(e.wave === WAVE_LIMIT ? 'noticeBossFinal' : 'noticeBoss', { n: e.wave, boss: t(`boss_${boss}`) }));
         else if (c) notice.show(t('noticeWaveComp', { n: e.wave, c: t(`comp_${c}`) }));
         else notice.show(t('noticeWave', { n: e.wave }));
       } else if (sim.waves.phase === 'done') {
         notice.show(t('noticeFinish'));
-      } else if ([...sim.pilots.values()].some((p) => p.alive)) {
+      } else if (bossDownWave !== e.wave && [...sim.pilots.values()].some((p) => p.alive)) {
         notice.show(t('noticeCleared', { n: e.wave, score: SCORE_WAVE * e.wave }));
       }
+    }
+    for (const d of sim.events.bossDown) {
+      bossDownWave = sim.waves.wave;
+      notice.show(t('noticeBossDown', { boss: t(`boss_${d.kind}`), score: SCORE_BOSS }));
     }
   };
 
@@ -257,7 +278,19 @@ export function createSpaceWarGame(): GameModule {
     const w = sim.waves;
     if (w.phase === 'done') return t('noticeFinish');
     if (w.phase === 'break') return t('hudBreak', { time: formatLeft(w.leftS) });
+    // У цели вместо времени — её имя и полоска прочности.
+    if (sim.boss && sim.boss.maxHp > 0) return t('hudBoss', { n: w.wave, of: WAVE_LIMIT, boss: t(`boss_${sim.boss.kind}`) });
     return t('hudWave', { n: w.wave, of: WAVE_LIMIT, time: formatLeft(w.leftS) });
+  };
+
+  const drawBossBar = (): void => {
+    bossBar.clear();
+    const boss = sim.boss;
+    if (!boss || boss.maxHp <= 0) return;
+    const x = waveText.x - BOSS_BAR_W / 2;
+    const y = waveTextY + waveText.height / 2 + BOSS_BAR_H;
+    bossBar.roundRect(x, y, BOSS_BAR_W, BOSS_BAR_H, BOSS_BAR_H / 2).fill({ color: BOSS_COLOR, alpha: HUD_ALPHA / 2 });
+    bossBar.roundRect(x, y, BOSS_BAR_W * (boss.hp / boss.maxHp), BOSS_BAR_H, BOSS_BAR_H / 2).fill({ color: BOSS_COLOR, alpha: HUD_ALPHA });
   };
 
   /** События шага → частицы, тряска, вспышки и обратная связь на телефоне. */
@@ -269,6 +302,13 @@ export function createSpaceWarGame(): GameModule {
       camera.shake(SHAKE_RAM);
       ctx.fx(bump.a, { vib: VIBRATE_RAM_MS });
       ctx.fx(bump.b, { vib: VIBRATE_RAM_MS });
+    }
+    for (const d of events.bossDown) {
+      shards(d.x, d.y, BOSS_EXPLOSION_SHARDS, BOSS_COLOR);
+      sparks(d.x, d.y, BOSS_EXPLOSION_SHARDS, BOSS_COLOR, MULT_SPARK_S[MULT_SPARK_S.length - 1] ?? 1);
+      camera.shake(SHAKE_BOSS_DEATH);
+      camera.flashScreen(FLASH_EXPLODE, FLASH_DEATH_ALPHA);
+      ctx.fx(d.by, { vib: VIBRATE_EXPLODE_MS });
     }
     for (const b of events.breaks) {
       shards(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR);
@@ -318,6 +358,8 @@ export function createSpaceWarGame(): GameModule {
           collisions: ctx.settings.collisions !== false,
           teamOf: (id) => teamOf.get(id) ?? id,
           difficulty: DIFFICULTIES.find((d) => d === ctx.settings.difficulty) ?? DIFFICULTY_DEFAULT,
+          // ?wave=N в адресе — начать с N-й волны (проверка боссов и поздних волн).
+          startWave: Number(new URLSearchParams(location.search).get('wave')) || 1,
         },
       );
       const botLevel = BOT_LEVELS.find((l) => l === ctx.settings.botLevel) ?? BOT_LEVEL_DEFAULT;
@@ -365,6 +407,9 @@ export function createSpaceWarGame(): GameModule {
       }
       glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
       vortexFx = createVortexFx((sim.bounds.left + sim.bounds.right) / 2, (sim.bounds.top + sim.bounds.bottom) / 2, ACCENT);
+      bg = cssVar('--bg');
+      bossView = createBossView(vfx);
+      glowLayer.addChildAt(bossView.view, 0);
       scene.addChild(field, vortexFx.view, rocksLayer, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
@@ -381,7 +426,9 @@ export function createSpaceWarGame(): GameModule {
       });
       waveText.alpha = HUD_ALPHA;
       waveText.anchor.set(0.5);
-      waveText.position.set(worldW / zoom / 2, FIELD_INSET + HUD_PAD_PX);
+      waveTextY = FIELD_INSET + HUD_PAD_PX;
+      waveText.position.set(worldW / zoom / 2, waveTextY);
+      bossBar = new Graphics();
       notice = createNotice(
         {
           text: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: NOTICE_FONT_PX, fill: textColor },
@@ -393,7 +440,7 @@ export function createSpaceWarGame(): GameModule {
         worldW / zoom / 2,
         NOTICE_Y,
       );
-      hud.addChild(waveText, notice.view);
+      hud.addChild(waveText, bossBar, notice.view);
       darkness = createDarkness(stage.app.renderer, worldW, worldH, cssVar('--bg'));
       stage.world.addChild(starsSprite, scene, darkness.view, hud, camera.flash);
       // Счётчик FPS — по переключателю в настройках хаба (или ?fps в адресе).
@@ -418,7 +465,7 @@ export function createSpaceWarGame(): GameModule {
       announce();
       notice.update(dtS);
       darkness.update(sim.waves.complication === 'dark', dtS);
-      vortexFx.update(sim.waves.complication === 'vortex', dtS);
+      vortexFx.update(sim.waves.complication === 'vortex' || sim.boss?.kind === 'vortex', dtS);
       camera.update(dtS);
       // Hit-stop: мир на мгновение замер — замирают и частицы, и следы; тряска и вспышка идут.
       if (sim.frozen) return;
@@ -479,7 +526,16 @@ export function createSpaceWarGame(): GameModule {
       multFx.draw();
       scoreHud.draw();
       vortexFx.draw();
+      const boss = sim.boss;
+      bossView.draw(
+        boss,
+        boss ? boss.prev.x + (boss.pos.x - boss.prev.x) * alpha : 0,
+        boss ? boss.prev.y + (boss.pos.y - boss.prev.y) * alpha : 0,
+        fxTimeS,
+        bg,
+      );
       waveText.text = waveLine();
+      drawBossBar();
       holes.length = 0;
       for (const pilot of sim.pilots.values()) {
         if (!pilot.alive) continue;
@@ -530,6 +586,7 @@ export function createSpaceWarGame(): GameModule {
       const w = sim.waves;
       if (w.phase === 'done') return t('statusFinish');
       if (w.phase === 'break') return t('statusBreak', { time: formatLeft(w.leftS) });
+      if (sim.boss && sim.boss.maxHp > 0) return t('statusBoss', { n: w.wave, boss: t(`boss_${sim.boss.kind}`) });
       return t('statusWave', { n: w.wave, time: formatLeft(w.leftS) });
     },
 

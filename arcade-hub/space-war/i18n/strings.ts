@@ -55,7 +55,6 @@ export type SpaceWarKey =
   | 'bot_strong'
   | 'noticeWave'
   | 'noticeWaveComp'
-  | 'noticeFinal'
   | 'noticeCleared'
   | 'noticeFinish'
   | 'comp_dark'
@@ -69,7 +68,16 @@ export type SpaceWarKey =
   | 'hudBreak'
   | 'statusWave'
   | 'statusBreak'
-  | 'statusFinish';
+  | 'statusFinish'
+  | 'boss_seeder'
+  | 'boss_swarm'
+  | 'boss_giant'
+  | 'boss_vortex'
+  | 'noticeBoss'
+  | 'noticeBossFinal'
+  | 'noticeBossDown'
+  | 'hudBoss'
+  | 'statusBoss';
 
 export const strings: GameStrings<SpaceWarKey> = {
   ru: {
@@ -126,7 +134,6 @@ export const strings: GameStrings<SpaceWarKey> = {
     time: '{m}:{s}',
     noticeWave: 'Волна {n}',
     noticeWaveComp: 'Волна {n} · {c}',
-    noticeFinal: 'Волна {n} · финал',
     noticeCleared: 'Волна {n} пройдена · +{score}',
     noticeFinish: 'Финиш',
     comp_dark: 'Затемнение',
@@ -141,6 +148,15 @@ export const strings: GameStrings<SpaceWarKey> = {
     statusWave: 'Волна {n} · до конца {time}',
     statusBreak: 'Передышка · {time}',
     statusFinish: 'Финиш',
+    boss_seeder: 'Сеятель',
+    boss_swarm: 'Рой',
+    boss_giant: 'Гигант',
+    boss_vortex: 'Воронка',
+    noticeBoss: 'Волна {n} · {boss}',
+    noticeBossFinal: 'Волна {n} · {boss} · финал',
+    noticeBossDown: '{boss} повержен · +{score}',
+    hudBoss: '{n}/{of} · {boss}',
+    statusBoss: 'Волна {n} · {boss}',
   },
   en: {
     title: 'Space War',
@@ -196,7 +212,6 @@ export const strings: GameStrings<SpaceWarKey> = {
     time: '{m}:{s}',
     noticeWave: 'Wave {n}',
     noticeWaveComp: 'Wave {n} · {c}',
-    noticeFinal: 'Wave {n} · final',
     noticeCleared: 'Wave {n} cleared · +{score}',
     noticeFinish: 'Finish',
     comp_dark: 'Blackout',
@@ -211,5 +226,14 @@ export const strings: GameStrings<SpaceWarKey> = {
     statusWave: 'Wave {n} · {time} left',
     statusBreak: 'Break · {time}',
     statusFinish: 'Finish',
+    boss_seeder: 'Seeder',
+    boss_swarm: 'Swarm',
+    boss_giant: 'Giant',
+    boss_vortex: 'Vortex',
+    noticeBoss: 'Wave {n} · {boss}',
+    noticeBossFinal: 'Wave {n} · {boss} · final',
+    noticeBossDown: '{boss} down · +{score}',
+    hudBoss: '{n}/{of} · {boss}',
+    statusBoss: 'Wave {n} · {boss}',
   },
 };

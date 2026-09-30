@@ -1,11 +1,13 @@
 // Симуляция Space War без графики: по сиду и потоку ввода матч воспроизводится один в один.
-// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки; Б8 — волны.
+// Б1 — корабли; Б2 — астероиды, жизни, конец игры; Б3 — стрельба, патроны, множитель, очки; Б8 — волны; Б9 — боссы.
 import type { InputState } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import {
   ASTEROID_HITBOX_K,
   ASTEROID_RADIUS,
   ASTEROID_SPAWN_PER_S,
+  BOSS_FLOW,
+  BOSS_HITBOX_K,
   BULLET_RADIUS,
   COMPLICATION_FLOW,
   COMPLICATION_SPEED,
@@ -20,6 +22,7 @@ import {
   HIT_STOP_S,
   NEAR_MISS_DISTANCE,
   SCORE_ASTEROID,
+  SCORE_BOSS,
   SCORE_LIFE_LEFT,
   SCORE_WAVE,
   VORTEX_ROCK_PULL,
@@ -27,6 +30,7 @@ import {
   WAVE_DENSITY_GROWTH,
   WAVE_FINISH_DELAY_S,
   WAVE_GROWTH_MIN,
+  WAVE_LIMIT,
   WAVE_SPEED_GROWTH,
   SHIP_BOUNCE,
   SHIP_PUSH_MIN,
@@ -34,12 +38,14 @@ import {
   SPAWN_RING_RADIUS,
   WORLD_H,
   type AsteroidSize,
+  type BossKind,
   type Difficulty,
   type Mode,
 } from '../config';
 import { FEATURES } from '../features';
 import { createAsteroidField, type Asteroid } from './asteroids';
-import { createBullets, type Bullet } from './bullets';
+import { createBoss, type Boss, type BossControl } from './bosses';
+import { createBullets, type Bullet, type Mover } from './bullets';
 import { Grid } from './grid';
 import { checkIdle, createPilot, nearMiss, regenAmmo, resetMult, type Pilot } from './pilot';
 import { clampToBounds, createShip, stepShip, type Bounds, type Ship } from './ship';
@@ -62,6 +68,8 @@ export interface SimEvents {
   bumps: Array<{ a: string; b: string; x: number; y: number; ram: boolean }>;
   /** Волна началась или кончилась (в конце — бонус SCORE_WAVE × номер живым). */
   waves: WaveEvent[];
+  /** Цель-босс убита: кем и где. */
+  bossDown: Array<{ kind: BossKind; by: string; x: number; y: number }>;
 }
 
 export interface SimOptions {
@@ -72,6 +80,8 @@ export interface SimOptions {
   teamOf?: (id: string) => string;
   /** Стартовая сложность из лобби. */
   difficulty?: Difficulty;
+  /** С какой волны начать (проверка поздних волн и боссов); по умолчанию — с первой. */
+  startWave?: number;
 }
 
 export interface Sim {
@@ -81,6 +91,8 @@ export interface Sim {
   readonly asteroids: readonly Asteroid[];
   readonly bullets: readonly Bullet[];
   readonly waves: Waves;
+  /** Босс текущей волны или null. */
+  readonly boss: Boss | null;
   readonly events: SimEvents;
   readonly timeS: number;
   /** Все погибли или пройдена последняя волна — и пауза после этого прошла. */
@@ -132,9 +144,12 @@ export function createSim(
   const claimed = new Set<Asteroid>();
   const killed: Array<{ rock: Asteroid; by: Pilot }> = [];
   const spent: Bullet[] = [];
-  const events: SimEvents = { hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [] };
+  const events: SimEvents = {
+    hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [], bossDown: [],
+  };
+  let bossCtl: BossControl | null = null;
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
-  const waves = createWaves(seed);
+  const waves = createWaves(seed, WAVE_LIMIT, options.startWave);
   const shift = DIFFICULTY_WAVE_SHIFT[options.difficulty ?? DIFFICULTY_DEFAULT];
   /** Рост с номером волны, сдвинутый стартовой сложностью. */
   const growth = (k: number): number => Math.max(WAVE_GROWTH_MIN, 1 + k * (waves.wave - 1 + shift));
@@ -154,12 +169,17 @@ export function createSim(
     field.split(a);
   };
 
-  /** Ближайший камень на поле — цель автонаведения. */
-  const nearestRock = (from: { x: number; y: number }): Asteroid | null => {
-    let best: Asteroid | null = null;
+  /** Ближайший камень на поле или цель-босс (до его края) — цель автонаведения. Камни Роя не цель. */
+  const nearestRock = (from: { x: number; y: number }): Mover | null => {
+    let best: Mover | null = null;
     let bestD = Infinity;
+    const boss = bossCtl?.target ? bossCtl.boss : null;
+    if (boss && inside(bounds, boss.pos)) {
+      bestD = Math.max(0, Math.hypot(boss.pos.x - from.x, boss.pos.y - from.y) - boss.radius) ** 2;
+      best = boss;
+    }
     for (const a of field.list) {
-      if (!inside(bounds, a.pos)) continue;
+      if (a.immortal || !inside(bounds, a.pos)) continue;
       const d = (a.pos.x - from.x) ** 2 + (a.pos.y - from.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -169,9 +189,9 @@ export function createSim(
     return best;
   };
 
-  /** Удар: камень разбивается, корабль теряет жизнь и множитель, ненадолго становится неуязвимым. */
-  const hitShip = (pilot: Pilot, rock: Asteroid): void => {
-    shatter(rock);
+  /** Удар: камень разбивается (камень Роя и тело босса — нет), корабль теряет жизнь и множитель, ненадолго неуязвим. */
+  const hitShip = (pilot: Pilot, rock: Asteroid | null): void => {
+    if (rock && !rock.immortal) shatter(rock);
     pilot.lives--;
     pilot.invulnS = HIT_INVULN_S;
     resetMult(pilot);
@@ -235,13 +255,25 @@ export function createSim(
   };
 
   /** Воронка тянет корабль к центру поля; тяга и сопротивление корабля с ней спорят. */
-  const pull = (ship: Ship, dtS: number): void => {
+  const pull = (ship: Ship, accel: number, dtS: number): void => {
     const dx = cx - ship.pos.x;
     const dy = cy - ship.pos.y;
     const d = Math.hypot(dx, dy);
     if (d === 0) return;
-    ship.vel.x += (dx / d) * VORTEX_SHIP_PULL * dtS;
-    ship.vel.y += (dy / d) * VORTEX_SHIP_PULL * dtS;
+    ship.vel.x += (dx / d) * accel * dtS;
+    ship.vel.y += (dy / d) * accel * dtS;
+  };
+
+  /** Цель убита: очки добившему, волна кончается. */
+  const bossKilled = (by: Pilot): void => {
+    if (!bossCtl) return;
+    const { boss } = bossCtl;
+    by.score += SCORE_BOSS;
+    events.bossDown.push({ kind: boss.kind, by: by.ship.id, x: boss.pos.x, y: boss.pos.y });
+    hitStopS = Math.max(hitStopS, HIT_STOP_DEATH_S);
+    bossCtl.release();
+    bossCtl = null;
+    waves.finishWave();
   };
 
   const fire = (pilot: Pilot, btn: boolean): void => {
@@ -265,11 +297,25 @@ export function createSim(
         spent.push(b);
         continue;
       }
+      // Тело босса: цель теряет прочность, ядро Воронки просто гасит снаряд.
+      const boss = bossCtl?.boss;
+      if (bossCtl && boss && boss.radius > 0 && Math.hypot(boss.pos.x - b.pos.x, boss.pos.y - b.pos.y) < BULLET_RADIUS + boss.radius) {
+        spent.push(b);
+        events.chips.push({ x: b.pos.x, y: b.pos.y });
+        const shooter = pilots.get(b.owner);
+        if (bossCtl.target && bossCtl.hit(b.pos) && shooter) bossKilled(shooter);
+        continue;
+      }
       for (const rock of grid.query(b.pos.x, b.pos.y, BULLET_RADIUS, near)) {
         if (claimed.has(rock)) continue;
         const reach = BULLET_RADIUS + rock.radius;
         if ((rock.pos.x - b.pos.x) ** 2 + (rock.pos.y - b.pos.y) ** 2 >= reach * reach) continue;
         spent.push(b);
+        // Камень Роя не разбить: снаряд гаснет искрами.
+        if (rock.immortal) {
+          events.chips.push({ x: b.pos.x, y: b.pos.y });
+          break;
+        }
         rock.hp--;
         const shooter = pilots.get(b.owner);
         if (rock.hp <= 0 && shooter) {
@@ -295,6 +341,9 @@ export function createSim(
     asteroids: field.list,
     bullets: bullets.list,
     waves,
+    get boss() {
+      return bossCtl?.boss ?? null;
+    },
     events,
     get timeS() {
       return timeS;
@@ -320,7 +369,13 @@ export function createSim(
       const wave = waves.step(dtS);
       if (wave) {
         events.waves.push(wave);
+        if (wave.kind === 'start' && waves.boss) {
+          bossCtl = createBoss(waves.boss, rng, field, bounds, playerIds.length, growth(WAVE_SPEED_GROWTH));
+        }
         if (wave.kind === 'end') {
+          // Испытание пройдено или цель ушла недобитой.
+          bossCtl?.release();
+          bossCtl = null;
           for (const p of pilots.values()) if (p.alive) p.score += SCORE_WAVE * wave.wave;
           if (waves.phase === 'done' && overInS === null) overInS = WAVE_FINISH_DELAY_S;
         }
@@ -328,8 +383,10 @@ export function createSim(
 
       // Камни идут только во время волны; на передышке и после финиша поле пустеет.
       const comp = waves.complication;
+      bossCtl?.step(dtS);
+      const bossFlow = waves.boss ? BOSS_FLOW[waves.boss] : 1;
       if (waves.phase === 'wave') {
-        spawnDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * (comp ? COMPLICATION_FLOW[comp] : 1) * dtS;
+        spawnDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * (comp ? COMPLICATION_FLOW[comp] : 1) * bossFlow * dtS;
         const speedK = growth(WAVE_SPEED_GROWTH) * (comp ? COMPLICATION_SPEED[comp] : 1);
         const size = comp === 'small' || comp === 'large' ? comp : undefined;
         while (spawnDebt >= 1) {
@@ -337,15 +394,28 @@ export function createSim(
           field.spawn(size ? { size, speedK } : { speedK });
         }
       }
-      if (comp === 'vortex') field.attract(cx, cy, VORTEX_ROCK_PULL, dtS);
+      // Воронка: осложнение или босс. Ядро босса глотает камни.
+      const rockPull = comp === 'vortex' ? VORTEX_ROCK_PULL : (bossCtl?.boss.rockPull ?? 0);
+      const shipPull = comp === 'vortex' ? VORTEX_SHIP_PULL : (bossCtl?.boss.shipPull ?? 0);
+      if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
       field.step(dtS);
+      if (bossCtl?.boss.kind === 'vortex') {
+        const core = bossCtl.boss;
+        for (let i = field.list.length - 1; i >= 0; i--) {
+          const a = field.list[i] as Asteroid;
+          if (Math.hypot(a.pos.x - core.pos.x, a.pos.y - core.pos.y) < core.radius) {
+            events.breaks.push({ x: a.pos.x, y: a.pos.y, size: a.size });
+            field.remove(a);
+          }
+        }
+      }
 
       for (const pilot of pilots.values()) {
         if (!pilot.alive) continue;
         const input = read(pilot.ship.id);
         stepShip(pilot.ship, input, dtS, bounds);
         pilot.invulnS = Math.max(0, pilot.invulnS - dtS);
-        if (comp === 'vortex') pull(pilot.ship, dtS);
+        if (shipPull > 0) pull(pilot.ship, shipPull, dtS);
         fire(pilot, input.btn);
         // Глушение: патроны не копятся.
         if (comp !== 'jam' && regenAmmo(pilot, dtS)) events.reloads.push(pilot.ship.id);
@@ -374,6 +444,15 @@ export function createSim(
         }
       }
       for (const { pilot, rock } of hits) hitShip(pilot, rock);
+      // Тело босса: минус жизнь, босс цел; неуязвимость даёт выбраться.
+      const body = bossCtl?.boss;
+      if (body && body.radius > 0) {
+        for (const pilot of pilots.values()) {
+          if (!pilot.alive || pilot.invulnS > 0) continue;
+          const { pos } = pilot.ship;
+          if (Math.hypot(body.pos.x - pos.x, body.pos.y - pos.y) < SHIP_HITBOX_RADIUS + body.radius * BOSS_HITBOX_K) hitShip(pilot, null);
+        }
+      }
 
       // Сближения: пролёт вплотную к камню, но без удара. Неуязвимый множитель не копит.
       rebuildGrid();

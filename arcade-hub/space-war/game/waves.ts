@@ -2,14 +2,19 @@
 // Осложнения разыгрываются заранее из сида матча — порядок не зависит от того, как шла игра.
 import { createRng } from '../../engine/rng';
 import {
+  BOSS_OF_WAVE,
+  BOSS_TARGET_MAX_S,
   BOSS_WAVES,
   COMPLICATION_CHANCE,
   COMPLICATION_FROM_WAVE,
   COMPLICATIONS,
   WAVE_LIMIT,
   WAVE_PAUSE_S,
+  SWARM_DURATION_S,
+  VORTEX_DURATION_S,
   WAVES_SEED_SALT,
   waveDurationS,
+  type BossKind,
   type Complication,
 } from '../config';
 
@@ -28,13 +33,24 @@ export interface Waves {
   readonly leftS: number;
   /** Осложнение текущей волны (на передышке — нет). */
   readonly complication: Complication | null;
-  /** Волна босса (Б9). */
-  readonly boss: boolean;
+  /** Босс текущей волны. */
+  readonly boss: BossKind | null;
+  /** Цель убита — волна кончается на следующем шаге. */
+  finishWave(): void;
   /** Шаг времени; возвращает событие, если волна началась или кончилась. */
   step(dtS: number): WaveEvent | null;
 }
 
 export const isBossWave = (wave: number): boolean => BOSS_WAVES.includes(wave);
+
+/** Длина волны: обычная — по формуле; испытание — ровно своё время; цель — пока жива (с пределом). */
+export function waveLengthS(wave: number): number {
+  const boss = BOSS_OF_WAVE[wave];
+  if (boss === 'swarm') return SWARM_DURATION_S;
+  if (boss === 'vortex') return VORTEX_DURATION_S;
+  if (boss) return BOSS_TARGET_MAX_S;
+  return waveDurationS(wave);
+}
 
 /** Осложнения всех волн (индекс — номер волны): не на первых, не у боссов, не два одинаковых подряд. */
 export function rollComplications(seed: number, limit: number = WAVE_LIMIT): Array<Complication | null> {
@@ -53,12 +69,12 @@ export function rollComplications(seed: number, limit: number = WAVE_LIMIT): Arr
   return out;
 }
 
-/** Первая волна начинается сразу; событие её начала — на первом шаге. */
-export function createWaves(seed: number, limit: number = WAVE_LIMIT): Waves {
+/** Первая волна начинается сразу; событие её начала — на первом шаге. startWave — для проверки поздних волн. */
+export function createWaves(seed: number, limit: number = WAVE_LIMIT, startWave = 1): Waves {
   const complications = rollComplications(seed, limit);
-  let wave = 1;
+  let wave = Math.min(Math.max(1, startWave), limit);
   let phase: WavePhase = 'wave';
-  let leftS = waveDurationS(1);
+  let leftS = waveLengthS(wave);
   let started = false;
 
   return {
@@ -75,7 +91,10 @@ export function createWaves(seed: number, limit: number = WAVE_LIMIT): Waves {
       return phase === 'wave' ? (complications[wave] ?? null) : null;
     },
     get boss() {
-      return isBossWave(wave);
+      return phase === 'wave' ? (BOSS_OF_WAVE[wave] ?? null) : null;
+    },
+    finishWave() {
+      if (phase === 'wave') leftS = 0;
     },
     step(dtS) {
       if (!started) {
@@ -92,7 +111,7 @@ export function createWaves(seed: number, limit: number = WAVE_LIMIT): Waves {
       }
       wave++;
       phase = 'wave';
-      leftS = waveDurationS(wave);
+      leftS = waveLengthS(wave);
       return { kind: 'start', wave };
     },
   };

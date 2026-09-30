@@ -32,6 +32,10 @@ export interface Asteroid {
   shape: number;
   angle: number;
   spin: number;
+  /** Камень Роя: пули его не берут, при ударе о корабль он не разбивается. */
+  immortal: boolean;
+  /** Ведёт босс: не удаляется за краем, пока его держат. */
+  held: boolean;
 }
 
 const SIZES: readonly AsteroidSize[] = ['small', 'medium', 'large'];
@@ -60,6 +64,8 @@ export interface Field {
   /** Раскол: дети встают на место родителя. Возвращает детей (у мелкого — пусто). */
   split(a: Asteroid): Asteroid[];
   remove(a: Asteroid): void;
+  /** Камень в заданной точке с заданной скоростью (выброс босса, откол, Рой). */
+  launch(size: AsteroidSize, x: number, y: number, vx: number, vy: number): Asteroid | null;
   /** Дрейф и уход за границу. */
   step(dtS: number): void;
   /** Воронка: камни, летящие к точке, ускоряются к ней; пролетевшие — уходят. */
@@ -87,6 +93,8 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       shape: 0,
       angle: 0,
       spin: 0,
+      immortal: false,
+      held: false,
     }),
     () => undefined,
     ASTEROIDS_MAX,
@@ -107,6 +115,8 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
     a.shape = Math.floor(rng.next() * ASTEROID_SHAPE_VARIANTS);
     a.angle = rng.range(0, Math.PI * 2);
     a.spin = rng.range(-ASTEROID_SPIN, ASTEROID_SPIN);
+    a.immortal = false;
+    a.held = false;
     list.push(a);
     return a;
   };
@@ -173,6 +183,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       return kids;
     },
     remove,
+    launch: make,
     step(dtS) {
       for (let i = list.length - 1; i >= 0; i--) {
         const a = list[i] as Asteroid;
@@ -181,6 +192,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
         a.pos.x += a.vel.x * dtS;
         a.pos.y += a.vel.y * dtS;
         a.angle += a.spin * dtS;
+        if (a.held) continue;
         // Ушёл за границу и удаляется от поля — больше не вернётся.
         const out = a.radius + ASTEROID_SPAWN_GAP * 2;
         const gone =
