@@ -666,6 +666,7 @@ export function createSpaceWarGame(): GameModule {
           ship.thrust,
         );
         view.setLives(pilot.lives, SHIP_LIVES);
+        view.setAmmo(pilot.ammo, AMMO_MAX);
         view.setMult(pilot.mult);
         view.setOverload(overloadTint(pilot));
         view.setShield(pilot.shieldS > 0, pilot.shieldS < SHIELD_BLINK_S && Math.floor(pilot.shieldS * INVULN_BLINK_HZ * 2) % 2 === 0);

@@ -137,6 +137,8 @@ export const en: Dictionary = {
   'records.replays': 'Match replays',
   'records.none': 'Nothing yet',
   'records.incompatible': 'other version',
+  'menu.qrZoom': 'Show QR full screen',
+  'menu.qrZoomRoom': 'Room {code}',
   'records.watch': 'Watch replay',
   'replay.play': 'Play',
   'replay.pause': 'Pause',

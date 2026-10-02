@@ -138,6 +138,8 @@ export const ru = {
   'records.none': 'Пока пусто',
   'records.incompatible': 'другая версия',
   'records.dailyMark': 'расклад дня',
+  'menu.qrZoom': 'Показать QR крупно',
+  'menu.qrZoomRoom': 'Комната {code}',
   'records.watch': 'Смотреть запись',
   'replay.play': 'Играть',
   'replay.pause': 'Пауза',

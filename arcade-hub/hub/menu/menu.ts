@@ -1,6 +1,6 @@
 // Меню игр (ARCADE_HUB_SPEC §6): верхняя полоса, заголовок, сетка, нижняя полоса с QR и игроками.
 // В простое ничего не рисуется: движение — только в ответ на действие.
-import { CONTROLLER_PATH, QR_SIZE_PX } from '../../shared/config';
+import { CONTROLLER_PATH, QR_SIZE_PX, QR_ZOOM_SIZE_PX } from '../../shared/config';
 import type { Replay } from '../../shared/replays';
 import type { GameManifest } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
@@ -89,7 +89,26 @@ export function createMenu(options: MenuOptions): Menu {
 
   const grid = h('div', { class: 'grid', role: 'list' });
 
-  const qr = h('div', { class: 'join__qr', 'aria-hidden': 'true' });
+  // QR по нажатию раскрывается почти на весь экран — телефоны сканируют его с дивана; закрывает клик или Esc.
+  const qr = h('button', { class: 'join__qr', type: 'button', 'aria-label': t('menu.qrZoom'), title: t('menu.qrZoom') });
+  const qrBig = h('div', { class: 'qr-zoom__code' });
+  const qrBigRoom = h('p', { class: 'qr-zoom__room' });
+  const qrZoom = h('dialog', { class: 'qr-zoom' }, h('div', { class: 'qr-zoom__plate' }, qrBig), qrBigRoom);
+  qr.addEventListener('click', () => {
+    if (!qrFor) return;
+    qrBig.innerHTML = qrSvg(qrFor, QR_ZOOM_SIZE_PX);
+    qrBigRoom.textContent = t('menu.qrZoomRoom', { code: qrFor });
+    qrZoom.showModal();
+  });
+  qrZoom.addEventListener('click', () => qrZoom.close());
+  // Esc закрывает только QR — меню под ним его не видит.
+  qrZoom.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      qrZoom.close();
+    }
+  });
   const joinCode = h('p', { class: 'join__code' });
   const inRoom = h('p', { class: 'players__count' });
   const avatarsSlot = h('div', { class: 'players__row' });
@@ -126,7 +145,7 @@ export function createMenu(options: MenuOptions): Menu {
     (game, replay) => options.onWatch(game, replay),
   );
 
-  const el = h('main', { class: 'menu', 'data-focus-scope': true }, topBar, heading, grid, bottomBar, gameWindow.el);
+  const el = h('main', { class: 'menu', 'data-focus-scope': true }, topBar, heading, grid, bottomBar, gameWindow.el, qrZoom);
 
   const title = (g: GameManifest): string => gameText(g)(g.title);
 

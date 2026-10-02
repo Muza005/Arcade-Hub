@@ -14,6 +14,12 @@ import {
   LIVES_PIP_GAP,
   LIVES_PIP_RADIUS,
   LIVES_Y,
+  AMMO_BAR_GAP,
+  AMMO_BAR_H,
+  AMMO_BAR_W,
+  AMMO_BARS,
+  AMMO_EMPTY_ALPHA,
+  AMMO_Y,
   MULT_FONT_PX,
   MULT_GLOW_ALPHA,
   MULT_GLOW_PX,
@@ -43,6 +49,8 @@ export interface ShipView {
   paint(color: string, hull: Hull): void;
   /** Жизни точками под кораблём. */
   setLives(lives: number, max: number): void;
+  /** Патроны полосками под жизнями: каждая полоска — max / AMMO_BARS патронов. */
+  setAmmo(ammo: number, max: number): void;
   /** Мигание неуязвимости. */
   setBlink(dim: boolean): void;
   /** Призрак: полупрозрачный корпус, без подписи. */
@@ -70,6 +78,8 @@ export function createShipView(textColor: string): ShipView {
   body.addChild(flame, glow, outline);
   const pips = new Graphics();
   pips.y = LIVES_Y;
+  const ammoBars = new Graphics();
+  ammoBars.y = AMMO_Y;
   const label = new Container();
   const multText = new Text({
     text: '',
@@ -88,13 +98,15 @@ export function createShipView(textColor: string): ShipView {
   shield.visible = false;
   node.addChild(body, shield);
   const tag = new Container();
-  tag.addChild(pips, label);
+  tag.addChild(pips, ammoBars, label);
 
   let hull: Hull = 'arrow';
   const above = -SHIP_SIZE - LABEL_GAP_PX;
   let color = textColor;
   let bounds = { left: -Infinity, top: -Infinity, right: Infinity };
   let lastLives = -1;
+  let lastAmmo = -1;
+  let maxAmmo = 0;
   let maxLives = 0;
   let mult = 1;
   let pop = 0;
@@ -107,6 +119,20 @@ export function createShipView(textColor: string): ShipView {
     pips.clear();
     for (let i = 0; i < maxLives; i++) {
       pips.circle(x0 + i * step, 0, LIVES_PIP_RADIUS).fill({ color, alpha: i < lastLives ? 1 : LIVES_LOST_ALPHA });
+    }
+  };
+
+  /** Полоска — доля патронов в ней: целая, половина или пусто (тускло). */
+  const drawAmmo = (): void => {
+    const per = maxAmmo / AMMO_BARS;
+    const step = AMMO_BAR_W + AMMO_BAR_GAP;
+    const x0 = (-(AMMO_BARS - 1) * step) / 2 - AMMO_BAR_W / 2;
+    ammoBars.clear();
+    for (let i = 0; i < AMMO_BARS; i++) {
+      const x = x0 + i * step;
+      const fill = Math.min(1, Math.max(0, (lastAmmo - i * per) / per));
+      ammoBars.rect(x, -AMMO_BAR_H / 2, AMMO_BAR_W, AMMO_BAR_H).fill({ color, alpha: AMMO_EMPTY_ALPHA });
+      if (fill > 0) ammoBars.rect(x, -AMMO_BAR_H / 2, AMMO_BAR_W * fill, AMMO_BAR_H).fill({ color });
     }
   };
 
@@ -165,12 +191,19 @@ export function createShipView(textColor: string): ShipView {
       repaint();
       layoutLabel();
       if (maxLives > 0) drawPips();
+      if (maxAmmo > 0) drawAmmo();
     },
     setLives(lives, max) {
       if (lives === lastLives && max === maxLives) return;
       lastLives = lives;
       maxLives = max;
       drawPips();
+    },
+    setAmmo(ammo, max) {
+      if (ammo === lastAmmo && max === maxAmmo) return;
+      lastAmmo = ammo;
+      maxAmmo = max;
+      drawAmmo();
     },
     setBlink(dim) {
       body.alpha = dim ? INVULN_ALPHA : 1;

@@ -167,6 +167,13 @@ export const LIVES_PIP_RADIUS = 4;
 export const LIVES_PIP_GAP = 5;
 export const LIVES_Y = 44; // под центром корабля
 export const LIVES_LOST_ALPHA = 0.2;
+/** Патроны под жизнями (решение заказчика): 5 полосок, каждая — 2 патрона; выстрел убирает половину полоски. */
+export const AMMO_BARS = 5;
+export const AMMO_BAR_W = 9;
+export const AMMO_BAR_H = 4;
+export const AMMO_BAR_GAP = 3;
+export const AMMO_Y = 56; // ниже точек жизней
+export const AMMO_EMPTY_ALPHA = 0.18;
 
 // ─── Обратная связь на телефон ───────────────────────────────────
 export const VIBRATE_HIT_MS = 40;
