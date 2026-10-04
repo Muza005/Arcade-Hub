@@ -52,6 +52,8 @@ export interface Pilot {
   shieldS: number;
   overloadS: number;
   jamS: number;
+  /** «×2 пули»: сколько ещё стреляет двумя снарядами двойного урона, с. */
+  doubleS: number;
   readonly stats: PilotStats;
   /** Время гибели от начала матча — для итогов. */
   diedAtS: number | null;
@@ -81,6 +83,7 @@ export function createPilot(ship: Ship): Pilot {
     shieldS: 0,
     overloadS: 0,
     jamS: 0,
+    doubleS: 0,
     stats: { hits: 0, near: 0, kills: 0, shots: 0, rams: 0, revives: 0, pickups: 0, sabShots: 0, maxMult: 1, waves: 0 },
     diedAtS: null,
     score: 0,

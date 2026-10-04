@@ -8,10 +8,12 @@ import {
   ROCK_RESTITUTION,
   ASTEROID_RADIUS,
   AMMO_MAX,
+  DOUBLE_DAMAGE,
+  DOUBLE_OFFSET,
+  DOUBLE_S,
   ASTEROID_SPAWN_PER_S,
   FREEZE_S,
   JAMMER_S,
-  JAMMER_TARGETS,
   OVERLOAD_S,
   POWERUP_DROP_CHANCE,
   POWERUP_RATE_DEFAULT,
@@ -91,6 +93,10 @@ export interface SimEvents extends AfterlifeEvents {
   pickups: Array<{ id: string; kind: PowerupKind; x: number; y: number }>;
   /** Кого заглушили. */
   jammed: string[];
+  /** Выпало усиление — вспышка и свечение на месте. */
+  drops: Array<{ x: number; y: number; kind: PowerupKind }>;
+  /** Кому Ремонт добавил жизнь — подрастает новое сердечко. */
+  healed: string[];
 }
 
 export interface SimOptions {
@@ -188,11 +194,11 @@ export function createSim(
   const spent: Bullet[] = [];
   const events: SimEvents = {
     hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [], bossDown: [],
-    ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [], pickups: [], jammed: [],
+    ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [], pickups: [], jammed: [], drops: [], healed: [],
   };
   const powerupsOn = (options.powerups ?? true) && FEATURES.powerups;
   const dropChance = POWERUP_DROP_CHANCE * (options.powerupRate ?? POWERUP_RATES[POWERUP_RATE_DEFAULT]);
-  const powerups = createPowerups(rng, mode);
+  const powerups = createPowerups(rng, mode, bounds);
   let freezeS = 0;
   let bossCtl: BossControl | null = null;
   const spawnPerS = ASTEROID_SPAWN_PER_S * (1 + FLOW_PLAYER_K * (playerIds.length - 1));
@@ -305,6 +311,7 @@ export function createSim(
     pilot.shieldS = 0;
     pilot.overloadS = 0;
     pilot.jamS = 0;
+    pilot.doubleS = 0;
     pilot.diedAtS = timeS;
     events.deaths.push(pilot.ship.id);
     afterlife.die(pilot);
@@ -390,7 +397,12 @@ export function createSim(
     if (!FEATURES.shooting || !pressed || pilot.ammo <= 0 || pilot.jamS > 0) return;
     const target = nearestRock(pilot.ship.pos);
     if (!target) return; // стрелять не во что — патрон не тратится
-    if (!bullets.fire(pilot.ship.id, pilot.ship.pos, target)) return;
+    // «×2 пули»: два снаряда рядом, двойной урон, патрон — один.
+    if (pilot.doubleS > 0) {
+      const a = bullets.fire(pilot.ship.id, pilot.ship.pos, target, DOUBLE_DAMAGE, -DOUBLE_OFFSET);
+      const b = bullets.fire(pilot.ship.id, pilot.ship.pos, target, DOUBLE_DAMAGE, DOUBLE_OFFSET);
+      if (!a && !b) return;
+    } else if (!bullets.fire(pilot.ship.id, pilot.ship.pos, target)) return;
     pilot.ammo--;
     pilot.stats.shots++;
     events.shots.push(pilot.ship.id);
@@ -416,7 +428,11 @@ export function createSim(
         spent.push(b);
         events.chips.push({ x: b.pos.x, y: b.pos.y });
         const shooter = pilots.get(b.owner);
-        if (bossCtl.target && bossCtl.hit(b.pos) && shooter) bossKilled(shooter);
+        if (bossCtl.target) {
+          let dead = false;
+          for (let d = 0; d < b.damage && !dead; d++) dead = bossCtl.hit(b.pos);
+          if (dead && shooter) bossKilled(shooter);
+        }
         continue;
       }
       for (const rock of grid.query(b.pos.x, b.pos.y, BULLET_RADIUS, near)) {
@@ -429,7 +445,7 @@ export function createSim(
           events.chips.push({ x: b.pos.x, y: b.pos.y });
           break;
         }
-        rock.hp--;
+        rock.hp -= b.damage;
         const shooter = pilots.get(b.owner);
         if (rock.hp <= 0 && shooter) {
           claimed.add(rock);
@@ -445,7 +461,10 @@ export function createSim(
       by.score += SCORE_ASTEROID[rock.size] * totalMult(by);
       by.stats.kills++;
       // Выпадение усиления — из камня, разбитого снарядом.
-      if (powerupsOn && rng.next() < dropChance) powerups.drop(rock.pos.x, rock.pos.y);
+      if (powerupsOn && rng.next() < dropChance) {
+        const up = powerups.drop(rock.pos.x, rock.pos.y);
+        events.drops.push({ x: up.pos.x, y: up.pos.y, kind: up.kind });
+      }
       shatter(rock);
     }
   };
@@ -461,6 +480,7 @@ export function createSim(
         // Лично; в кооперативе и командном — в общий пул: тому из своих, у кого жизней меньше всех.
         const pool = mode === 'versus' ? [pilot] : alive.filter((p) => ally(p.ship.id, pilot.ship.id));
         const target = pool.reduce((best, p) => (p.lives < best.lives ? p : best), pilot);
+        if (target.lives < SHIP_LIVES) events.healed.push(target.ship.id);
         target.lives = Math.min(SHIP_LIVES, target.lives + 1);
         return;
       }
@@ -474,23 +494,15 @@ export function createSim(
       case 'freeze':
         freezeS = FREEZE_S;
         return;
-      case 'clear':
-        for (let i = field.list.length - 1; i >= 0; i--) {
-          const a = field.list[i] as Asteroid;
-          if (a.size === 'small' && !a.immortal && !a.held) shatter(a);
-        }
+      case 'double':
+        pilot.doubleS = DOUBLE_S;
         return;
       case 'overload':
         pilot.overloadS = OVERLOAD_S;
         return;
       case 'jammer': {
-        // Три ближайших соперника (если их меньше — все) не стреляют.
-        const { pos } = pilot.ship;
-        const dist = (p: Pilot): number => Math.hypot(p.ship.pos.x - pos.x, p.ship.pos.y - pos.y);
-        const rivals = alive
-          .filter((p) => !ally(p.ship.id, pilot.ship.id))
-          .sort((a, b) => dist(a) - dist(b))
-          .slice(0, JAMMER_TARGETS);
+        // Решение заказчика: глушит всех соперников (в командном — только чужую команду).
+        const rivals = alive.filter((p) => !ally(p.ship.id, pilot.ship.id));
         for (const r of rivals) {
           r.jamS = JAMMER_S;
           events.jammed.push(r.ship.id);
@@ -623,6 +635,7 @@ export function createSim(
         pilot.shieldS = Math.max(0, pilot.shieldS - dtS);
         pilot.overloadS = Math.max(0, pilot.overloadS - dtS);
         pilot.jamS = Math.max(0, pilot.jamS - dtS);
+        pilot.doubleS = Math.max(0, pilot.doubleS - dtS);
         if (shipPull > 0) pull(pilot.ship, shipPull, dtS);
         fire(pilot, input.btn);
         // Глушение: патроны не копятся.

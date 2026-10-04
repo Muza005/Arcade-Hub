@@ -15,6 +15,8 @@ export interface Bullet {
   prev: Vec;
   vel: Vec;
   ttlS: number;
+  /** Урон по камню или боссу: обычный 1, под «×2 пули» — DOUBLE_DAMAGE. */
+  damage: number;
 }
 
 /** Точка встречи с камнем, летящим прямо: |p + v·t − s| = BULLET_SPEED · t. Нет решения — в текущую точку. */
@@ -42,7 +44,8 @@ export function leadDirection(from: Vec, rock: Mover): Vec {
 
 export interface Bullets {
   readonly list: Bullet[];
-  fire(owner: string, from: Vec, target: Mover): Bullet | null;
+  /** offset — сдвиг поперёк полёта (два снаряда рядом). */
+  fire(owner: string, from: Vec, target: Mover, damage?: number, offset?: number): Bullet | null;
   remove(b: Bullet): void;
   step(dtS: number): void;
 }
@@ -50,7 +53,7 @@ export interface Bullets {
 export function createBullets(): Bullets {
   const list: Bullet[] = [];
   const pool = new Pool<Bullet>(
-    () => ({ owner: '', pos: { x: 0, y: 0 }, prev: { x: 0, y: 0 }, vel: { x: 0, y: 0 }, ttlS: 0 }),
+    () => ({ owner: '', pos: { x: 0, y: 0 }, prev: { x: 0, y: 0 }, vel: { x: 0, y: 0 }, ttlS: 0, damage: 1 }),
     () => undefined,
     BULLETS_MAX,
   );
@@ -62,13 +65,14 @@ export function createBullets(): Bullets {
   };
   return {
     list,
-    fire(owner, from, target) {
+    fire(owner, from, target, damage = 1, offset = 0) {
       if (list.length >= BULLETS_MAX) return null;
       const dir = leadDirection(from, target);
       const b = pool.acquire();
       b.owner = owner;
-      b.pos.x = b.prev.x = from.x;
-      b.pos.y = b.prev.y = from.y;
+      b.damage = damage;
+      b.pos.x = b.prev.x = from.x - dir.y * offset;
+      b.pos.y = b.prev.y = from.y + dir.x * offset;
       b.vel.x = dir.x * BULLET_SPEED;
       b.vel.y = dir.y * BULLET_SPEED;
       b.ttlS = BULLET_LIFE_S;

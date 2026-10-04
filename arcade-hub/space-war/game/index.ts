@@ -96,6 +96,9 @@ import {
   POWERUP_RATE_KEYS,
   POWERUP_RATES,
   VIBRATE_PICKUP,
+  AMMO_Y,
+  DOUBLE_SPARK_PER_S,
+  POWERUP_DROP_SPARKS,
   VIBRATE_HIT_MS as VIBRATE_GHOST_MS,
   WAVE_HUD_FONT_PX,
   WAVE_LIMIT,
@@ -113,7 +116,7 @@ import { createCamera, type Camera } from '../render/camera';
 import { createAfterlifeView, type AfterlifeView } from '../render/afterlife-view';
 import { createBossView, type BossView } from '../render/boss-view';
 import { mixColor } from '../render/color';
-import { createPowerupView, type PowerupView } from '../render/powerup-view';
+import { createPowerupView, loadPowerupIcons, type PowerupView } from '../render/powerup-view';
 import { createDarkness, type Darkness } from '../render/darkness';
 import { createVortexFx, type VortexFx } from '../render/vortex-fx';
 import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
@@ -139,6 +142,8 @@ const SECONDS_PER_MINUTE = 60;
 const EXPLOSION_K = 2;
 /** Пролёт вплотную — несколько искр в цвет игрока. */
 const NEAR_SPARKS = 4;
+/** Искры «×2 пули» — по ширине полосок патронов. */
+const AMMO_SPARK_SPREAD = 34;
 /** Взрыв бомбы — кольцо искр. */
 const BLAST_SPARKS = 36;
 
@@ -414,9 +419,22 @@ export function createSpaceWarGame(): GameModule {
       buzz(bump.a, { vib: VIBRATE_RAM_MS });
       buzz(bump.b, { vib: VIBRATE_RAM_MS });
     }
+    // Выпадение: искры и кольцо-вспышка цветом усиления.
+    for (const d of events.drops) {
+      sparks(d.x, d.y, POWERUP_DROP_SPARKS, POWERUP_COLOR[d.kind], DEBRIS_S);
+      powerupView.burst(d.x, d.y, d.kind);
+    }
+    // Подбор: неяркая вспышка корабля цветом усиления; боезапас — полоски ярче; ремонт — новое сердечко подрастает.
     for (const p of events.pickups) {
       sparks(p.x, p.y, DEBRIS_COUNT.medium, POWERUP_COLOR[p.kind], DEBRIS_S);
+      const view = views.get(p.id);
+      view?.flash(POWERUP_COLOR[p.kind]);
+      if (p.kind === 'ammo') view?.glowAmmo();
       buzz(p.id, { vib: VIBRATE_PICKUP });
+    }
+    for (const id of events.healed) {
+      const lives = sim.pilots.get(id)?.lives ?? 0;
+      views.get(id)?.popHeart(lives - 1);
     }
     for (const id of events.jammed) buzz(id, { vib: VIBRATE_HIT_MS });
     for (const id of events.ghosts) buzz(id, { vib: VIBRATE_GHOST_MS });
@@ -552,9 +570,10 @@ export function createSpaceWarGame(): GameModule {
       bossView = createBossView(vfx);
       glowLayer.addChildAt(bossView.view, 0);
       afterView = createAfterlifeView();
-      powerupView = createPowerupView();
-      glowLayer.addChild(afterView.view, powerupView.view);
-      scene.addChild(field, vortexFx.view, rocksLayer, glowLayer, tagsLayer);
+      powerupView = createPowerupView(await loadPowerupIcons());
+      glowLayer.addChild(afterView.view);
+      // Значки усилений — над камнями, вне bloom: их свечение уже нарисовано.
+      scene.addChild(field, vortexFx.view, rocksLayer, powerupView.view, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
       const hud = new Container();
@@ -632,6 +651,21 @@ export function createSpaceWarGame(): GameModule {
         views.get(id)?.update(dtS);
       }
       multFx.update(dtS);
+      powerupView.update(dtS);
+      // «×2 пули»: мелкие искры на полосках патронов, пока действует.
+      if (quality.level !== 'low') {
+        for (const pilot of sim.pilots.values()) {
+          if (!pilot.alive || pilot.doubleS <= 0 || vfx.next() > DOUBLE_SPARK_PER_S * dtS) continue;
+          const { x, y } = pilot.ship.pos;
+          particles.burst(x + vfx.range(-AMMO_SPARK_SPREAD, AMMO_SPARK_SPREAD), y + AMMO_Y, {
+            texture: atlas.spark,
+            color: POWERUP_COLOR.double,
+            count: 1,
+            speed: [0, SPARK_SPEED],
+            life: DEBRIS_S,
+          });
+        }
+      }
       particles.update(dtS);
       const live = (id: string): number => sim.pilots.get(id)?.score ?? 0;
       scoreHud.update(
@@ -667,6 +701,7 @@ export function createSpaceWarGame(): GameModule {
         );
         view.setLives(pilot.lives, SHIP_LIVES);
         view.setAmmo(pilot.ammo, AMMO_MAX);
+        view.setJammed(pilot.jamS > 0);
         view.setMult(pilot.mult);
         view.setOverload(overloadTint(pilot));
         view.setShield(pilot.shieldS > 0, pilot.shieldS < SHIELD_BLINK_S && Math.floor(pilot.shieldS * INVULN_BLINK_HZ * 2) % 2 === 0);
@@ -686,7 +721,7 @@ export function createSpaceWarGame(): GameModule {
       multFx.draw();
       scoreHud.draw();
       vortexFx.draw();
-      powerupView.draw(sim.powerups, fxTimeS, bg);
+      powerupView.draw(sim.powerups, alpha, fxTimeS);
       afterView.draw(
         sim.shards,
         sim.bombs,

@@ -24,7 +24,9 @@ function copyEvents(e: SimEvents): SimEvents {
     blasts: e.blasts.map((b) => ({ ...b })),
     sabShots: [],
     pickups: e.pickups.map((p) => ({ ...p })),
-    jammed: [],
+    jammed: [...e.jammed],
+    drops: e.drops.map((d) => ({ ...d })),
+    healed: [...e.healed],
   };
 }
 
@@ -56,7 +58,7 @@ export function snapshot(sim: Sim): Sim {
     boss,
     shards: sim.shards.map((s) => ({ ...s, pos: vec(s.pos), prev: vec(s.prev), vel: vec(s.vel) })),
     bombs: sim.bombs.map((b) => ({ ...b, pos: vec(b.pos), prev: vec(b.prev), vel: vec(b.vel) })),
-    powerups: sim.powerups.map((p) => ({ ...p, pos: vec(p.pos) })),
+    powerups: sim.powerups.map((p) => ({ ...p, pos: vec(p.pos), prev: vec(p.prev), vel: vec(p.vel) })),
     freezeS: sim.freezeS,
     sabotage: () => false,
     sabCooldownS: () => 0,

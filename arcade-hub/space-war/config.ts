@@ -163,17 +163,16 @@ export const HUD_POP_SCALE = 0.3;
 export const HUD_SLIDE_RATE = 10;
 
 // Жизни под кораблём
-export const LIVES_PIP_RADIUS = 4;
-export const LIVES_PIP_GAP = 5;
 export const LIVES_Y = 44; // под центром корабля
 export const LIVES_LOST_ALPHA = 0.2;
-/** Патроны под жизнями (решение заказчика): 5 полосок, каждая — 2 патрона; выстрел убирает половину полоски. */
-export const AMMO_BARS = 5;
-export const AMMO_BAR_W = 9;
-export const AMMO_BAR_H = 4;
-export const AMMO_BAR_GAP = 3;
-export const AMMO_Y = 56; // ниже точек жизней
-export const AMMO_EMPTY_ALPHA = 0.18;
+/** Жизни сердечками и патроны полосками под кораблём — по шаблону заказчика (размеры шаблона, px мира). */
+export const HEART_STEP = 13; // сердечко 9 px, зазор 4
+export const AMMO_BARS = 5; // каждая полоска — 2 патрона; выстрел убирает половину
+export const AMMO_BAR_W = 12;
+export const AMMO_BAR_H = 3;
+export const AMMO_BAR_GAP = 2;
+export const AMMO_Y = 53.5; // под сердечками
+export const AMMO_EMPTY_COLOR = '#494949';
 
 // ─── Обратная связь на телефон ───────────────────────────────────
 export const VIBRATE_HIT_MS = 40;
@@ -359,27 +358,54 @@ export const FREEZE_S = 3;
 export const OVERLOAD_S = 5;
 export const OVERLOAD_FACTOR = 2; // максимум итогового множителя ×10
 export const JAMMER_S = 5;
-export const JAMMER_TARGETS = 3; // всегда 3 ближайших соперника, даже если их меньше
-export const POWERUPS = ['repair', 'ammo', 'shield', 'freeze', 'clear', 'overload', 'jammer'] as const;
+export const POWERUPS = ['repair', 'ammo', 'shield', 'freeze', 'overload', 'double', 'jammer'] as const;
 export type PowerupKind = (typeof POWERUPS)[number];
-/** По 5 на режим: три общих и два своих (SPACE_WAR_SPEC §5 «Усиления»). */
+/** Решение заказчика: Расчистки нет; Заморозка, Перегрузка и «×2 пули» — во всех режимах; Глушилка — только против соперников. */
 export const POWERUPS_OF_MODE: Record<Mode, readonly PowerupKind[]> = {
-  coop: ['repair', 'ammo', 'shield', 'freeze', 'clear'],
-  versus: ['repair', 'ammo', 'shield', 'overload', 'jammer'],
-  teams: ['repair', 'ammo', 'shield', 'overload', 'jammer'],
+  coop: ['repair', 'ammo', 'shield', 'freeze', 'overload', 'double'],
+  versus: ['repair', 'ammo', 'shield', 'freeze', 'overload', 'double', 'jammer'],
+  teams: ['repair', 'ammo', 'shield', 'freeze', 'overload', 'double', 'jammer'],
 };
-export const POWERUP_RADIUS = 24;
+export const POWERUP_RADIUS = 24; // радиус подбора
 export const POWERUP_BLINK_S = 2; // последние секунды на поле — мигает
 export const POWERUP_BLINK_HZ = 4;
+/** Цвета — по шаблону иконок заказчика (свечение, вспышка подбора). */
 export const POWERUP_COLOR: Record<PowerupKind, string> = {
-  repair: '#3DDC97',
-  ammo: '#FFD23F',
-  shield: '#3DE0FF',
-  freeze: '#A8EEFF',
-  clear: '#FFFFFF',
-  overload: '#C2185B',
-  jammer: '#FF9F43',
+  repair: '#2BFF4A',
+  ammo: '#FFA51F',
+  shield: '#0059FF',
+  freeze: '#00FFE6',
+  overload: '#FF3B30',
+  double: '#FFC46B',
+  jammer: '#FFFFFF',
 };
+// «×2 пули» (решение заказчика): 10 с два снаряда за один патрон, каждый — двойной урон.
+export const DOUBLE_S = 10;
+export const DOUBLE_DAMAGE = 2;
+export const DOUBLE_OFFSET = 9; // снаряды идут рядом, на столько в стороны от оси
+export const DOUBLE_SPARK_PER_S = 10; // мелкие искры на полосках патронов, пока действует
+// Выпадение: вспышка и свечение, усиление подпрыгивает и медленно плывёт в случайную сторону.
+export const POWERUP_ICON_PX = 48; // видимый размер значка
+export const POWERUP_DRIFT_SPEED = 22; // px/с
+export const POWERUP_HOP_S = 0.7;
+export const POWERUP_HOP_PX = 30;
+export const POWERUP_BOB_PX = 4; // потом — мягко покачивается
+export const POWERUP_BOB_HZ = 0.8;
+export const POWERUP_HALO_PX = 34;
+export const POWERUP_HALO_ALPHA = 0.28;
+export const POWERUP_DROP_SPARKS = 18;
+export const POWERUP_DROP_RING_S = 0.45;
+export const POWERUP_DROP_RING_PX = 70;
+// Подбор: неяркая вспышка корабля цветом усиления; ремонт — сердечко подрастает, боезапас — полоски ярче и чуть больше.
+export const PICKUP_FLASH_S = 0.4;
+export const PICKUP_FLASH_ALPHA = 0.55;
+export const PICKUP_FLASH_PX = 7;
+export const HEART_POP_S = 1;
+export const HEART_POP_SCALE = 0.7;
+export const AMMO_GLOW_S = 1;
+export const AMMO_GLOW_SCALE = 0.35;
+export const AMMO_GLOW_ALPHA = 0.5;
+export const AMMO_JAMMED_COLOR = '#6B6B6B'; // под Глушилкой полоски серые
 /** Перегрузка: корабль и след ярко-бордовые (не красный палитры); за 1 с до конца тускнеет. */
 export const OVERLOAD_COLOR = '#C2185B';
 export const OVERLOAD_FADE_S = 1;
