@@ -1,13 +1,13 @@
 // Профиль клавиатурного игрока в лобби (§11): ник, поля игрока из схемы игры и цвет.
 // Телефон меняет то же самое у себя в настройках; этим окном пользуются игроки у экрана.
-// Варианты с иконками (например, формы корпуса) — сеткой иконок по группам.
+// Варианты с иконками (например, формы корпуса) — рядами по разделам с подписью; слева — превью выбранного
+// крупно в цвете игрока и никнейм; внизу — «Отмена» и «Сохранить» (макет заказчика).
 import { NICK_MAX_LEN, PLAYER_COLORS } from '../../shared/config';
 import type { LobbyField } from '../../shared/game-manifest';
 import { t } from '../../shared/i18n';
 import type { LobbyValue } from '../../shared/protocol';
-import { h, icon } from '../ui/dom';
+import { h } from '../ui/dom';
 import { BACK_EVENT } from '../ui/focus';
-import { ICONS } from '../ui/icons';
 
 export interface ProfileDraft {
   nick: string;
@@ -32,7 +32,7 @@ export interface ProfileEditor {
 }
 
 /** Ряды вариантов: по группам в порядке появления. */
-function groupsOf<T extends { group?: string }>(options: readonly T[]): T[][] {
+function groupsOf<T extends { group?: string; groupLabel?: string }>(options: readonly T[]): T[][] {
   const rows = new Map<string, T[]>();
   for (const o of options) {
     const key = o.group ?? '';
@@ -78,6 +78,8 @@ export function createProfileEditor(): ProfileEditor {
       render(`f:${key}=${value}`);
     };
 
+    // Поле с иконками (например, корпус) — сеткой по разделам с подписью; оно же в превью слева.
+    const iconField = input.fields.find((f) => f.kind === 'select' && f.options.some((o) => o.icon));
     const fieldBlocks = input.fields.map((field) => {
       const value = draft.fields[field.key] ?? field.default;
       if (field.kind === 'toggle') {
@@ -90,7 +92,8 @@ export function createProfileEditor(): ProfileEditor {
       const rows = groupsOf(field.options).map((row) =>
         h(
           'div',
-          { class: withIcons ? 'pe__icons' : 'pe__chips', role: 'radiogroup' },
+          { class: withIcons ? 'pe__row' : 'pe__chips', role: 'radiogroup' },
+          withIcons && row[0]?.groupLabel && h('span', { class: 'pe__row-label' }, input.label(row[0].groupLabel)),
           ...row.map((o) => {
             const b = h(
               'button',
@@ -111,7 +114,7 @@ export function createProfileEditor(): ProfileEditor {
           }),
         ),
       );
-      return h('section', { class: 'pe__block' }, h('p', { class: 'pe__label' }, input.label(field.label)), ...rows);
+      return h('section', { class: 'pe__block' }, h('h3', { class: 'pe__title' }, input.label(field.label)), ...rows);
     });
 
     const colors = h(
@@ -136,8 +139,17 @@ export function createProfileEditor(): ProfileEditor {
       }),
     );
 
-    const ok = h('button', { class: 'pe__action pe__action--ok', type: 'button', 'aria-label': t('lobby.save'), 'data-focus-key': 'ok' }, icon(ICONS.check));
-    const cancel = h('button', { class: 'pe__action', type: 'button', 'aria-label': t('lobby.cancel'), 'data-focus-key': 'cancel' }, icon(ICONS.close));
+    // Превью: выбранный вариант крупно в цвете игрока; под ним — «Раздел · «Название»».
+    const chosen = iconField?.kind === 'select' ? iconField.options.find((o) => o.value === (draft.fields[iconField.key] ?? iconField.default)) : undefined;
+    const art = h('div', { class: 'pe__art' });
+    if (chosen?.icon) art.innerHTML = chosen.icon;
+    else art.append(h('span', { class: 'pe__letter' }, (draft.nick || input.defaultNick).slice(0, 1).toUpperCase()));
+    const caption = chosen
+      ? [chosen.groupLabel ? input.label(chosen.groupLabel) : '', `«${input.label(chosen.label)}»`].filter(Boolean).join(' · ')
+      : '';
+
+    const ok = h('button', { class: 'pe__btn pe__btn--ok', type: 'button', 'data-focus-key': 'ok' }, t('lobby.save'));
+    const cancel = h('button', { class: 'pe__btn', type: 'button', 'data-focus-key': 'cancel' }, t('lobby.cancel'));
     ok.addEventListener('click', () => {
       input.save({ ...draft, nick: draft.nick.trim() });
       close();
@@ -148,13 +160,20 @@ export function createProfileEditor(): ProfileEditor {
       h(
         'div',
         { class: 'pe' },
-        h('header', { class: 'pe__head' }, h('p', { class: 'pe__label' }, t('lobby.nick')), h('div', { class: 'pe__actions' }, ok, cancel)),
-        nick,
+        h(
+          'aside',
+          { class: 'pe__side' },
+          art,
+          caption && h('p', { class: 'pe__caption' }, caption),
+          h('p', { class: 'pe__nick-label' }, t('lobby.nick')),
+          nick,
+        ),
         h(
           'div',
-          { class: 'pe__body' },
-          h('div', { class: 'pe__fields' }, ...fieldBlocks),
-          h('section', { class: 'pe__block' }, h('p', { class: 'pe__label' }, t('lobby.color')), colors),
+          { class: 'pe__main' },
+          ...fieldBlocks,
+          h('section', { class: 'pe__block' }, h('h3', { class: 'pe__title' }, t('lobby.color')), colors),
+          h('div', { class: 'pe__buttons' }, cancel, ok),
         ),
       ),
     );

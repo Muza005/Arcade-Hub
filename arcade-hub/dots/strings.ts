@@ -23,6 +23,7 @@ export type DotsKey =
   | 'setShape'
   | 'shapeCircle'
   | 'shapeSquare'
+  | 'groupShapes'
   | 'awardStars'
   | 'colStars'
   | 'metaBest'
@@ -52,6 +53,7 @@ export const strings: GameStrings<DotsKey> = {
     setShape: 'Форма',
     shapeCircle: 'Круг',
     shapeSquare: 'Квадрат',
+    groupShapes: 'Формы',
     awardStars: 'Больше всех звёзд',
     colStars: 'Звёзды',
     metaBest: 'Лучший — {nick}, {score} ★',
@@ -80,6 +82,7 @@ export const strings: GameStrings<DotsKey> = {
     setShape: 'Shape',
     shapeCircle: 'Circle',
     shapeSquare: 'Square',
+    groupShapes: 'Shapes',
     awardStars: 'Most stars',
     colStars: 'Stars',
     metaBest: 'Best — {nick}, {score} ★',

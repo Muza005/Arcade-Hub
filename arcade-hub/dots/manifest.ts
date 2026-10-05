@@ -75,8 +75,9 @@ export const dotsManifest: GameManifest = {
         label: 'setShape',
         kind: 'select',
         options: [
-          { value: 'circle', label: 'shapeCircle', icon: SHAPE_ICONS.circle },
-          { value: 'square', label: 'shapeSquare', icon: SHAPE_ICONS.square },
+          // Подпись ряда (проверка подписей разделов в окне профиля).
+          { value: 'circle', label: 'shapeCircle', icon: SHAPE_ICONS.circle, group: 'shapes', groupLabel: 'groupShapes' },
+          { value: 'square', label: 'shapeSquare', icon: SHAPE_ICONS.square, group: 'shapes', groupLabel: 'groupShapes' },
         ],
         default: SHAPE_DEFAULT,
       },

@@ -539,6 +539,7 @@ export function createLobby(options: LobbyOptions): Lobby {
                   label: tg(o.label),
                   ...(o.icon ? { icon: o.icon } : {}),
                   ...(o.group ? { group: o.group } : {}),
+                  ...(o.groupLabel ? { groupLabel: tg(o.groupLabel) } : {}),
                 })),
               }
             : {}),

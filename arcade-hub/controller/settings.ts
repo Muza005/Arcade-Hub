@@ -114,19 +114,64 @@ export function createSettings(cb: SettingsCallbacks): Settings {
     return head;
   };
 
-  /** Поля игрока из лобби: варианты с иконками — сеткой по группам, остальные — кнопками. */
-  const lobbyRows = (panel: LobbyPanel): HTMLElement[] =>
-    panel.fields.map((field) => {
-      const value = panel.values[field.key];
+  /** Профиль — черновиком (макет заказчика): применяется по «Сохранить», «Отмена» — без изменений. */
+  let draft: { nick: string; color: string; values: Record<string, LobbyValue> } | null = null;
+  const openProfile = (c: SettingsContext): void => {
+    draft = { nick: c.slot.nick, color: c.slot.color, values: { ...(c.lobby?.values ?? {}) } };
+    view = 'profile';
+    render();
+  };
+  const closeProfile = (): void => {
+    draft = null;
+    view = 'main';
+    render();
+  };
+
+  const renderProfile = (c: SettingsContext): HTMLElement[] => {
+    const { slot, lobby } = c;
+    const d = draft ?? { nick: slot.nick, color: slot.color, values: { ...(lobby?.values ?? {}) } };
+    draft = d;
+    const root = el('div', 'profile');
+    root.style.setProperty('--player', d.color);
+
+    // Превью: выбранный вариант с иконкой (корпус) крупно в цвете игрока; иначе — буква ника.
+    const iconField = lobby?.fields.find((f) => f.options?.some((o) => o.icon));
+    const chosen = iconField?.options?.find((o) => o.value === d.values[iconField.key]);
+    const art = el('div', 'profile__art');
+    if (chosen?.icon) art.innerHTML = chosen.icon;
+    else art.append(el('span', 'profile__letter', (d.nick || slot.nick).slice(0, 1).toUpperCase()));
+    const caption = chosen ? [chosen.groupLabel, `«${chosen.label}»`].filter(Boolean).join(' · ') : '';
+    const nick = el('input', 'nick profile__nick');
+    nick.maxLength = NICK_MAX_LEN;
+    nick.value = d.nick;
+    nick.autocomplete = 'off';
+    nick.enterKeyHint = 'done';
+    nick.setAttribute('aria-label', t('ctrl.nick'));
+    nick.addEventListener('input', () => (d.nick = nick.value));
+    nick.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') nick.blur();
+    });
+    const card = el('section', 'profile__card');
+    const who = el('div', 'profile__who');
+    if (caption) who.append(el('p', 'profile__caption', caption));
+    who.append(nick);
+    card.append(art, who);
+
+    // Поля игрока: варианты с иконками — рядами по разделам, остальные — кнопками.
+    const fields = el('div', 'profile__fields');
+    for (const field of lobby?.fields ?? []) {
+      const value = d.values[field.key];
       const pick = (v: LobbyValue): void => {
-        panel.values = { ...panel.values, [field.key]: v };
-        cb.lobbyField(field.key, v);
+        d.values = { ...d.values, [field.key]: v };
         render();
       };
-      if (field.kind === 'toggle') return toggle(field.label, value === true, () => pick(value !== true));
+      if (field.kind === 'toggle') {
+        fields.append(toggle(field.label, value === true, () => pick(value !== true)));
+        continue;
+      }
       const options = field.options ?? [];
       const withIcons = options.some((o) => o.icon);
-      const rows = groupsOf(options).map((group) => {
+      for (const group of groupsOf(options)) {
         const line = el('div', withIcons ? 'hulls' : 'seg');
         line.setAttribute('role', 'radiogroup');
         for (const o of group) {
@@ -137,39 +182,42 @@ export function createSettings(cb: SettingsCallbacks): Settings {
           b.addEventListener('click', () => pick(o.value));
           line.append(b);
         }
-        return line;
-      });
-      return row(field.label, ...rows);
-    });
+        fields.append(line);
+      }
+    }
 
-  const renderProfile = ({ slot, lobby }: SettingsContext): HTMLElement[] => {
-    const nick = el('input', 'nick');
-    nick.maxLength = NICK_MAX_LEN;
-    nick.value = slot.nick;
-    nick.autocomplete = 'off';
-    nick.enterKeyHint = 'done';
-    nick.setAttribute('aria-label', t('ctrl.nick'));
-    nick.addEventListener('change', () => cb.profile(nick.value, slot.color));
-    nick.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') nick.blur();
-    });
     const colors = el('div', 'colors');
     const taken = new Set(slot.taken);
     for (const color of PLAYER_COLORS) {
       const b = button('color', undefined, color);
       b.style.setProperty('--c', color);
       b.setAttribute('role', 'radio');
-      b.setAttribute('aria-checked', String(color === slot.color));
-      b.disabled = taken.has(color);
-      b.addEventListener('click', () => cb.profile(nick.value || slot.nick, color));
+      b.setAttribute('aria-checked', String(color === d.color));
+      b.disabled = taken.has(color) && color !== slot.color;
+      b.addEventListener('click', () => {
+        d.color = color;
+        render();
+      });
       colors.append(b);
     }
-    return [
-      header(t('ctrl.nick'), () => ((view = 'main'), render())),
-      nick,
-      ...(lobby ? lobbyRows(lobby) : []),
-      row(t('ctrl.color'), colors),
-    ];
+    const colorBlock = el('section', 'profile__colors');
+    colorBlock.append(el('h2', 'set-row__title', t('ctrl.color')), colors);
+
+    const save = button('profile__save', t('lobby.save'));
+    save.addEventListener('click', () => {
+      const name = d.nick.trim() || slot.nick;
+      if (name !== slot.nick || d.color !== slot.color) cb.profile(name, d.color);
+      for (const [key, v] of Object.entries(d.values)) if (lobby && lobby.values[key] !== v) cb.lobbyField(key, v);
+      if (lobby) lobby.values = { ...d.values };
+      closeProfile();
+    });
+    const cancel = button('profile__cancel', t('lobby.cancel'));
+    cancel.addEventListener('click', closeProfile);
+    const buttons = el('div', 'profile__buttons');
+    buttons.append(cancel, save);
+
+    root.append(card, fields, colorBlock, buttons);
+    return [root];
   };
 
   const renderHandoff = ({ slot }: SettingsContext): HTMLElement[] => {
@@ -206,7 +254,7 @@ export function createSettings(cb: SettingsCallbacks): Settings {
       avatar.innerHTML = chosen;
     }
     who.append(avatar, el('span', 'who__nick', slot.nick), el('span', 'who__edit', '›'));
-    who.addEventListener('click', () => ((view = 'profile'), render()));
+    who.addEventListener('click', () => openProfile(c));
     parts.push(who);
 
     const mode = c.modes.includes(prefs.mode) ? prefs.mode : (c.modes[0] ?? 'joystick');
@@ -306,6 +354,7 @@ export function createSettings(cb: SettingsCallbacks): Settings {
       render();
     },
     hide() {
+      draft = null;
       root.hidden = true;
       root.replaceChildren();
     },

@@ -562,10 +562,11 @@ export const BOT_SAB_LEAD_S = 0.8;
 // ─── Лобби (Б5, SPACE_WAR_SPEC §8) ───────────────────────────────
 /** Формы корпуса: треугольник, круг, квадрат, звезда — у каждой свои варианты рисунка. Хитбокс у всех один. */
 export const HULLS = [
-  'arrow', 'delta', 'wing', 'dart', 'chevron', 'needle', // треугольник
-  'ring', 'core', 'half', // круг
-  'box', 'diamond', 'kite', 'prism', // квадрат
-  'star5', 'star4', // звезда
+  'arrow', 'spire', 'delta', 'needle', 'stealth', 'chevron', // треугольные
+  'planet', 'jelly', 'saucer', 'comet', 'arch', 'dome', // круглые
+  'diamond', 'gem', 'crystal', 'prism', 'ark', 'tower', // гранёные
+  'rocket', 'jet', 'raptor', 'starship', 'nova', 'bat', // крылатые
+  'spark', 'star', 'bolt', 'sword', 'cat', 'ghost', // особые
 ] as const;
 export type Hull = (typeof HULLS)[number];
 export const HULL_DEFAULT: Hull = 'arrow';

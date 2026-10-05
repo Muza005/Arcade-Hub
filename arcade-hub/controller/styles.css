@@ -891,30 +891,131 @@ button {
   width: 100%;
 }
 
-/* Поля игрока из лобби в профиле (например, корпус): иконки рядами по видам формы. */
-.hulls {
+/* ─── Профиль (макет заказчика) ───
+   Вертикально: карточка (превью, раздел и название, ник) → корпуса рядами по разделам → цвета → «Отмена» и «Сохранить».
+   Горизонтально — три колонки: карточка | корпуса | цвета и кнопки. Всё внутри безопасной зоны (.settings). */
+.profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'card' 'fields' 'colors' 'buttons';
+  gap: 14px;
+}
+
+.profile__card {
+  grid-area: card;
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.profile__art {
+  width: 92px;
+  height: 92px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--player) 18%, var(--surface));
+  color: var(--player);
+}
+
+.profile__art svg {
+  width: 64%;
+  height: 64%;
+}
+
+.profile__art svg :is(polygon, circle):not([fill]) {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+.profile__letter {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 700;
+}
+
+.profile__who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__caption {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.profile__nick {
+  height: 48px;
+  border-radius: 12px;
+  font-size: 17px;
+}
+
+.profile__fields {
+  grid-area: fields;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__colors {
+  grid-area: colors;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__buttons {
+  grid-area: buttons;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+}
+
+.profile__cancel,
+.profile__save {
+  height: 52px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.profile__cancel {
+  border: 2px solid var(--line);
+  background: none;
+}
+
+.profile__save {
+  border: 0;
+  background: var(--ok);
+  color: var(--bg);
+}
+
+/* Корпуса: ряд раздела — шесть иконок поровну; выбранный — в рамке цвета игрока. */
+.hulls {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 6px;
   border-radius: 14px;
   background: var(--surface);
 }
 
-.hulls + .hulls {
-  margin-top: 8px;
-}
-
 .hull {
-  width: 48px;
-  height: 48px;
+  aspect-ratio: 1.15;
   display: grid;
   place-items: center;
-  padding: 8px;
-  border: 0;
+  padding: 9px;
+  border: 1.5px solid transparent;
   border-radius: 10px;
   background: none;
-  color: var(--text);
+  color: var(--text-2);
 }
 
 .hull svg {
@@ -923,8 +1024,63 @@ button {
 }
 
 .hull[aria-checked='true'] {
-  background: rgb(255 255 255 / 0.14);
+  border-color: var(--player);
+  background: var(--surface-2);
   color: var(--player);
+}
+
+@media (orientation: landscape) {
+  .profile {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 2fr) minmax(0, 0.95fr);
+    grid-template-rows: 1fr auto;
+    grid-template-areas: 'card fields colors' 'card fields buttons';
+    align-items: stretch;
+  }
+
+  .profile__card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile__art {
+    width: 100%;
+    height: auto;
+    flex: 1;
+    min-height: 120px;
+  }
+
+  .profile__art svg {
+    width: 48%;
+    height: auto;
+  }
+
+  .profile__caption {
+    text-align: center;
+  }
+
+  .profile__fields {
+    gap: 6px;
+  }
+
+  .profile__fields .hull {
+    aspect-ratio: auto;
+    height: 40px;
+    padding: 7px;
+  }
+
+  .profile__colors .colors {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .profile__buttons {
+    grid-template-columns: 1fr;
+    align-self: end;
+  }
+
+  .profile__cancel {
+    order: 2;
+  }
 }
 
 .plate__avatar.plate__avatar--icon {

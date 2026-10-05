@@ -22,20 +22,40 @@ export type SpaceWarKey =
   | 'time'
   | 'setHull'
   | 'hull_arrow'
+  | 'hull_spire'
   | 'hull_delta'
-  | 'hull_wing'
-  | 'hull_dart'
-  | 'hull_chevron'
   | 'hull_needle'
-  | 'hull_half'
-  | 'hull_kite'
-  | 'hull_prism'
-  | 'hull_ring'
-  | 'hull_core'
-  | 'hull_box'
+  | 'hull_stealth'
+  | 'hull_chevron'
+  | 'hull_planet'
+  | 'hull_jelly'
+  | 'hull_saucer'
+  | 'hull_comet'
+  | 'hull_arch'
+  | 'hull_dome'
   | 'hull_diamond'
-  | 'hull_star5'
-  | 'hull_star4'
+  | 'hull_gem'
+  | 'hull_crystal'
+  | 'hull_prism'
+  | 'hull_ark'
+  | 'hull_tower'
+  | 'hull_rocket'
+  | 'hull_jet'
+  | 'hull_raptor'
+  | 'hull_starship'
+  | 'hull_nova'
+  | 'hull_bat'
+  | 'hull_spark'
+  | 'hull_star'
+  | 'hull_bolt'
+  | 'hull_sword'
+  | 'hull_cat'
+  | 'hull_ghost'
+  | 'group_tri'
+  | 'group_round'
+  | 'group_facet'
+  | 'group_wing'
+  | 'group_special'
   | 'setCollisions'
   | 'setRockBounce'
   | 'setPowerupRate'
@@ -174,20 +194,40 @@ export const strings: GameStrings<SpaceWarKey> = {
     colTeam: 'Команда',
     setHull: 'Корпус',
     hull_arrow: 'Стрела',
+    hull_spire: 'Шпиль',
     hull_delta: 'Дельта',
-    hull_wing: 'Крыло',
-    hull_dart: 'Дротик',
-    hull_chevron: 'Шеврон',
     hull_needle: 'Игла',
-    hull_half: 'Полукруг',
-    hull_kite: 'Змей',
-    hull_prism: 'Призма',
-    hull_ring: 'Кольцо',
-    hull_core: 'Ядро',
-    hull_box: 'Короб',
+    hull_stealth: 'Стелс',
+    hull_chevron: 'Шеврон',
+    hull_planet: 'Планета',
+    hull_jelly: 'Медуза',
+    hull_saucer: 'Тарелка',
+    hull_comet: 'Комета',
+    hull_arch: 'Арка',
+    hull_dome: 'Купол',
     hull_diamond: 'Ромб',
-    hull_star5: 'Звезда',
-    hull_star4: 'Звезда-4',
+    hull_gem: 'Самоцвет',
+    hull_crystal: 'Кристалл',
+    hull_prism: 'Призма',
+    hull_ark: 'Ковчег',
+    hull_tower: 'Башня',
+    hull_rocket: 'Ракета',
+    hull_jet: 'Истребитель',
+    hull_raptor: 'Хищник',
+    hull_starship: 'Звездолёт',
+    hull_nova: 'Сверхновая',
+    hull_bat: 'Летучая мышь',
+    hull_spark: 'Искра',
+    hull_star: 'Звезда',
+    hull_bolt: 'Молния',
+    hull_sword: 'Меч',
+    hull_cat: 'Кот',
+    hull_ghost: 'Призрак',
+    group_tri: 'Треугольные',
+    group_round: 'Круглые',
+    group_facet: 'Гранёные',
+    group_wing: 'Крылатые',
+    group_special: 'Особые',
     setCollisions: 'Столкновения кораблей',
     setRockBounce: 'Отскок астероидов',
     setPowerupRate: 'Частота усилений',
@@ -326,20 +366,40 @@ export const strings: GameStrings<SpaceWarKey> = {
     colTeam: 'Team',
     setHull: 'Hull',
     hull_arrow: 'Arrow',
+    hull_spire: 'Spire',
     hull_delta: 'Delta',
-    hull_wing: 'Wing',
-    hull_dart: 'Dart',
-    hull_chevron: 'Chevron',
     hull_needle: 'Needle',
-    hull_half: 'Half',
-    hull_kite: 'Kite',
-    hull_prism: 'Prism',
-    hull_ring: 'Ring',
-    hull_core: 'Core',
-    hull_box: 'Box',
+    hull_stealth: 'Stealth',
+    hull_chevron: 'Chevron',
+    hull_planet: 'Planet',
+    hull_jelly: 'Jellyfish',
+    hull_saucer: 'Saucer',
+    hull_comet: 'Comet',
+    hull_arch: 'Arch',
+    hull_dome: 'Dome',
     hull_diamond: 'Diamond',
-    hull_star5: 'Star',
-    hull_star4: 'Star-4',
+    hull_gem: 'Gem',
+    hull_crystal: 'Crystal',
+    hull_prism: 'Prism',
+    hull_ark: 'Ark',
+    hull_tower: 'Tower',
+    hull_rocket: 'Rocket',
+    hull_jet: 'Jet',
+    hull_raptor: 'Raptor',
+    hull_starship: 'Starship',
+    hull_nova: 'Nova',
+    hull_bat: 'Bat',
+    hull_spark: 'Spark',
+    hull_star: 'Star',
+    hull_bolt: 'Bolt',
+    hull_sword: 'Sword',
+    hull_cat: 'Cat',
+    hull_ghost: 'Ghost',
+    group_tri: 'Triangular',
+    group_round: 'Round',
+    group_facet: 'Faceted',
+    group_wing: 'Winged',
+    group_special: 'Special',
     setCollisions: 'Ship collisions',
     setRockBounce: 'Asteroid bounce',
     setPowerupRate: 'Power-up frequency',

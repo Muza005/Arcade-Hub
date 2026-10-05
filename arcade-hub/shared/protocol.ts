@@ -135,7 +135,7 @@ export interface PhoneField {
   key: string;
   label: string;
   kind: 'toggle' | 'select';
-  options?: Array<{ value: string | number; label: string; icon?: string; group?: string }>;
+  options?: Array<{ value: string | number; label: string; icon?: string; group?: string; groupLabel?: string }>;
 }
 
 /** Поля игрока в лобби (ARCADE_HUB_SPEC §11): телефон выбирает своё сам — например, форму корпуса. */
