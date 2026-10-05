@@ -17,10 +17,23 @@ export interface GameMode {
 
 // ─── Схема лобби (§11): игра описывает поля, лобби их рисует и сохраняет ───
 
+/** Что видно лобби, когда оно решает, имеет ли поле смысл. */
+export interface LobbyState {
+  mode: string;
+  settings: MatchSettings;
+  /** Сколько ботов добавлено. */
+  bots: number;
+}
+
 interface FieldBase {
   key: string;
   /** Ключ словаря игры. */
   label: string;
+  /** SVG-иконка у названия (цвет — currentColor). */
+  icon?: string;
+  /** Имеет ли поле смысл сейчас (например, частота усилений при выключенных усилениях). Нет — лобби гасит поле,
+   *  значение остаётся. */
+  active?: (state: LobbyState) => boolean;
 }
 
 export interface ToggleField extends FieldBase {
@@ -44,6 +57,8 @@ export interface SelectOption {
   icon?: string;
   /** Варианты с одной группой стоят в одном ряду (например, формы корпуса одного вида). */
   group?: string;
+  /** Цвет варианта: в настройках матча выбор из иконок — цветные кнопки (например, сложность от зелёного к красному). */
+  color?: string;
 }
 
 export interface SelectField extends FieldBase {

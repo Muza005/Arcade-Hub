@@ -3,10 +3,13 @@
 // Что из настроек работает уже сейчас, а что ждёт своего этапа, — в комментариях.
 import type { LobbySchema } from '../../shared/game-manifest';
 import {
+  BOT_LEVEL_COLOR,
   BOT_LEVEL_DEFAULT,
   BOT_LEVELS,
   DIFFICULTIES,
+  DIFFICULTY_COLOR,
   DIFFICULTY_DEFAULT,
+  RATE_COLOR,
   ROCK_BOUNCE_DEFAULT,
   POWERUP_RATE_DEFAULT,
   POWERUP_RATE_KEYS,
@@ -17,6 +20,14 @@ import {
   QUALITY_CHOICES,
 } from '../config';
 import { HULL_SHAPES, hullSvg } from '../hull-shapes';
+import {
+  BOT_LEVEL_ICONS,
+  BOTS_FIELD_ICON,
+  DIFFICULTY_FIELD_ICON,
+  DIFFICULTY_ICONS,
+  RATE_FIELD_ICON,
+  RATE_ICONS,
+} from './icons';
 
 export const lobbySchema: LobbySchema = {
   playerFields: [
@@ -31,17 +42,19 @@ export const lobbySchema: LobbySchema = {
   settings: [
     // Столкновения и таран — Б7.
     { key: 'collisions', label: 'setCollisions', kind: 'toggle', default: true },
-    // Камни отскакивают друг от друга — решение заказчика после Б11.
+    // Отскок астероидов друг от друга — решение заказчика после Б11.
     { key: 'rockBounce', label: 'setRockBounce', kind: 'toggle', default: ROCK_BOUNCE_DEFAULT },
     // Усиления — Б11.
     { key: 'powerups', label: 'setPowerups', kind: 'toggle', default: true },
-    // Частота усилений — решение заказчика после Б13.
+    // Частота усилений — решение заказчика после Б13; без усилений гаснет.
     {
       key: 'powerupRate',
       label: 'setPowerupRate',
       kind: 'select',
-      options: POWERUP_RATE_KEYS.map((r) => ({ value: r, label: `rate_${r}` })),
+      icon: RATE_FIELD_ICON,
+      options: POWERUP_RATE_KEYS.map((r) => ({ value: r, label: `rate_${r}`, icon: RATE_ICONS[r], color: RATE_COLOR[r] })),
       default: POWERUP_RATE_DEFAULT,
+      active: ({ settings }) => settings.powerups !== false,
     },
     // Саботаж погибших — Б10.
     { key: 'sabotage', label: 'setSabotage', kind: 'toggle', default: true },
@@ -50,7 +63,8 @@ export const lobbySchema: LobbySchema = {
       key: 'difficulty',
       label: 'setDifficulty',
       kind: 'select',
-      options: DIFFICULTIES.map((d) => ({ value: d, label: `diff_${d}` })),
+      icon: DIFFICULTY_FIELD_ICON,
+      options: DIFFICULTIES.map((d) => ({ value: d, label: `diff_${d}`, icon: DIFFICULTY_ICONS[d], color: DIFFICULTY_COLOR[d] })),
       default: DIFFICULTY_DEFAULT,
     },
     // Работает сейчас: «Авто» — берётся из настроек хаба.
@@ -61,15 +75,17 @@ export const lobbySchema: LobbySchema = {
       options: QUALITY_CHOICES.map((q) => ({ value: q, label: `q_${q}` })),
       default: 'auto',
     },
-    // Время призрака — Б10.
-    { key: 'ghostS', label: 'setGhost', kind: 'slider', ...GHOST_S_RANGE, default: GHOST_S },
-    // Уровень ботов — Б6.
+    // Время призрака — Б10. В соревновании погибший сразу саботажник — поле гаснет.
+    { key: 'ghostS', label: 'setGhost', kind: 'slider', ...GHOST_S_RANGE, default: GHOST_S, active: ({ mode }) => mode !== 'versus' },
+    // Уровень ботов — Б6; без ботов гаснет.
     {
       key: 'botLevel',
       label: 'setBots',
       kind: 'select',
-      options: BOT_LEVELS.map((b) => ({ value: b, label: `bot_${b}` })),
+      icon: BOTS_FIELD_ICON,
+      options: BOT_LEVELS.map((b) => ({ value: b, label: `bot_${b}`, icon: BOT_LEVEL_ICONS[b], color: BOT_LEVEL_COLOR[b] })),
       default: BOT_LEVEL_DEFAULT,
+      active: ({ bots }) => bots > 0,
     },
   ],
 };

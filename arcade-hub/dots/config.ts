@@ -27,6 +27,16 @@ export const FIELD_RADIUS = 28;
 
 export const MATCH_S_DEFAULT = 60;
 export const MATCH_S_OPTIONS = [30, 60, 90] as const; // схема лобби — этап А6
+/** Длительность в лобби — иконками (проверка выбора иконками): секундомер у названия; у вариантов — часы,
+ *  сектор — доля полутора минут, цвет — от короткого к длинному. */
+const ICON_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">';
+export const DURATION_ICON = `${ICON_OPEN}<circle cx="12" cy="13.5" r="7.5"/><path d="M10 3h4M12 3v3M12 13.5V10"/></svg>`;
+export const DURATION_ICONS: Record<(typeof MATCH_S_OPTIONS)[number], string> = {
+  30: `${ICON_OPEN}<circle cx="12" cy="12" r="9.5"/><path d="M12 12V5.5A6.5 6.5 0 0 1 17.63 15.25Z" fill="currentColor" stroke="none"/></svg>`,
+  60: `${ICON_OPEN}<circle cx="12" cy="12" r="9.5"/><path d="M12 12V5.5A6.5 6.5 0 1 1 6.37 15.25Z" fill="currentColor" stroke="none"/></svg>`,
+  90: `${ICON_OPEN}<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6.5" fill="currentColor" stroke="none"/></svg>`,
+};
+export const DURATION_COLORS: Record<(typeof MATCH_S_OPTIONS)[number], string> = { 30: '#7FE7FF', 60: '#FFC46B', 90: '#FF8A65' };
 export const DASH_ENABLED_DEFAULT = true;
 /** Бросок звёзд с телефона (проверка раскладки «прицел»): телефоны не летают, а бросают звёзды с края поля. */
 export const THROW_ENABLED_DEFAULT = false;

@@ -835,9 +835,10 @@
   background: color-mix(in srgb, var(--bg) 92%, transparent);
 }
 
+/* Крупно, но не во весь экран (решение заказчика: на 30 % меньше прежних 80vh). */
 .qr-zoom__plate {
-  width: min(80vh, 90vw);
-  height: min(80vh, 90vw);
+  width: min(56vh, 63vw);
+  height: min(56vh, 63vw);
   padding: calc(24rem / 24);
   border-radius: var(--radius-md);
   background: #fff;

@@ -457,6 +457,14 @@ export type Difficulty = (typeof DIFFICULTIES)[number];
 export const DIFFICULTY_DEFAULT: Difficulty = 'normal';
 export const BOT_LEVELS = ['weak', 'mid', 'strong'] as const;
 export const BOT_LEVEL_DEFAULT = 'mid';
+// Цвета вариантов в лобби: от спокойного к жаркому — понятно без подписи
+const CALM = '#8FA3BF';
+const EASY = '#4ADE80';
+const WARM = '#FFC46B';
+const HOT = '#FF5D5D';
+export const RATE_COLOR: Record<PowerupRate, string> = { rare: CALM, normal: EASY, often: WARM, max: '#FF5DA2' };
+export const DIFFICULTY_COLOR: Record<Difficulty, string> = { easy: EASY, normal: WARM, hard: HOT };
+export const BOT_LEVEL_COLOR: Record<BotLevel, string> = { weak: EASY, mid: WARM, strong: HOT };
 export const QUALITY_CHOICES = ['auto', 'low', 'mid', 'high'] as const;
 export const GHOST_S_RANGE = { min: 10, max: 30, step: 5 } as const;
 

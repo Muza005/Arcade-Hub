@@ -2,7 +2,7 @@
 // режим и настройки матча по схеме игры. Старт — у ведущего (или с клавиатуры у экрана).
 import type { KeyboardScheme } from '../../engine/input';
 import { LOBBY_SELECT_CHIPS_MAX, MAX_KEYBOARD_PLAYERS } from '../../shared/config';
-import type { GameManifest, GamePlayer, LobbyField, MatchSettings } from '../../shared/game-manifest';
+import type { GameManifest, GamePlayer, LobbyField, LobbyState, MatchSettings } from '../../shared/game-manifest';
 import { createTranslator, t, tn } from '../../shared/i18n';
 import type { LobbyPanel, LobbyValue } from '../../shared/protocol';
 import type { Room } from '../room';
@@ -167,41 +167,60 @@ export function createLobby(options: LobbyOptions): Lobby {
     return String(value);
   };
 
-  const fieldControl = (scope: string, field: LobbyField, value: LobbyValue, set: (v: LobbyValue) => void): HTMLElement => {
+  /** Поле настроек; погашенное (on = false) — без смысла сейчас: кнопки неактивны, значение остаётся. */
+  const fieldControl = (scope: string, field: LobbyField, value: LobbyValue, set: (v: LobbyValue) => void, on = true): HTMLElement => {
     const key = `${scope}:${field.key}`;
+    const off = on ? {} : { disabled: true };
+    const name = (): HTMLElement[] => [
+      ...(field.icon ? [icon(field.icon, 'field__icon')] : []),
+      h('span', { class: 'field__name' }, tg(field.label)),
+    ];
+    const wrap = (...children: Array<HTMLElement | false>): HTMLElement => h('div', { class: `field${on ? '' : ' field--off'}` }, ...children);
     if (field.kind === 'toggle') {
-      return btn(key, 'field field--toggle', tg(field.label), () => set(stepValue(field, value, 1)), {
+      const b = btn(key, 'field field--toggle', '', () => set(stepValue(field, value, 1)), {
         role: 'switch',
         'aria-checked': String(value === true),
+        ...off,
       });
+      b.append(...name());
+      return b;
     }
     if (field.kind === 'select' && field.options.length <= LOBBY_SELECT_CHIPS_MAX) {
-      return h(
-        'div',
-        { class: 'field' },
-        h('span', { class: 'field__label' }, tg(field.label)),
+      // Варианты с иконками — цветные кнопки без текста; название выбранного — в строке поля, его цветом.
+      const iconic = field.options.every((o) => o.icon);
+      const chosen = field.options.find((o) => o.value === value);
+      return wrap(
+        h(
+          'span',
+          { class: 'field__label' },
+          ...name(),
+          iconic && chosen && h('span', { class: 'field__current', style: chosen.color ? `color: ${chosen.color}` : undefined }, tg(chosen.label)),
+        ),
         h(
           'div',
-          { class: 'field__options', role: 'radiogroup' },
-          ...field.options.map((o) =>
-            btn(`${key}=${o.value}`, 'field__option', tg(o.label), () => set(o.value), {
+          { class: `field__options${iconic ? ' field__options--icons' : ''}`, role: 'radiogroup' },
+          ...field.options.map((o) => {
+            const b = btn(`${key}=${o.value}`, 'field__option', iconic ? '' : tg(o.label), () => set(o.value), {
               role: 'radio',
               'aria-checked': String(o.value === value),
-            }),
-          ),
+              ...(iconic ? { 'aria-label': tg(o.label), title: tg(o.label) } : {}),
+              ...(o.color ? { style: `--opt: ${o.color}` } : {}),
+              ...off,
+            });
+            if (iconic && o.icon) b.append(icon(o.icon, 'field__option-icon'));
+            return b;
+          }),
         ),
       );
     }
-    return h(
-      'div',
-      { class: 'field' },
-      h('span', { class: 'field__label' }, tg(field.label)),
+    return wrap(
+      h('span', { class: 'field__label' }, ...name()),
       h(
         'div',
         { class: 'field__slider' },
-        btn(`${key}:-`, 'field__step', '−', () => set(stepValue(field, value, -1)), { 'aria-label': '−' }),
+        btn(`${key}:-`, 'field__step', '−', () => set(stepValue(field, value, -1)), { 'aria-label': '−', ...off }),
         h('span', { class: 'field__value' }, valueLabel(field, value)),
-        btn(`${key}:+`, 'field__step', '+', () => set(stepValue(field, value, 1)), { 'aria-label': '+' }),
+        btn(`${key}:+`, 'field__step', '+', () => set(stepValue(field, value, 1)), { 'aria-label': '+', ...off }),
       ),
     );
   };
@@ -320,20 +339,27 @@ export function createLobby(options: LobbyOptions): Lobby {
     const { settings: settingFields } = schema();
     const full = r.playing.length >= current.players.max;
 
+    // Режимы — иконками; название выбранного — рядом.
+    const chosenMode = current.modes.find((m) => m.id === mode);
     const modes =
       current.modes.length > 1
         ? h(
             'div',
             { class: 'lobby__modes', role: 'radiogroup' },
-            ...current.modes.map((m) =>
-              btn(`mode:${m.id}`, 'mode-chip', tg(m.title), () => {
+            chosenMode && h('span', { class: 'lobby__mode-name' }, tg(chosenMode.title)),
+            ...current.modes.map((m) => {
+              const b = btn(`mode:${m.id}`, 'mode-chip', '', () => {
                 mode = m.id; // значения настроек при смене режима не меняются
                 persist();
                 render();
-              }, { role: 'radio', 'aria-checked': String(m.id === mode) }),
-            ),
+              }, { role: 'radio', 'aria-checked': String(m.id === mode), 'aria-label': tg(m.title), title: tg(m.title) });
+              b.append(h('img', { class: 'mode-chip__icon', src: m.icon, alt: '' }));
+              return b;
+            }),
           )
         : null;
+    /** Для полей, которые имеют смысл не всегда (частота усилений, уровень ботов…). */
+    const state: LobbyState = { mode, settings, bots };
 
     const start = btn('start', 'btn btn--play lobby__start', t('lobby.start'), () => {
       const config = makeStart();
@@ -385,11 +411,17 @@ export function createLobby(options: LobbyOptions): Lobby {
               { class: 'lobby__settings' },
               h('h2', { class: 'lobby__label' }, t('lobby.settings')),
               ...settingFields.map((f) =>
-                fieldControl('s', f, settings[f.key] ?? f.default, (v) => {
-                  settings = { ...settings, [f.key]: v };
-                  persist();
-                  render();
-                }),
+                fieldControl(
+                  's',
+                  f,
+                  settings[f.key] ?? f.default,
+                  (v) => {
+                    settings = { ...settings, [f.key]: v };
+                    persist();
+                    render();
+                  },
+                  f.active?.(state) ?? true,
+                ),
               ),
               btn('reset', 'link-btn', t('lobby.reset'), () => {
                 settings = defaults(settingFields);

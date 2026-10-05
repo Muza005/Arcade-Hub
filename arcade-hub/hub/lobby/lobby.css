@@ -35,25 +35,44 @@
 .lobby__modes {
   margin-left: auto;
   display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 
-.mode-chip {
-  height: calc(56rem / 24);
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-full);
-  background: var(--surface);
-  color: var(--text-2);
-  font: inherit;
+.lobby__mode-name {
+  margin-right: var(--space-1);
   font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* Режим — иконкой; выбранный — ярче и в рамке цвета игры. */
+.mode-chip {
+  display: grid;
+  place-items: center;
+  width: calc(80rem / 24);
+  height: calc(64rem / 24);
+  padding: 0;
+  border: calc(3rem / 24) solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
   cursor: pointer;
   transition: transform var(--dur-fast) var(--ease);
 }
 
+.mode-chip__icon {
+  width: calc(36rem / 24);
+  height: calc(36rem / 24);
+  opacity: 0.45;
+}
+
 .mode-chip[aria-checked='true'] {
-  background: var(--accent);
-  color: var(--on-accent);
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.mode-chip[aria-checked='true'] .mode-chip__icon {
+  opacity: 1;
 }
 
 .lobby__body {
@@ -233,9 +252,29 @@
 }
 
 .field__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
   font-size: var(--fs-caption);
   font-weight: 500;
   color: var(--text-2);
+}
+
+.field__icon {
+  width: calc(22rem / 24);
+  height: calc(22rem / 24);
+}
+
+/* Название выбранного варианта — справа, его цветом. */
+.field__current {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+/* Поле без смысла сейчас (например, уровень ботов без ботов): погашено, значение сохраняется. */
+.field--off > .field__label,
+.field--off .field__value {
+  opacity: 0.4;
 }
 
 .field__options,
@@ -267,6 +306,23 @@
   color: var(--on-accent);
 }
 
+/* Выбор иконками: иконка цветом варианта; выбранный — залит этим цветом. */
+.field__options--icons .field__option {
+  display: grid;
+  place-items: center;
+  color: var(--opt, var(--text));
+}
+
+.field__options--icons .field__option[aria-checked='true'] {
+  background: var(--opt, var(--accent));
+  color: var(--on-accent);
+}
+
+.field__option-icon {
+  width: calc(34rem / 24);
+  height: calc(34rem / 24);
+}
+
 .field__step {
   width: calc(56rem / 24);
 }
@@ -283,10 +339,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-1);
   padding: 0 var(--space-2);
+  text-align: left;
+}
+
+.field--toggle .field__name {
+  flex: 1;
+}
+
+.field--toggle .field__icon {
+  color: var(--text-2);
 }
 
 .field--toggle::after {
+  flex-shrink: 0;
   content: '';
   width: calc(56rem / 24);
   height: calc(32rem / 24);
