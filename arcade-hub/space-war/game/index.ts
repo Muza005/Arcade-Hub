@@ -2,7 +2,7 @@
 // Б0: поле и FPS. Б1: корабли. Б2: астероиды, жизни, проигрыш. Б3: Power, патроны, множитель, очки.
 // Б4: звёзды, частицы, тряска, вспышки, hit-stop, bloom, аберрация, три уровня качества. Б8: волны и осложнения. Б9: боссы.
 // Б10: призрак, осколки, воскрешение, саботажник (раскладка «прицел» на телефоне). Б11: усиления. Б12: звук. Б13: итоги (повтор, награды, полоски волн), метки записи.
-import { Container, Graphics, Sprite, Text, Texture } from 'pixi.js';
+import { Container, Graphics, Rectangle, Sprite, Text, Texture } from 'pixi.js';
 import { createNotice, type Notice } from '../../engine/notice';
 import { createRng } from '../../engine/rng';
 import { FixedLoop } from '../../engine/loop';
@@ -24,6 +24,7 @@ import {
   CRACK_GLOW,
   DEBRIS_COUNT,
   DEBRIS_S,
+  BREAK_SPARKS_K,
   DEBRIS_SPEED,
   DEBRIS_VFX_SEED,
   FIELD_INSET,
@@ -57,6 +58,7 @@ import {
   SHAKE_BREAK_LARGE,
   SHAKE_DEATH,
   SHAKE_HIT,
+  SHAKE_MAX_PX,
   SHIP_LIVES,
   SPARK_SPEED,
   VIBRATE_EXPLODE_MS,
@@ -520,7 +522,9 @@ export function createSpaceWarGame(): GameModule {
       buzz(d.by, { vib: VIBRATE_EXPLODE_MS });
     }
     for (const b of events.breaks) {
+      // Взрыв камня: осколки и вспышка искр — заметно даже краем глаза.
       shards(b.x, b.y, DEBRIS_COUNT[b.size], ASTEROID_COLOR);
+      sparks(b.x, b.y, DEBRIS_COUNT[b.size] * BREAK_SPARKS_K, ASTEROID_COLOR, DEBRIS_S);
       if (b.size === 'large') camera.shake(SHAKE_BREAK_LARGE);
     }
     for (const c of events.chips) sparks(c.x, c.y, CHIP_COUNT, CRACK_GLOW, DEBRIS_S);
@@ -623,6 +627,11 @@ export function createSpaceWarGame(): GameModule {
         tagsLayer.addChild(view.tag);
       }
       glowLayer.addChild(multFx.view, bulletsView, shipsLayer, particles.view);
+      // Частицы своих границ не считают (ParticleContainer): без явной области bloom считал её по кораблям,
+      // снарядам и боссу — осколки и искры за её краем обрезались или пропадали целиком. Область — всё поле.
+      const world = new Rectangle(-SHAKE_MAX_PX, -SHAKE_MAX_PX, worldW + SHAKE_MAX_PX * 2, worldH + SHAKE_MAX_PX * 2);
+      particles.view.boundsArea = world;
+      glowLayer.filterArea = world;
       vortexFx = createVortexFx((sim.bounds.left + sim.bounds.right) / 2, (sim.bounds.top + sim.bounds.bottom) / 2, ACCENT);
       bg = cssVar('--bg');
       bossView = createBossView(vfx);

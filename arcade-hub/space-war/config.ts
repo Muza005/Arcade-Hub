@@ -145,7 +145,8 @@ export const ASTEROID_TEXTURE_PAD = 4;
 // Осколки: только вид, урона не наносят
 export const DEBRIS_COUNT = { small: 5, medium: 7, large: 9 } as const;
 export const DEBRIS_SPEED = [120, 320] as const;
-export const DEBRIS_S = 0.6;
+export const DEBRIS_S = 0.9; // было 0,6: через полсекунды осколков уже не было видно
+export const BREAK_SPARKS_K = 2; // искр при взрыве камня — вдвое больше, чем осколков
 export const DEBRIS_VFX_SEED = 0xdeb415; // осколки — только вид, своя случайность
 export const INVULN_ALPHA = 0.3; // мигание неуязвимого корабля
 // Три состояния камня по урону: целый, трещины, светящиеся разломы на последнем попадании

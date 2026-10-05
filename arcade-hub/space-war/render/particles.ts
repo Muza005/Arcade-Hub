@@ -103,7 +103,9 @@ export function createParticles(rng: Rng, blend: 'add' | 'normal' = 'add'): Part
         }
         item.p.x += item.vx * dtS;
         item.p.y += item.vy * dtS;
-        item.p.alpha = 1 - item.age / item.life;
+        // Яркие почти до конца, гаснут к концу жизни.
+        const k = item.age / item.life;
+        item.p.alpha = 1 - k * k;
       }
     },
     clear() {
