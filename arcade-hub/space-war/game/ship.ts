@@ -55,7 +55,17 @@ export function clampToBounds(ship: Ship, bounds: Bounds): void {
   ship.pos.y = Math.min(Math.max(ship.pos.y, bounds.top + r), bounds.bottom - r);
 }
 
-export function stepShip(ship: Ship, input: InputState, dtS: number, bounds: Bounds): void {
+/** Что меняет физику корабля на этом шаге: осложнения и прилипшие инопланетяне. */
+export interface ShipMods {
+  /** × сопротивление (Скользкий космос — меньше). */
+  dragK?: number;
+  /** × тяга и предел скорости (инопланетяне — меньше). */
+  powerK?: number;
+  /** Постоянное ускорение (Течение), px/с². */
+  push?: Vec;
+}
+
+export function stepShip(ship: Ship, input: InputState, dtS: number, bounds: Bounds, mods: ShipMods = {}): void {
   ship.prev.x = ship.pos.x;
   ship.prev.y = ship.pos.y;
   ship.prevAngle = ship.angle;
@@ -63,20 +73,22 @@ export function stepShip(ship: Ship, input: InputState, dtS: number, bounds: Bou
   // Тяга: ввод длиннее 1 (диагональ клавиатуры) приводим к 1.
   const len = Math.hypot(input.x, input.y);
   const k = len > 1 ? 1 / len : 1;
-  const ax = input.x * k * SHIP_THRUST;
-  const ay = input.y * k * SHIP_THRUST;
+  const power = mods.powerK ?? 1;
+  const ax = input.x * k * SHIP_THRUST * power + (mods.push?.x ?? 0);
+  const ay = input.y * k * SHIP_THRUST * power + (mods.push?.y ?? 0);
   ship.thrust = Math.min(1, len);
 
   ship.vel.x += ax * dtS;
   ship.vel.y += ay * dtS;
   // Сопротивление: без тяги скорость плавно гаснет.
-  const drag = Math.exp(-SHIP_DRAG * dtS);
+  const drag = Math.exp(-SHIP_DRAG * (mods.dragK ?? 1) * dtS);
   ship.vel.x *= drag;
   ship.vel.y *= drag;
   const speed = Math.hypot(ship.vel.x, ship.vel.y);
-  if (speed > SHIP_MAX_SPEED) {
-    ship.vel.x *= SHIP_MAX_SPEED / speed;
-    ship.vel.y *= SHIP_MAX_SPEED / speed;
+  const max = SHIP_MAX_SPEED * power;
+  if (speed > max) {
+    ship.vel.x *= max / speed;
+    ship.vel.y *= max / speed;
   }
 
   ship.pos.x += ship.vel.x * dtS;

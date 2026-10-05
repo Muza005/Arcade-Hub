@@ -9,7 +9,7 @@ import {
   HUNTER_SHOT_S,
   SCORE_BOSS,
   SWARM_DURATION_S,
-  SWARM_ROCKS,
+  SWARM_WALLS,
   VORTEX_DURATION_S,
 } from '../config';
 import { createAsteroidField } from './asteroids';
@@ -63,19 +63,29 @@ describe('боссы', () => {
     expect(field.list[field.list.length - 1]!.immortal).toBe(false);
   });
 
-  it('Рой: камни неуязвимы и держатся всё испытание, потом уходят; с игроками их больше', () => {
+  it('Рой: 10 стен с проходом с разных сторон, сначала мигают у края; камни неуязвимы; потом уходят', () => {
     const { field, ctl } = setup('swarm');
-    expect(field.list.length).toBe(SWARM_ROCKS);
-    expect(field.list.every((a) => a.immortal && a.held)).toBe(true);
+    const seen = new Set<string>();
+    let total = 0;
+    let warned = false;
     for (let i = 0; i < FIXED_STEP_HZ * SWARM_DURATION_S; i++) {
+      const before = ctl.boss.walls.length;
       ctl.step(DT);
       field.step(DT);
+      for (const w of ctl.boss.walls) {
+        seen.add(`${w.axis}${w.dir}`);
+        if (w.warnS > 0) warned = true;
+      }
+      if (ctl.boss.walls.length > before) total += ctl.boss.walls.length - before;
+      expect(field.list.every((a) => a.immortal && a.held)).toBe(true);
     }
-    expect(field.list.length).toBe(SWARM_ROCKS);
+    expect(total).toBe(SWARM_WALLS);
+    expect(warned).toBe(true);
+    // Первые три — снизу, слева, справа; дальше все четыре стороны в ходу.
+    expect(seen.size).toBeGreaterThanOrEqual(3);
     ctl.release();
     for (let i = 0; i < FIXED_STEP_HZ * 20; i++) field.step(DT);
     expect(field.list.length).toBe(0);
-    expect(setup('swarm', 10).field.list.length).toBeGreaterThan(SWARM_ROCKS);
   });
 
   it('Охотник гонится за ближайшим, бросает в него камни и расталкивает камни перед собой', () => {

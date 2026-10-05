@@ -5,7 +5,6 @@ import {
   BOSS_OF_WAVE,
   BOSS_TARGET_MAX_S,
   BOSS_WAVES,
-  COMPLICATION_CHANCE,
   COMPLICATION_FROM_WAVE,
   COMPLICATIONS,
   WAVE_LIMIT,
@@ -33,6 +32,10 @@ export interface Waves {
   readonly leftS: number;
   /** Осложнение текущей волны (на передышке — нет). */
   readonly complication: Complication | null;
+  /** Течение: куда сносит (единичный вектор по оси); вне Течения — нулевой. */
+  readonly flow: { x: number; y: number };
+  /** Сколько прошло с начала волны, с. */
+  readonly elapsedS: number;
   /** Босс текущей волны. */
   readonly boss: BossKind | null;
   /** Цель убита — волна кончается на следующем шаге. */
@@ -52,26 +55,42 @@ export function waveLengthS(wave: number): number {
   return waveDurationS(wave);
 }
 
-/** Осложнения всех волн (индекс — номер волны): не на первых, не у боссов, не два одинаковых подряд. */
+const FLOW_DIRS = [
+  { x: 1, y: 0 },
+  { x: -1, y: 0 },
+  { x: 0, y: 1 },
+  { x: 0, y: -1 },
+] as const;
+const NO_FLOW = { x: 0, y: 0 };
+const FLOW_SALT = 0x51f7;
+
+/** Осложнения всех волн (индекс — номер волны), решение заказчика: в каждой волне, кроме первой и волн
+ *  боссов, и без повторов в матче — колода осложнений тасуется по сиду и раздаётся по порядку. */
 export function rollComplications(seed: number, limit: number = WAVE_LIMIT): Array<Complication | null> {
   const rng = createRng((seed ^ WAVES_SEED_SALT) >>> 0);
+  const deck = [...COMPLICATIONS];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [deck[i], deck[j]] = [deck[j] as Complication, deck[i] as Complication];
+  }
   const out: Array<Complication | null> = [null];
-  let last: Complication | null = null;
   for (let wave = 1; wave <= limit; wave++) {
-    // Бросок — на каждую волну, даже без шанса: номер волны не сдвигает случайность соседних.
-    const roll = rng.next();
-    const pick = rng.pick(COMPLICATIONS.filter((c) => c !== last));
     const allowed = wave >= COMPLICATION_FROM_WAVE && !isBossWave(wave);
-    const c = allowed && roll < COMPLICATION_CHANCE ? pick : null;
-    out.push(c);
-    last = c;
+    out.push(allowed ? (deck.shift() ?? null) : null);
   }
   return out;
+}
+
+/** Течение каждой волны: сторона — из сида (своя случайность, порядок осложнений не сдвигает). */
+export function rollFlows(seed: number, limit: number = WAVE_LIMIT): Array<{ x: number; y: number }> {
+  const rng = createRng((seed ^ WAVES_SEED_SALT ^ FLOW_SALT) >>> 0);
+  return Array.from({ length: limit + 1 }, () => rng.pick(FLOW_DIRS));
 }
 
 /** Первая волна начинается сразу; событие её начала — на первом шаге. startWave — для проверки поздних волн. */
 export function createWaves(seed: number, limit: number = WAVE_LIMIT, startWave = 1): Waves {
   const complications = rollComplications(seed, limit);
+  const flows = rollFlows(seed, limit);
   let wave = Math.min(Math.max(1, startWave), limit);
   let phase: WavePhase = 'wave';
   let leftS = waveLengthS(wave);
@@ -89,6 +108,12 @@ export function createWaves(seed: number, limit: number = WAVE_LIMIT, startWave 
     },
     get complication() {
       return phase === 'wave' ? (complications[wave] ?? null) : null;
+    },
+    get flow() {
+      return phase === 'wave' && complications[wave] === 'current' ? (flows[wave] ?? NO_FLOW) : NO_FLOW;
+    },
+    get elapsedS() {
+      return phase === 'wave' ? waveLengthS(wave) - leftS : 0;
     },
     get boss() {
       return phase === 'wave' ? (BOSS_OF_WAVE[wave] ?? null) : null;

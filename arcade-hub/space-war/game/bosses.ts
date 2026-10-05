@@ -38,15 +38,15 @@ import {
   SEEDER_SPEED,
   SEEDER_SPIN,
   SWARM_GAP,
+  SWARM_GAP_INSET,
   SWARM_OUTSIDE,
-  SWARM_PER_WALL,
+  SWARM_PAIR_CHANCE,
   SWARM_PLAYER_K,
-  SWARM_ROCKS,
-  SWARM_SPEED_MAX,
-  SWARM_STIFFNESS,
-  SWARM_WALL_SPACING,
+  SWARM_SPACING,
+  SWARM_WALL_EVERY_S,
   SWARM_WALL_SPEED,
-  SWARM_REFORM_S,
+  SWARM_WALLS,
+  SWARM_WARN_S,
   VORTEX_BOSS_K,
   VORTEX_CORE_RADIUS,
   VORTEX_PLAYER_K,
@@ -67,6 +67,19 @@ export interface FortressRing {
   slots: number;
   /** Пустые места кольца (разрывы). */
   empty: readonly number[];
+}
+
+/** Стена Роя для рисунка: ось движения, направление, где линия, проход и ширина поля поперёк. */
+export interface SwarmWall {
+  axis: 'x' | 'y';
+  dir: 1 | -1;
+  along: number;
+  gap: number;
+  gapSize: number;
+  lo: number;
+  hi: number;
+  /** Ещё ждёт за краем (мигает предупреждение). */
+  warnS: number;
 }
 
 /** Корабль, за которым может гнаться Охотник. */
@@ -98,6 +111,8 @@ export interface Boss {
   prey: string | null;
   /** Крепость: кольца брони; у других — пусто. */
   rings: FortressRing[];
+  /** Рой: стены на поле и у края; у других — пусто. */
+  walls: SwarmWall[];
 }
 
 export interface BossControl {
@@ -142,6 +157,7 @@ export function createBoss(
     hits: 0,
     prey: null,
     rings: [],
+    walls: [],
   };
   const noop = (): void => undefined;
 
@@ -236,100 +252,112 @@ export function createBoss(
   };
 }
 
-/** Рой: стены камней проходят поле насквозь с проходом в каждой; после прохода — перестраиваются. */
+/** Рой: 10 стен камней с проходом, по очереди с разных сторон; иногда пара сразу с противоположных сторон
+ *  (проходы на одной линии — стоя в проходе, пропускаешь обе). Перед выходом стена мигает у края. */
 function createSwarm(boss: Boss, rng: Rng, field: Field, bounds: Bounds, players: number): BossControl {
-  const count = Math.round(SWARM_ROCKS * (1 + SWARM_PLAYER_K * (players - 1)));
-  const walls = Math.max(1, Math.ceil(count / SWARM_PER_WALL));
-  const rocks: Asteroid[] = [];
-  /** Стена i-го камня и его место в ней. */
-  const slots: Array<{ wall: number; j: number; n: number }> = [];
-  for (let i = 0; i < count; i++) {
-    const wall = i % walls;
-    const n = Math.floor(count / walls) + (wall < count % walls ? 1 : 0);
-    slots.push({ wall, j: Math.floor(i / walls), n });
-  }
-
-  // Проход: ось (x — стена вертикальная, идёт вдоль x), направление, место прохода у каждой стены.
-  let axis: 'x' | 'y' = rng.next() < 0.5 ? 'x' : 'y';
-  let dir = rng.next() < 0.5 ? 1 : -1;
-  let gaps: number[] = [];
-  let sweepS = 0;
+  const speed = SWARM_WALL_SPEED * (1 + SWARM_PLAYER_K * (players - 1));
+  type Dir = { axis: 'x' | 'y'; dir: 1 | -1 };
+  const DIRS: readonly Dir[] = [
+    { axis: 'y', dir: -1 }, // снизу вверх
+    { axis: 'x', dir: 1 }, // слева направо
+    { axis: 'x', dir: -1 }, // справа налево
+    { axis: 'y', dir: 1 }, // сверху вниз
+  ];
   const span = (a: 'x' | 'y'): [number, number] => (a === 'x' ? [bounds.left, bounds.right] : [bounds.top, bounds.bottom]);
-  const pathLen = (): number => {
-    const [lo, hi] = span(axis);
-    return hi - lo + SWARM_OUTSIDE * 2 + (walls - 1) * SWARM_WALL_SPACING;
-  };
-  const newSweep = (): void => {
-    const [lo, hi] = span(axis === 'x' ? 'y' : 'x');
-    gaps = Array.from({ length: walls }, () => rng.range(lo, hi - SWARM_GAP));
-    sweepS = -SWARM_REFORM_S;
-  };
-  newSweep();
+  const across = (a: 'x' | 'y'): 'x' | 'y' => (a === 'x' ? 'y' : 'x');
 
-  /** Где сейчас место камня. Стены идут друг за другом; до старта (сбор) стоят за краем. */
-  const slotPos = (i: number): Vec => {
-    const s = slots[i] as (typeof slots)[number];
-    const [lo, hi] = span(axis);
-    const progress = Math.max(0, sweepS) * SWARM_WALL_SPEED;
-    const start = dir > 0 ? lo - SWARM_OUTSIDE : hi + SWARM_OUTSIDE;
-    const along = start + dir * (progress - s.wall * SWARM_WALL_SPACING);
-    const [alo, ahi] = span(axis === 'x' ? 'y' : 'x');
-    const usable = ahi - alo - SWARM_GAP;
-    let across = alo + ((s.j + 0.5) * usable) / s.n;
-    const gap = gaps[s.wall] ?? alo;
-    if (across > gap) across += SWARM_GAP;
-    return axis === 'x' ? { x: along, y: across } : { x: across, y: along };
-  };
-
-  for (let i = 0; i < count; i++) {
-    const p = slotPos(i);
-    const rock = field.launch('small', p.x, p.y, 0, 0);
-    if (!rock) continue;
-    rock.immortal = true;
-    rock.held = true;
-    rocks[i] = rock;
+  // Расписание: первые три — как у заказчика (снизу, слева, справа), дальше — случайно, не два одинаковых подряд.
+  const plan: Array<{ atS: number; dir: Dir; pair: boolean }> = [];
+  let walls = 0;
+  let last: Dir | null = null;
+  for (let k = 0; walls < SWARM_WALLS; k++) {
+    const dir: Dir = k < 3 ? (DIRS[k] as Dir) : rng.pick(DIRS.filter((d) => d !== last));
+    const pair = k >= 3 && walls + 2 <= SWARM_WALLS && rng.next() < SWARM_PAIR_CHANCE;
+    plan.push({ atS: k * SWARM_WALL_EVERY_S, dir, pair });
+    walls += pair ? 2 : 1;
+    last = dir;
   }
+
+  interface Wall extends SwarmWall {
+    rocks: Asteroid[];
+  }
+  const live: Wall[] = [];
+  let timeS = 0;
+  let next = 0;
+
+  const launch = (d: Dir, gap: number): void => {
+    const [lo, hi] = span(d.axis);
+    const [alo, ahi] = span(across(d.axis));
+    const along = d.dir > 0 ? lo - SWARM_OUTSIDE : hi + SWARM_OUTSIDE;
+    const wall: Wall = { axis: d.axis, dir: d.dir, along, gap, gapSize: SWARM_GAP, lo: alo, hi: ahi, warnS: SWARM_WARN_S, rocks: [] };
+    for (let c = alo + SWARM_SPACING / 2; c < ahi; c += SWARM_SPACING) {
+      if (c > gap - SWARM_SPACING / 2 && c < gap + SWARM_GAP + SWARM_SPACING / 2) continue;
+      const x = d.axis === 'x' ? along : c;
+      const y = d.axis === 'x' ? c : along;
+      const rock = field.launch('small', x, y, 0, 0);
+      if (!rock) continue;
+      rock.immortal = true;
+      rock.held = true;
+      wall.rocks.push(rock);
+    }
+    live.push(wall);
+  };
+
+  const sync = (): void => {
+    boss.walls = live.map((w) => ({ axis: w.axis, dir: w.dir, along: w.along, gap: w.gap, gapSize: w.gapSize, lo: w.lo, hi: w.hi, warnS: w.warnS }));
+  };
 
   return {
     boss,
     target: false,
     step(dtS) {
-      sweepS += dtS;
-      if (sweepS * SWARM_WALL_SPEED >= pathLen()) {
-        // Перестройка: та же ось — обратно; другая — камни идут к новому краю.
-        const nextAxis = rng.next() < 0.5 ? 'x' : 'y';
-        dir = nextAxis === axis ? -dir : rng.next() < 0.5 ? 1 : -1;
-        axis = nextAxis;
-        newSweep();
+      timeS += dtS;
+      while (next < plan.length && timeS >= (plan[next] as (typeof plan)[number]).atS) {
+        const g = plan[next] as (typeof plan)[number];
+        next++;
+        const [alo, ahi] = span(across(g.dir.axis));
+        const gap = rng.range(alo + SWARM_GAP_INSET, ahi - SWARM_GAP_INSET - SWARM_GAP);
+        launch(g.dir, gap);
+        if (g.pair) launch({ axis: g.dir.axis, dir: g.dir.dir > 0 ? -1 : 1 }, gap);
       }
-      rocks.forEach((rock, i) => {
-        if (!rock?.held) return;
-        const p = slotPos(i);
-        let vx = (p.x - rock.pos.x) * SWARM_STIFFNESS;
-        let vy = (p.y - rock.pos.y) * SWARM_STIFFNESS;
-        const v = Math.hypot(vx, vy);
-        if (v > SWARM_SPEED_MAX) {
-          vx = (vx / v) * SWARM_SPEED_MAX;
-          vy = (vy / v) * SWARM_SPEED_MAX;
+      for (let i = live.length - 1; i >= 0; i--) {
+        const w = live[i] as Wall;
+        if (w.warnS > 0) w.warnS = Math.max(0, w.warnS - dtS);
+        else w.along += w.dir * speed * dtS;
+        const [lo, hi] = span(w.axis);
+        const gone = w.dir > 0 ? w.along > hi + SWARM_OUTSIDE : w.along < lo - SWARM_OUTSIDE;
+        if (gone) {
+          for (const r of w.rocks) field.remove(r);
+          live.splice(i, 1);
+          continue;
         }
-        rock.vel.x = vx;
-        rock.vel.y = vy;
-      });
+        // Камни — точно на линию стены к концу шага (сдвиг делает field.step).
+        for (const r of w.rocks) {
+          if (!r.held) continue;
+          const tx = w.axis === 'x' ? w.along : r.pos.x;
+          const ty = w.axis === 'x' ? r.pos.y : w.along;
+          r.vel.x = (tx - r.pos.x) / dtS;
+          r.vel.y = (ty - r.pos.y) / dtS;
+        }
+      }
+      sync();
     },
     hit: () => false,
     release() {
-      // Отпущенные камни летят дальше своим ходом и уходят за край.
-      for (const rock of rocks) {
-        if (!rock) continue;
-        rock.held = false;
-        const v = Math.hypot(rock.vel.x, rock.vel.y);
-        if (v < SWARM_WALL_SPEED) {
-          const ax = axis === 'x' ? dir : 0;
-          const ay = axis === 'y' ? dir : 0;
-          rock.vel.x = ax * SWARM_WALL_SPEED;
-          rock.vel.y = ay * SWARM_WALL_SPEED;
+      // Конец испытания: идущие стены уходят своим ходом, ещё не вышедшие — исчезают.
+      for (const w of live) {
+        for (const r of w.rocks) {
+          if (w.warnS > 0) {
+            field.remove(r);
+            continue;
+          }
+          r.held = false;
+          r.vel.x = w.axis === 'x' ? w.dir * speed : 0;
+          r.vel.y = w.axis === 'y' ? w.dir * speed : 0;
         }
       }
+      live.length = 0;
+      sync();
     },
   };
 }

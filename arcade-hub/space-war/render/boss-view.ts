@@ -10,6 +10,10 @@ import type { Rng } from '../../engine/rng';
 import {
   ASTEROID_COLOR,
   BOSS_COLORS,
+  SWARM_CHEVRONS,
+  SWARM_WALL_W,
+  SWARM_WARN_HZ,
+  SWARM_WARN_INSET,
   BOSS_FLASH_S,
   BOSS_HP_RING_GAP,
   BOSS_HP_RING_PX,
@@ -305,6 +309,56 @@ export function createBossView(rng: Rng): BossView {
     if (cracks > 0) neon(crackPath, color, BOSS_LINE_PX * 0.6, 1, true);
   };
 
+  /** Рой: стены — светящаяся линия через камни с проходом; у краёв прохода — огни, в проходе — бегущие стрелки
+   *  по ходу стены. Перед выходом стена мигает полосой у своего края, проход на ней — светлым. */
+  const swarm = (boss: Boss, timeS: number, color: string, ox: number, oy: number): void => {
+    const pt = (axis: 'x' | 'y', along: number, across: number): [number, number] =>
+      axis === 'x' ? [along - ox, across - oy] : [across - ox, along - oy];
+    for (const w of boss.walls) {
+      const g0 = w.gap;
+      const g1 = w.gap + w.gapSize;
+      if (w.warnS > 0) {
+        const blink = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(timeS * SWARM_WARN_HZ * Math.PI * 2));
+        // Полоса у края, откуда выйдет стена: стена — цветом Роя, проход — белым.
+        const e = w.along + w.dir * SWARM_WARN_INSET;
+        const seg = (a: number, b: number): void => {
+          const [ax, ay] = pt(w.axis, e, a);
+          const [bx, by] = pt(w.axis, e, b);
+          view.moveTo(ax, ay).lineTo(bx, by);
+        };
+        neon(() => (seg(w.lo, g0), seg(g1, w.hi)), color, 3, blink);
+        neon(() => seg(g0, g1), WHITE, 2, blink * 0.8);
+        continue;
+      }
+      const line = (a: number, b: number): void => {
+        const [ax, ay] = pt(w.axis, w.along, a);
+        const [bx, by] = pt(w.axis, w.along, b);
+        view.moveTo(ax, ay).lineTo(bx, by);
+      };
+      line(w.lo, g0);
+      line(g1, w.hi);
+      view.stroke({ color, width: SWARM_WALL_W, alpha: 0.12 });
+      neon(() => (line(w.lo, g0), line(g1, w.hi)), color, 2, 0.5);
+      for (const c of [g0, g1]) {
+        const [px, py] = pt(w.axis, w.along, c);
+        blob(px, py, 16, color, 0.9);
+      }
+      // Стрелки в проходе — куда идёт стена.
+      const run = (timeS * 2) % 1;
+      const chevrons = (): void => {
+        for (let i = 0; i < SWARM_CHEVRONS; i++) {
+          const c = g0 + ((i + 0.5) / SWARM_CHEVRONS) * (g1 - g0);
+          const tip = w.along + w.dir * (6 + run * 10);
+          const [tx, ty] = pt(w.axis, tip, c);
+          const [ax, ay] = pt(w.axis, tip - w.dir * 10, c - 8);
+          const [bx, by] = pt(w.axis, tip - w.dir * 10, c + 8);
+          view.moveTo(ax, ay).lineTo(tx, ty).lineTo(bx, by);
+        }
+      };
+      neon(chevrons, color, 2, 0.7 * (1 - run));
+    }
+  };
+
   const vortex = (boss: Boss, timeS: number, color: string): void => {
     const r = boss.radius;
     const a = boss.angle;
@@ -347,7 +401,7 @@ export function createBossView(rng: Rng): BossView {
     },
     draw(boss, x, y, timeS, bg, extra) {
       view.clear();
-      view.visible = boss !== null && boss.kind !== 'swarm';
+      view.visible = boss !== null;
       if (!boss) {
         lastHits = 0;
         return;
@@ -361,6 +415,10 @@ export function createBossView(rng: Rng): BossView {
       lastHits = boss.hits;
       if (!view.visible) return;
       view.position.set(x, y);
+      if (boss.kind === 'swarm') {
+        swarm(boss, timeS, BOSS_COLORS.swarm, x, y);
+        return;
+      }
       const base = boss.kind === 'hunter' && extra?.prey ? extra.prey.color : BOSS_COLORS[boss.kind];
       const color = mixColor(base, WHITE, flashS / BOSS_FLASH_S);
       if (boss.kind === 'seeder') seeder(boss, timeS, color, bg);

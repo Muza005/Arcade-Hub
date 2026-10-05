@@ -114,7 +114,7 @@ export const ASTEROID_SIZE_WEIGHTS = { small: 0.4, medium: 0.35, large: 0.25 } a
 /** Камень летит в случайную точку центральной части поля: доля отступа от краёв. */
 export const ASTEROID_AIM_INSET = 0.2;
 export const ASTEROID_SPAWN_GAP = 8; // рождается за краем поля, px
-export const ASTEROIDS_MAX = 160; // размер пула
+export const ASTEROIDS_MAX = 240; // размер пула (стены Роя — до сотни камней сразу)
 /** Хитбокс камня чуть меньше рисунка: задевание краем контура прощается. */
 export const ASTEROID_HITBOX_K = 0.85;
 /** Настройка лобби «Камни отскакивают»: упругий удар, масса ∝ площади; выкл. — пролетают насквозь. */
@@ -248,20 +248,67 @@ export const DIFFICULTY_WAVE_SHIFT = { easy: -3, normal: 0, hard: 4 } as const;
 export const WAVE_FINISH_DELAY_S = 3;
 export const WAVES_SEED_SALT = 0x3a7e5; // своя случайность осложнений, из сида матча
 
-// Осложнения (SPACE_WAR_SPEC §5 «Волны»): случайно, не в каждой волне, на всю волну.
-export const COMPLICATIONS = ['dark', 'fast', 'dense', 'vortex', 'jam', 'small', 'large'] as const;
+// Осложнения (SPACE_WAR_SPEC §5 «Волны»). Решение заказчика: в каждой волне, кроме первой и волн боссов,
+// без повторов в матче — обычных волн как раз столько, сколько осложнений, порядок — из сида.
+export const COMPLICATIONS = [
+  'dark', 'fast', 'dense', 'vortex', 'jam', 'small', 'large',
+  'current', 'slippery', 'recoil', 'aliens', 'phantom', 'bombs',
+] as const;
 export type Complication = (typeof COMPLICATIONS)[number];
-export const COMPLICATION_FROM_WAVE = 3; // первые волны — без осложнений, чтобы освоиться
-export const COMPLICATION_CHANCE = 0.5; // TUNE
+export const COMPLICATION_FROM_WAVE = 2; // первая волна — без осложнения, чтобы освоиться
 /** Множитель потока камней. */
 export const COMPLICATION_FLOW: Record<Complication, number> = {
   dark: 1, fast: 1, dense: 2, vortex: 1, jam: 1, small: 3,
   large: 0.6, // TUNE: одни крупные при том же потоке — стена
+  current: 1, slippery: 1, recoil: 1, aliens: 1, phantom: 1,
+  bombs: 2, // бомб вдвое больше, чем камней было бы в этой волне
 };
 /** Множитель скорости камней. */
 export const COMPLICATION_SPEED: Record<Complication, number> = {
   dark: 1, fast: 1.5, dense: 0.6, vortex: 1, jam: 1, small: 1, large: 1,
+  current: 1.4, slippery: 1, recoil: 1, aliens: 1, phantom: 1, bombs: 1,
 };
+// Течение: постоянная сила сносит корабли и камни в одну сторону (из сида: ←, →, ↑ или ↓); камни идут только по ней.
+export const CURRENT_SHIP_ACCEL = 460; // TUNE: px/с²; с сопротивлением корабль сносит ~150 px/с
+export const CURRENT_ROCK_ACCEL = 60; // px/с² — камни разгоняются по течению
+export const CURRENT_SPREAD_RAD = 0.25; // камни идут почти параллельно
+export const CURRENT_STREAKS = 40; // на поле — бледные чёрточки по течению
+export const CURRENT_STREAK_PX = 70;
+export const CURRENT_STREAK_ALPHA = 0.12;
+// Скользкий космос: сопротивление ниже — корабль тормозит гораздо дольше.
+export const SLIPPERY_DRAG_K = 0.22;
+// Отдача: каждый выстрел толкает корабль назад.
+export const RECOIL_SPEED = 240; // TUNE: px/с — средне
+// Инопланетяне: мельче мелкого камня, быстрее камней; с краёв летят к ближайшему кораблю сквозь камни;
+// три попадания; цепляются к кораблю и замедляют его (до пяти — дальше не хуже); в конце волны отстают и уходят.
+export const ALIEN_RADIUS = 11;
+export const ALIEN_HP = 3;
+export const ALIEN_SPEED = 270; // TUNE: px/с
+export const ALIEN_STEER = 2.2; // 1/с: как быстро доворачивает на корабль
+export const ALIEN_FLOW_K = 1.5; // инопланетян в секунду — в 1,5 раза больше, чем камней
+export const ALIENS_MAX = 60;
+export const ALIEN_SLOW_STEP = 0.11; // каждый прилипший — минус 11 % тяги и предела скорости
+export const ALIEN_SLOW_MAX_COUNT = 5; // дальше не медленнее (−55 %)
+export const ALIEN_LEAVE_SPEED = 260;
+export const ALIEN_SCORE = 30; // × множитель
+export const ALIEN_BODY = '#7CFF8A';
+export const ALIEN_EYE = '#B05CFF';
+export const ALIEN_BEAM = '#B05CFF';
+export const ALIEN_TRAIL_PX = 44; // лучи-след — не длиннее пары сантиметров
+// Призрак: камни гаснут на 2 с, вспыхивают на 1 с; попадание — видно 0,5 с. Удариться можно и о погасший.
+export const PHANTOM_HIDE_S = 2;
+export const PHANTOM_SHOW_S = 1;
+export const PHANTOM_REVEAL_S = 0.5;
+export const PHANTOM_ALPHA = 0.05;
+export const PHANTOM_FADE_S = 0.25;
+// Бомбы: вместо камней — бомбы трёх размеров. Бомба о бомбу — обе взрываются; выстрел — взрыв;
+// корабль врезался — минус жизнь и сильный отброс. Взрыв отталкивает бомбы и корабли: ближе — сильнее.
+export const BOOM_RADIUS = { small: 170, medium: 230, large: 300 } as const;
+export const BOOM_PUSH = 700; // px/с у центра, к краю радиуса — до нуля
+export const BOOM_HIT_PUSH = 900; // корабль, врезавшийся в бомбу, отлетает сильно
+export const BOOM_COLOR = '#FF6B3D';
+export const BOOM_SPARKS = 26;
+export const BOMB_FUSE_TINT = '#FFB8A0'; // бомба мигает: светлее и обратно
 export const VORTEX_SHIP_PULL = 420; // TUNE: px/с² к центру; с сопротивлением корабль сносит ~140 px/с
 export const VORTEX_ROCK_PULL = 90; // TUNE: px/с², только пока камень летит к центру — потом уходит
 export const DARK_RADIUS = 260; // TUNE: круг видимости вокруг корабля
@@ -298,7 +345,7 @@ export const fieldZoom = (size: unknown, players: number): number =>
 // ─── Боссы ───────────────────────────────────────────────────────
 export const BOSS_HP_PLAYER_K = 0.7; // прочность = база · (1 + 0.7 · (N − 1))
 export const BOSS_BASE_HP = { seeder: 25, hunter: 26, fortress: 18, giant: 30 } as const;
-export const SWARM_DURATION_S = 25;
+export const SWARM_DURATION_S = 28;
 export const VORTEX_DURATION_S = 30;
 export type BossKind = 'seeder' | 'hunter' | 'swarm' | 'fortress' | 'giant' | 'vortex';
 export type TargetBossKind = keyof typeof BOSS_BASE_HP;
@@ -388,17 +435,23 @@ export const GIANT_SPIN = 0.15;
 export const GIANT_SHAPE_POINTS = 14;
 export const GIANT_SHAPE_JITTER = 0.18;
 // Рой: камни стеной проходят поле, перестраиваются; убить нельзя.
-export const SWARM_ROCKS = 40;
-export const SWARM_PLAYER_K = 0.15; // камней × (1 + 0.15 · (N − 1))
-export const SWARM_PER_WALL = 40;
-export const SWARM_WALL_SPEED = 380; // TUNE: px/с, с какой стена идёт через поле
-export const SWARM_REFORM_S = 1.2; // перед проходом стена собирается за краем
-export const SWARM_GAP = 240; // проход в стене
-export const SWARM_WALL_SPACING = 360; // следующая стена — позади
+// Рой (решение заказчика): в начале все камни поля взрываются (с шансом усиления), дальше — 10 стен с проходом
+// с разных сторон по очереди; иногда две стены сразу с противоположных сторон — проходы у них на одной линии.
+export const SWARM_WALLS = 10;
+export const SWARM_WALL_EVERY_S = 2.3; // TUNE: новая стена (или пара) — через столько
+export const SWARM_WARN_S = 1; // перед выходом стена мигает у края — видно, откуда и где проход
+export const SWARM_PAIR_CHANCE = 0.3; // доля пар «с двух сторон сразу»
+export const SWARM_SPACING = 50; // между камнями стены: корабль не пролезет
+export const SWARM_PLAYER_K = 0.03; // скорость стен × (1 + 0.03 · (N − 1))
+export const SWARM_WALL_SPEED = 360; // TUNE: px/с, с какой стена идёт через поле
+export const SWARM_GAP = 250; // проход в стене
+export const SWARM_GAP_INSET = 120; // проход не у самого края
 export const SWARM_OUTSIDE = 80; // стена начинает и кончает за краем
-export const SWARM_STIFFNESS = 4; // 1/с: камень догоняет своё место
-export const SWARM_SPEED_MAX = 520;
 export const SWARM_TINT = '#FF8A8A';
+export const SWARM_WARN_HZ = 3; // мигание полосы-предупреждения
+export const SWARM_WARN_INSET = SWARM_OUTSIDE + 10; // полоса — чуть внутри поля у края выхода
+export const SWARM_WALL_W = 22; // бледная полоса стены
+export const SWARM_CHEVRONS = 3; // стрелок в проходе
 // Воронка-босс: неуязвимое ядро в центре, тянет сильнее осложнения.
 export const VORTEX_BOSS_K = 1.8;
 export const VORTEX_PLAYER_K = 0.06; // тяга × (1 + 0.06 · (N − 1))

@@ -3,6 +3,17 @@
 import type { InputState } from '../../engine/input';
 import { createRng } from '../../engine/rng';
 import {
+  ALIEN_FLOW_K,
+  ALIEN_RADIUS,
+  ALIEN_SCORE,
+  BOOM_HIT_PUSH,
+  BOOM_PUSH,
+  BOOM_RADIUS,
+  CURRENT_ROCK_ACCEL,
+  CURRENT_SHIP_ACCEL,
+  PHANTOM_REVEAL_S,
+  RECOIL_SPEED,
+  SLIPPERY_DRAG_K,
   ASTEROID_HITBOX_K,
   ROCK_BOUNCE_DEFAULT,
   ROCK_RESTITUTION,
@@ -60,6 +71,7 @@ import {
   type Mode,
 } from '../config';
 import { FEATURES } from '../features';
+import { createAliens, type Alien } from './aliens';
 import { createAsteroidField, type Asteroid } from './asteroids';
 import { createAfterlife, type AfterlifeEvents, type Bomb, type SabShot, type Shard } from './afterlife';
 import { createBoss, type Boss, type BossControl } from './bosses';
@@ -97,6 +109,12 @@ export interface SimEvents extends AfterlifeEvents {
   drops: Array<{ x: number; y: number; kind: PowerupKind }>;
   /** Кому Ремонт добавил жизнь — подрастает новое сердечко. */
   healed: string[];
+  /** Осложнение «Бомбы»: взрыв — где и какого размера. */
+  booms: Array<{ x: number; y: number; size: AsteroidSize }>;
+  /** Инопланетянин сбит или сгорел о щит. */
+  alienDown: Array<{ x: number; y: number }>;
+  /** К кому прилип инопланетянин. */
+  stuck: string[];
 }
 
 export interface SimOptions {
@@ -135,6 +153,8 @@ export interface Sim {
   readonly bombs: readonly Bomb[];
   /** Усиления на поле. */
   readonly powerups: readonly Powerup[];
+  /** Осложнение «Инопланетяне». */
+  readonly aliens: readonly Alien[];
   /** Заморозка: сколько ещё камни стоят, с. */
   readonly freezeS: number;
   /** Выстрел саботажника; false — не саботажник или снаряд ещё не готов. */
@@ -195,7 +215,10 @@ export function createSim(
   const events: SimEvents = {
     hits: [], deaths: [], breaks: [], chips: [], shots: [], near: [], reloads: [], bumps: [], waves: [], bossDown: [],
     ghosts: [], revives: [], saboteurs: [], blasts: [], sabShots: [], pickups: [], jammed: [], drops: [], healed: [],
+    booms: [], alienDown: [], stuck: [],
   };
+  const aliens = createAliens(rng, bounds);
+  let alienDebt = 0;
   const powerupsOn = (options.powerups ?? true) && FEATURES.powerups;
   const dropChance = POWERUP_DROP_CHANCE * (options.powerupRate ?? POWERUP_RATES[POWERUP_RATE_DEFAULT]);
   const powerups = createPowerups(rng, mode, bounds);
@@ -286,6 +309,14 @@ export function createSim(
       bestD = Math.max(0, Math.hypot(boss.pos.x - from.x, boss.pos.y - from.y) - boss.radius) ** 2;
       best = boss;
     }
+    for (const a of aliens.list) {
+      if (a.host || a.leaving || !inside(bounds, a.pos)) continue;
+      const d = (a.pos.x - from.x) ** 2 + (a.pos.y - from.y) ** 2;
+      if (d < bestD) {
+        bestD = d;
+        best = a;
+      }
+    }
     for (const a of field.list) {
       // Камни Роя — не цель; броня Крепости — цель (в неё и уходят патроны издалека).
       if ((a.immortal && !a.armor) || !inside(bounds, a.pos)) continue;
@@ -314,6 +345,7 @@ export function createSim(
     pilot.jamS = 0;
     pilot.doubleS = 0;
     pilot.diedAtS = timeS;
+    aliens.leave(pilot.ship.id);
     events.deaths.push(pilot.ship.id);
     afterlife.die(pilot);
   };
@@ -399,11 +431,19 @@ export function createSim(
     const target = nearestRock(pilot.ship.pos);
     if (!target) return; // стрелять не во что — патрон не тратится
     // «×2 пули»: два снаряда рядом, двойной урон, патрон — один.
+    let shot: Bullet | null;
     if (pilot.doubleS > 0) {
       const a = bullets.fire(pilot.ship.id, pilot.ship.pos, target, DOUBLE_DAMAGE, -DOUBLE_OFFSET);
       const b = bullets.fire(pilot.ship.id, pilot.ship.pos, target, DOUBLE_DAMAGE, DOUBLE_OFFSET);
-      if (!a && !b) return;
-    } else if (!bullets.fire(pilot.ship.id, pilot.ship.pos, target)) return;
+      shot = a ?? b;
+    } else shot = bullets.fire(pilot.ship.id, pilot.ship.pos, target);
+    if (!shot) return;
+    // Отдача: выстрел толкает корабль назад.
+    if (waves.complication === 'recoil') {
+      const v = Math.hypot(shot.vel.x, shot.vel.y) || 1;
+      pilot.ship.vel.x -= (shot.vel.x / v) * RECOIL_SPEED;
+      pilot.ship.vel.y -= (shot.vel.y / v) * RECOIL_SPEED;
+    }
     pilot.ammo--;
     pilot.stats.shots++;
     events.shots.push(pilot.ship.id);
@@ -421,6 +461,22 @@ export function createSim(
       }
       if (afterlife.shootBomb(b.pos, BULLET_RADIUS)) {
         spent.push(b);
+        continue;
+      }
+      // Инопланетянин: три попадания — сбит.
+      const alien = aliens.list.find(
+        (a) => !a.host && !a.leaving && Math.hypot(a.pos.x - b.pos.x, a.pos.y - b.pos.y) < BULLET_RADIUS + ALIEN_RADIUS,
+      );
+      if (alien) {
+        spent.push(b);
+        const shooter = pilots.get(b.owner);
+        if (aliens.hit(alien, b.damage)) {
+          events.alienDown.push({ x: alien.pos.x, y: alien.pos.y });
+          if (shooter) {
+            shooter.score += ALIEN_SCORE * totalMult(shooter);
+            shooter.stats.kills++;
+          }
+        } else events.chips.push({ x: b.pos.x, y: b.pos.y });
         continue;
       }
       // Тело босса: цель теряет прочность, ядро Воронки просто гасит снаряд.
@@ -452,6 +508,7 @@ export function createSim(
           claimed.add(rock);
           killed.push({ rock, by: shooter });
         } else {
+          rock.seenS = PHANTOM_REVEAL_S;
           events.chips.push({ x: b.pos.x, y: b.pos.y });
         }
         break;
@@ -466,7 +523,60 @@ export function createSim(
         const up = powerups.drop(rock.pos.x, rock.pos.y);
         events.drops.push({ x: up.pos.x, y: up.pos.y, kind: up.kind });
       }
-      shatter(rock);
+      if (rock.bomb) explode(rock);
+      else shatter(rock);
+    }
+  };
+
+  /** Бомба взрывается: бомбы и корабли вокруг отлетают — ближе к центру сильнее. */
+  const explode = (bomb: Asteroid): void => {
+    if (!field.list.includes(bomb)) return;
+    const { x, y } = bomb.pos;
+    const radius = BOOM_RADIUS[bomb.size];
+    events.booms.push({ x, y, size: bomb.size });
+    field.remove(bomb);
+    const push = (pos: { x: number; y: number }, vel: { x: number; y: number }): void => {
+      const dx = pos.x - x;
+      const dy = pos.y - y;
+      const d = Math.hypot(dx, dy);
+      if (d >= radius) return;
+      const k = BOOM_PUSH * (1 - d / radius);
+      vel.x += (d > 0 ? dx / d : 1) * k;
+      vel.y += (d > 0 ? dy / d : 0) * k;
+    };
+    for (const a of field.list) if (a.bomb && !a.held) push(a.pos, a.vel);
+    for (const p of pilots.values()) if (p.alive) push(p.ship.pos, p.ship.vel);
+  };
+
+  /** Бомба о бомбу — обе взрываются. */
+  const collideBombs = (): void => {
+    rebuildGrid();
+    const pairs: Array<[Asteroid, Asteroid]> = [];
+    for (const a of field.list) {
+      if (!a.bomb) continue;
+      for (const b of grid.query(a.pos.x, a.pos.y, a.radius, near)) {
+        if (b.id <= a.id || !b.bomb) continue;
+        const min = (a.radius + b.radius) * ASTEROID_HITBOX_K;
+        if ((b.pos.x - a.pos.x) ** 2 + (b.pos.y - a.pos.y) ** 2 < min * min) pairs.push([a, b]);
+      }
+    }
+    for (const [a, b] of pairs) {
+      explode(a);
+      explode(b);
+    }
+  };
+
+  /** Начало Роя: все камни поля взрываются (с обычным шансом усиления). */
+  const clearField = (): void => {
+    for (let i = field.list.length - 1; i >= 0; i--) {
+      const rock = field.list[i] as Asteroid;
+      if (rock.held) continue;
+      if (powerupsOn && inside(bounds, rock.pos) && rng.next() < dropChance) {
+        const up = powerups.drop(rock.pos.x, rock.pos.y);
+        events.drops.push({ x: up.pos.x, y: up.pos.y, kind: up.kind });
+      }
+      events.breaks.push({ x: rock.pos.x, y: rock.pos.y, size: rock.size });
+      field.remove(rock);
     }
   };
 
@@ -538,6 +648,7 @@ export function createSim(
       return bossCtl?.boss ?? null;
     },
     powerups: powerups.list,
+    aliens: aliens.list,
     get freezeS() {
       return freezeS;
     },
@@ -570,6 +681,7 @@ export function createSim(
       const wave = waves.step(dtS);
       if (wave) {
         events.waves.push(wave);
+        if (wave.kind === 'start' && waves.boss === 'swarm') clearField();
         if (wave.kind === 'start' && waves.boss) {
           bossCtl = createBoss(waves.boss, rng, field, bounds, playerIds.length, growth(WAVE_SPEED_GROWTH), () =>
             [...pilots.values()]
@@ -578,6 +690,8 @@ export function createSim(
           );
         }
         if (wave.kind === 'end') {
+          // Инопланетяне отстают от кораблей и уходят.
+          aliens.leave();
           // Испытание пройдено или цель ушла недобитой.
           bossCtl?.release();
           bossCtl = null;
@@ -598,9 +712,22 @@ export function createSim(
         spawnDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * (comp ? COMPLICATION_FLOW[comp] : 1) * bossFlow * dtS;
         const speedK = growth(WAVE_SPEED_GROWTH) * (comp ? COMPLICATION_SPEED[comp] : 1);
         const size = comp === 'small' || comp === 'large' ? comp : undefined;
+        const flow = waves.flow;
         while (spawnDebt >= 1) {
           spawnDebt--;
-          field.spawn(size ? { size, speedK } : { speedK });
+          const rock = field.spawn({ speedK, ...(size ? { size } : {}), ...(comp === 'current' ? { dir: flow } : {}) });
+          if (rock && comp === 'bombs') {
+            rock.bomb = true;
+            rock.hp = rock.maxHp = 1;
+          }
+        }
+        // Инопланетян больше, чем камней.
+        if (comp === 'aliens') {
+          alienDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * ALIEN_FLOW_K * dtS;
+          while (alienDebt >= 1) {
+            alienDebt--;
+            aliens.spawn();
+          }
         }
       }
       // Воронка: осложнение или босс. Ядро босса глотает камни.
@@ -610,7 +737,15 @@ export function createSim(
       freezeS = Math.max(0, freezeS - dtS);
       if (freezeS === 0) {
         if (rockPull > 0) field.attract(cx, cy, rockPull, dtS);
+        if (comp === 'current') {
+          for (const a of field.list) {
+            if (a.held) continue;
+            a.vel.x += waves.flow.x * CURRENT_ROCK_ACCEL * dtS;
+            a.vel.y += waves.flow.y * CURRENT_ROCK_ACCEL * dtS;
+          }
+        }
         field.step(dtS);
+        collideBombs();
         if (rockBounce) bounceRocks();
       } else {
         for (const a of field.list) {
@@ -618,7 +753,15 @@ export function createSim(
           a.prev.y = a.pos.y;
         }
       }
+      for (const a of field.list) a.seenS = Math.max(0, a.seenS - dtS);
       powerups.step(dtS);
+      // Инопланетяне летят к кораблям; щит их сжигает.
+      const alive = [...pilots.values()].filter((p) => p.alive);
+      const stuckBefore = new Map(alive.map((p) => [p.ship.id, aliens.stuck(p.ship.id)]));
+      for (const at of aliens.step(dtS, alive.map((p) => ({ id: p.ship.id, pos: p.ship.pos, shielded: p.shieldS > 0 })))) {
+        events.alienDown.push(at);
+      }
+      for (const [id, n] of stuckBefore) if (aliens.stuck(id) > n) events.stuck.push(id);
       afterlife.moveGhosts(dtS, read);
       afterlife.step(dtS);
       if (bossCtl?.boss.kind === 'vortex') {
@@ -635,7 +778,12 @@ export function createSim(
       for (const pilot of pilots.values()) {
         if (!pilot.alive) continue;
         const input = read(pilot.ship.id);
-        stepShip(pilot.ship, input, dtS, bounds);
+        const flowPush = comp === 'current' ? { x: waves.flow.x * CURRENT_SHIP_ACCEL, y: waves.flow.y * CURRENT_SHIP_ACCEL } : undefined;
+        stepShip(pilot.ship, input, dtS, bounds, {
+          ...(comp === 'slippery' ? { dragK: SLIPPERY_DRAG_K } : {}),
+          powerK: aliens.powerK(pilot.ship.id),
+          ...(flowPush ? { push: flowPush } : {}),
+        });
         pilot.invulnS = Math.max(0, pilot.invulnS - dtS);
         pilot.shieldS = Math.max(0, pilot.shieldS - dtS);
         pilot.overloadS = Math.max(0, pilot.overloadS - dtS);
@@ -669,9 +817,17 @@ export function createSim(
           break;
         }
       }
-      // Щит: камень разбивается о него, жизнь и множитель целы.
+      // Щит: камень разбивается о него, жизнь и множитель целы. Бомба взрывается и сильно отбрасывает.
       for (const { pilot, rock } of hits) {
-        if (pilot.shieldS > 0) {
+        if (rock.bomb) {
+          const dx = pilot.ship.pos.x - rock.pos.x;
+          const dy = pilot.ship.pos.y - rock.pos.y;
+          const d = Math.hypot(dx, dy) || 1;
+          explode(rock);
+          pilot.ship.vel.x += (dx / d) * BOOM_HIT_PUSH;
+          pilot.ship.vel.y += (dy / d) * BOOM_HIT_PUSH;
+          if (pilot.shieldS <= 0) hitShip(pilot, null);
+        } else if (pilot.shieldS > 0) {
           if (!rock.immortal) shatter(rock);
         } else hitShip(pilot, rock);
       }

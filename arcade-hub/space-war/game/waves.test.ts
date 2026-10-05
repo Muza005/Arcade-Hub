@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXED_STEP_HZ } from '../../shared/config';
-import { BOSS_WAVES, COMPLICATION_FROM_WAVE, SCORE_WAVE, WAVE_LIMIT, WAVE_PAUSE_S, waveDurationS } from '../config';
+import { BOSS_WAVES, COMPLICATION_FROM_WAVE, COMPLICATIONS, SCORE_WAVE, WAVE_LIMIT, WAVE_PAUSE_S, waveDurationS } from '../config';
 import { createSim } from './sim';
 import { createWaves, rollComplications, waveLengthS, type WaveEvent } from './waves';
 
@@ -43,17 +43,18 @@ describe('волны', () => {
     }
   });
 
-  it('осложнения: не на первых волнах, не у боссов, не два одинаковых подряд, по сиду', () => {
+  it('осложнения: в каждой волне, кроме первой и боссов, без повторов, по сиду', () => {
     for (let seed = 0; seed < 50; seed++) {
       const c = rollComplications(seed);
       expect(c).toEqual(rollComplications(seed));
       for (let n = 1; n < COMPLICATION_FROM_WAVE; n++) expect(c[n]).toBeNull();
       for (const n of BOSS_WAVES) expect(c[n]).toBeNull();
-      for (let n = 2; n <= WAVE_LIMIT; n++) if (c[n]) expect(c[n]).not.toBe(c[n - 1]);
+      const used = c.filter((x) => x !== null);
+      expect(new Set(used).size).toBe(used.length);
+      for (let n = COMPLICATION_FROM_WAVE; n <= WAVE_LIMIT; n++) if (!BOSS_WAVES.includes(n)) expect(c[n]).not.toBeNull();
     }
-    // Не в каждой волне, но и не никогда.
-    const all = Array.from({ length: 50 }, (_, s) => rollComplications(s)).flat();
-    expect(all.some((c) => c !== null)).toBe(true);
+    // Обычных волн столько же, сколько осложнений: каждое — ровно раз за матч.
+    expect(new Set(rollComplications(7).filter((x) => x !== null))).toEqual(new Set(COMPLICATIONS));
     expect(rollComplications(1)).not.toEqual(rollComplications(2));
   });
 

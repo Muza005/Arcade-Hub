@@ -17,6 +17,7 @@ import {
   ASTEROID_TEXTURE_PAD,
   ASTEROID_VERTICES,
   ATLAS_FX_PAD,
+  BOOM_COLOR,
   ATLAS_GAP,
   CRACK_COLOR,
   CRACK_GLOW,
@@ -36,6 +37,8 @@ export type AsteroidTextures = Record<AsteroidSize, Texture[][]>;
 
 export interface Atlas {
   readonly asteroids: AsteroidTextures;
+  /** Осложнение «Бомбы»: бомба каждого размера. */
+  readonly bombs: Record<AsteroidSize, Texture>;
   /** Мягкая белая точка — искры, красится tint. */
   readonly spark: Texture;
   /** Белая чёрточка — осколки. */
@@ -106,6 +109,26 @@ function rock(shape: number[], lines: number[][], state: RockState): Graphics {
   return g.poly(shape).stroke({ color: edge, width: ASTEROID_LINE_PX, join: 'round' });
 }
 
+/** Бомба: тёмный шар с шипами, неоновый контур, горящий фитиль-сердцевина. */
+const BOMB_SPIKES = 8;
+const BOMB_SPIKE_K = 0.28;
+function bomb(radius: number): Graphics {
+  const g = new Graphics();
+  const layerAlpha = 1 - (1 - ASTEROID_GLOW_ALPHA) ** (1 / ASTEROID_GLOW_LAYERS);
+  for (let i = BOMB_SPIKES - 1; i >= 0; i--) {
+    const a = (i / BOMB_SPIKES) * Math.PI * 2;
+    g.moveTo(Math.cos(a) * radius * 0.8, Math.sin(a) * radius * 0.8).lineTo(Math.cos(a) * radius * (1 + BOMB_SPIKE_K), Math.sin(a) * radius * (1 + BOMB_SPIKE_K));
+  }
+  g.stroke({ color: BOOM_COLOR, width: ASTEROID_LINE_PX, cap: 'round' });
+  for (let i = ASTEROID_GLOW_LAYERS; i >= 1; i--) {
+    g.circle(0, 0, radius * 0.85).stroke({ color: BOOM_COLOR, width: (ASTEROID_GLOW_PX * i) / ASTEROID_GLOW_LAYERS, alpha: layerAlpha });
+  }
+  g.circle(0, 0, radius * 0.85).fill(ASTEROID_FILL).stroke({ color: BOOM_COLOR, width: ASTEROID_LINE_PX });
+  g.circle(0, 0, radius * 0.5).stroke({ color: BOOM_COLOR, width: ASTEROID_LINE_PX / 2, alpha: 0.5 });
+  for (let i = 4; i >= 1; i--) g.circle(0, 0, radius * 0.3 * (i / 4)).fill({ color: '#FFE2B0', alpha: 0.25 });
+  return g;
+}
+
 export function bakeAtlas(renderer: Renderer): Atlas {
   const rng = createRng(ASTEROID_SHAPE_SEED);
   const sheet = new Container();
@@ -138,6 +161,10 @@ export function bakeAtlas(renderer: Renderer): Atlas {
       for (const state of STATES) place(`${size}:${v}:${state}`, rock(shape, lines, state), side, side);
     }
   }
+  for (const size of SIZES) {
+    const side = Math.ceil(ASTEROID_RADIUS[size] * (1 + BOMB_SPIKE_K) + ASTEROID_GLOW_PX / 2 + ASTEROID_TEXTURE_PAD) * 2;
+    place(`bomb:${size}`, bomb(ASTEROID_RADIUS[size]), side, side);
+  }
   const spark = new Graphics();
   for (let i = SPARK_RINGS; i >= 1; i--) spark.circle(0, 0, (SPARK_TEXTURE_PX / 2) * (i / SPARK_RINGS)).fill({ color: 0xffffff, alpha: 1 / SPARK_RINGS });
   place('spark', spark, SPARK_TEXTURE_PX + ATLAS_FX_PAD * 2, SPARK_TEXTURE_PX + ATLAS_FX_PAD * 2);
@@ -160,6 +187,7 @@ export function bakeAtlas(renderer: Renderer): Atlas {
   }
   return {
     asteroids,
+    bombs: { small: get('bomb:small'), medium: get('bomb:medium'), large: get('bomb:large') },
     spark: get('spark'),
     shard: get('shard'),
     destroy() {

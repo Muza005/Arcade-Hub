@@ -27,6 +27,9 @@ function copyEvents(e: SimEvents): SimEvents {
     jammed: [...e.jammed],
     drops: e.drops.map((d) => ({ ...d })),
     healed: [...e.healed],
+    booms: e.booms.map((b) => ({ ...b })),
+    alienDown: e.alienDown.map((a) => ({ ...a })),
+    stuck: [],
   };
 }
 
@@ -38,13 +41,15 @@ export function snapshot(sim: Sim): Sim {
     [...sim.pilots].map(([id, p]) => [id, { ...p, ship: shipOf.get(id) ?? p.ship, sabS: { ...p.sabS }, stats: { ...p.stats } }]),
   );
   const boss = sim.boss
-    ? { ...sim.boss, pos: vec(sim.boss.pos), prev: vec(sim.boss.prev), vel: vec(sim.boss.vel), rings: sim.boss.rings.map((r) => ({ ...r })) }
+    ? { ...sim.boss, pos: vec(sim.boss.pos), prev: vec(sim.boss.prev), vel: vec(sim.boss.vel), rings: sim.boss.rings.map((r) => ({ ...r })), walls: sim.boss.walls.map((w) => ({ ...w })) }
     : null;
   const waves = {
     wave: sim.waves.wave,
     phase: sim.waves.phase,
     leftS: sim.waves.leftS,
     complication: sim.waves.complication,
+    flow: { ...sim.waves.flow },
+    elapsedS: sim.waves.elapsedS,
     boss: sim.waves.boss,
     finishWave: noop,
     step: () => null,
@@ -61,6 +66,7 @@ export function snapshot(sim: Sim): Sim {
     shards: sim.shards.map((s) => ({ ...s, pos: vec(s.pos), prev: vec(s.prev), vel: vec(s.vel) })),
     bombs: sim.bombs.map((b) => ({ ...b, pos: vec(b.pos), prev: vec(b.prev), vel: vec(b.vel) })),
     powerups: sim.powerups.map((p) => ({ ...p, pos: vec(p.pos), prev: vec(p.prev), vel: vec(p.vel) })),
+    aliens: sim.aliens.map((a) => ({ ...a, pos: vec(a.pos), prev: vec(a.prev), vel: vec(a.vel), offset: vec(a.offset) })),
     freezeS: sim.freezeS,
     sabotage: () => false,
     sabCooldownS: () => 0,

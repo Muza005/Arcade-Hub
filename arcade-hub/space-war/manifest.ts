@@ -38,7 +38,7 @@ export const spaceWarManifest: GameManifest = {
     { id: 'teams', title: 'modeTeams', description: 'modeTeamsDesc', icon: modeTeamsIcon, sharedColors: true },
   ],
   status: 'available',
-  version: '9', // 8 — новые усиления; 9 — боссы на 4, 8, 11, 14, 17, 20 волнах, Охотник и Крепость
+  version: '10', // 9 — боссы на 4, 8, 11, 14, 17, 20, Охотник и Крепость; 10 — осложнения в каждой волне, новый Рой
   load: async () => (await import('./game')).createSpaceWarGame(),
   strings,
   // Главная кнопка — Power (патроны и ободок накопления — этап Б3).

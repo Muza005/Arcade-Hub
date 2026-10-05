@@ -12,6 +12,7 @@ import {
   ASTEROID_SPEED,
   ASTEROID_SPIN,
   ASTEROIDS_MAX,
+  CURRENT_SPREAD_RAD,
   SPLIT_COUNT,
   SPLIT_SPEED_K,
   SPLIT_SPREAD_RAD,
@@ -38,6 +39,10 @@ export interface Asteroid {
   held: boolean;
   /** Броня Крепости: неуязвима, но автонаведение в неё целится — патроны уходят в броню. */
   armor: boolean;
+  /** Осложнение «Бомбы»: вместо камня — бомба (взрывается от удара, выстрела и другой бомбы). */
+  bomb: boolean;
+  /** Осложнение «Призрак»: сколько ещё камень виден после попадания, с. */
+  seenS: number;
   /** Камень саботажника: кто бросил (контур в его цвет); обычный — null. */
   owner: string | null;
 }
@@ -79,6 +84,8 @@ export interface Field {
 export interface SpawnOptions {
   size?: AsteroidSize;
   speedK?: number;
+  /** Течение: камень входит с наветренного края и идёт по течению (единичный вектор по оси). */
+  dir?: { x: number; y: number };
 }
 
 export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
@@ -100,6 +107,8 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       immortal: false,
       held: false,
       armor: false,
+      bomb: false,
+      seenS: 0,
       owner: null,
     }),
     () => undefined,
@@ -124,6 +133,8 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
     a.immortal = false;
     a.held = false;
     a.armor = false;
+    a.bomb = false;
+    a.seenS = 0;
     a.owner = null;
     list.push(a);
     return a;
@@ -164,6 +175,17 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
         t -= h;
         x = bounds.right + out;
         y = bounds.top + t;
+      }
+      // Течение: с наветренного края, почти параллельно течению.
+      if (options.dir && (options.dir.x !== 0 || options.dir.y !== 0)) {
+        const { x: dx, y: dy } = options.dir;
+        const along = rng.next();
+        const sx = dx !== 0 ? (dx > 0 ? bounds.left - out : bounds.right + out) : bounds.left + along * w;
+        const sy = dy !== 0 ? (dy > 0 ? bounds.top - out : bounds.bottom + out) : bounds.top + along * h;
+        const [min, max] = ASTEROID_SPEED[size];
+        const v = rng.range(min, max) * (options.speedK ?? 1);
+        const a = Math.atan2(dy, dx) + rng.range(-CURRENT_SPREAD_RAD, CURRENT_SPREAD_RAD);
+        return make(size, sx, sy, Math.cos(a) * v, Math.sin(a) * v);
       }
       // Летит в случайную точку середины поля.
       const tx = rng.range(bounds.left + w * ASTEROID_AIM_INSET, bounds.right - w * ASTEROID_AIM_INSET);

@@ -77,6 +77,12 @@ export type SpaceWarKey =
   | 'comp_jam'
   | 'comp_small'
   | 'comp_large'
+  | 'comp_current'
+  | 'comp_slippery'
+  | 'comp_recoil'
+  | 'comp_aliens'
+  | 'comp_phantom'
+  | 'comp_bombs'
   | 'hudWave'
   | 'hudBreak'
   | 'statusWave'
@@ -224,6 +230,12 @@ export const strings: GameStrings<SpaceWarKey> = {
     comp_jam: 'Глушение — патроны не копятся',
     comp_small: 'Мелкий калибр',
     comp_large: 'Крупный калибр',
+    comp_current: 'Течение — всех сносит',
+    comp_slippery: 'Скользкий космос',
+    comp_recoil: 'Отдача — выстрел толкает назад',
+    comp_aliens: 'Инопланетяне — липнут и тормозят',
+    comp_phantom: 'Призрак — камни гаснут',
+    comp_bombs: 'Бомбы',
     hudWave: '{n}/{of} · {time}',
     hudBreak: 'Передышка · {time}',
     statusWave: 'Волна {n} · до конца {time}',
@@ -370,6 +382,12 @@ export const strings: GameStrings<SpaceWarKey> = {
     comp_jam: 'Jamming — no ammo refill',
     comp_small: 'Small caliber',
     comp_large: 'Large caliber',
+    comp_current: 'Current — everything drifts',
+    comp_slippery: 'Slippery space',
+    comp_recoil: 'Recoil — shots push you back',
+    comp_aliens: 'Aliens — they stick and slow you',
+    comp_phantom: 'Phantom — rocks fade out',
+    comp_bombs: 'Bombs',
     hudWave: '{n}/{of} · {time}',
     hudBreak: 'Break · {time}',
     statusWave: 'Wave {n} · {time} left',

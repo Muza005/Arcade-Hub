@@ -84,6 +84,17 @@ import {
   BOSS_HINT_FONT_PX,
   BOSS_HINT_S,
   FORTRESS_TINT,
+  ALIEN_BEAM,
+  ALIEN_BODY,
+  BOMB_FUSE_HZ,
+  BOMB_FUSE_TINT,
+  BOOM_COLOR,
+  BOOM_RADIUS,
+  BOOM_SPARKS,
+  PHANTOM_ALPHA,
+  PHANTOM_FADE_S,
+  PHANTOM_HIDE_S,
+  PHANTOM_SHOW_S,
   BOSS_EXPLOSION_SHARDS,
   SHAKE_BOSS_DEATH,
   SWARM_TINT,
@@ -125,6 +136,7 @@ import { createAfterlifeView, type AfterlifeView } from '../render/afterlife-vie
 import { createBossView, type BossView } from '../render/boss-view';
 import { mixColor } from '../render/color';
 import { createPowerupView, loadPowerupIcons, type PowerupView } from '../render/powerup-view';
+import { createAlienView, createCurrentView, type AlienView, type CurrentView } from '../render/alien-view';
 import { createDarkness, type Darkness } from '../render/darkness';
 import { createVortexFx, type VortexFx } from '../render/vortex-fx';
 import { BloomFilter, createChromaFilter, createStarsFilter, type ChromaFilter, type StarsFilter } from '../render/filters';
@@ -225,6 +237,8 @@ export function createSpaceWarGame(): GameModule {
   let bossView: BossView;
   let afterView: AfterlifeView;
   let powerupView: PowerupView;
+  let alienView: AlienView;
+  let currentView: CurrentView;
   let audio: GameAudio | null = null;
   /** Последние шаги — для замедленного повтора в итогах; метки волн и гибелей — для шкалы записи. */
   const tail: Sim[] = [];
@@ -320,6 +334,17 @@ export function createSpaceWarGame(): GameModule {
     if (quality.level !== 'low') particles.burst(x, y, { texture: atlas.spark, color, count, speed: [0, SPARK_SPEED * 3], life });
   };
 
+  /** Призрак: 0 — камни видны, 1 — погасли. Гаснут на 2 с, горят 1 с, переходы плавные; в конце волны — видны. */
+  const phantomHide = (): number => {
+    if (sim.waves.complication !== 'phantom') return 0;
+    const period = PHANTOM_HIDE_S + PHANTOM_SHOW_S;
+    const t = sim.waves.elapsedS % period;
+    if (t < PHANTOM_FADE_S) return t / PHANTOM_FADE_S;
+    if (t < PHANTOM_HIDE_S) return 1;
+    if (t < PHANTOM_HIDE_S + PHANTOM_FADE_S) return 1 - (t - PHANTOM_HIDE_S) / PHANTOM_FADE_S;
+    return 0;
+  };
+
   /** Перегрузка: бордовый корабль и след; за OVERLOAD_FADE_S до конца тускнеет к цвету игрока. */
   const overloadTint = (pilot: Pilot): string | null => {
     if (pilot.overloadS <= 0) return null;
@@ -328,6 +353,8 @@ export function createSpaceWarGame(): GameModule {
 
   const syncRocks = (alpha: number): void => {
     const seen = new Set<number>();
+    const phantomK = phantomHide();
+    const fuseOn = Math.floor(fxTimeS * BOMB_FUSE_HZ * 2) % 2 === 1;
     for (const rock of sim.asteroids) {
       seen.add(rock.id);
       let sprite = rockSprites.get(rock.id);
@@ -338,9 +365,15 @@ export function createSpaceWarGame(): GameModule {
         rockSprites.set(rock.id, sprite);
       }
       const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
-      sprite.texture = shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!;
-      // Камни Роя — другим оттенком: их не разбить; камень саботажника — в цвет бросившего.
-      sprite.tint = rock.armor
+      sprite.texture = rock.bomb ? atlas.bombs[rock.size] : (shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!);
+      // Призрак: камень почти не виден, кроме вспышек и попаданий.
+      sprite.alpha = phantomK > 0 && rock.seenS <= 0 ? 1 - phantomK * (1 - PHANTOM_ALPHA) : 1;
+      // Камни Роя — другим оттенком: их не разбить; камень саботажника — в цвет бросившего; бомба мигает.
+      sprite.tint = rock.bomb
+        ? fuseOn
+          ? BOMB_FUSE_TINT
+          : 0xffffff
+        : rock.armor
         ? FORTRESS_TINT
         : rock.immortal
         ? SWARM_TINT
@@ -459,6 +492,8 @@ export function createSpaceWarGame(): GameModule {
     for (const p of events.pickups) audio.play(p.kind === 'overload' ? 'overload' : 'pickup', pan(p.x));
     for (const id of events.jammed) audio.play('jam', at(id));
     for (const b of events.blasts) audio.play('blast', pan(b.x));
+    for (const b of events.booms) audio.play('blast', pan(b.x));
+    for (const a of events.alienDown) audio.play('breakSmall', pan(a.x));
     for (const d of events.bossDown) audio.play('bossDown', pan(d.x));
     for (const w of events.waves) audio.play(w.kind === 'start' ? 'waveStart' : 'waveClear');
     for (const r of events.revives) audio.play('revive', pan(r.x));
@@ -528,6 +563,21 @@ export function createSpaceWarGame(): GameModule {
       if (b.size === 'large') camera.shake(SHAKE_BREAK_LARGE);
     }
     for (const c of events.chips) sparks(c.x, c.y, CHIP_COUNT, CRACK_GLOW, DEBRIS_S);
+    // Бомбы: взрыв — осколки, искры кольцом до края отброса, тряска.
+    for (const b of events.booms) {
+      shards(b.x, b.y, DEBRIS_COUNT[b.size] * EXPLOSION_K, BOOM_COLOR);
+      sparks(b.x, b.y, BOOM_SPARKS, BOOM_COLOR, DEBRIS_S);
+      if (quality.level !== 'low') {
+        const reach = BOOM_RADIUS[b.size] / DEBRIS_S;
+        particles.burst(b.x, b.y, { texture: atlas.spark, color: BOOM_COLOR, count: BLAST_SPARKS, speed: [reach, reach], life: DEBRIS_S });
+      }
+      camera.shake(SHAKE_BOMB);
+    }
+    for (const a of events.alienDown) {
+      shards(a.x, a.y, DEBRIS_COUNT.small, ALIEN_BODY);
+      sparks(a.x, a.y, DEBRIS_COUNT.medium, ALIEN_BEAM, DEBRIS_S);
+    }
+    for (const id of events.stuck) buzz(id, { vib: VIBRATE_HIT_MS });
     for (const n of events.near) sparks(n.x, n.y, NEAR_SPARKS, colors.get(n.id) ?? ACCENT, DEBRIS_S);
     for (const id of events.hits) {
       camera.shake(SHAKE_HIT);
@@ -637,10 +687,13 @@ export function createSpaceWarGame(): GameModule {
       bossView = createBossView(vfx);
       glowLayer.addChildAt(bossView.view, 0);
       afterView = createAfterlifeView();
+      alienView = createAlienView();
+      currentView = createCurrentView(vfx, sim.bounds, ACCENT);
+      glowLayer.addChild(alienView.view);
       powerupView = createPowerupView(await loadPowerupIcons());
       glowLayer.addChild(afterView.view);
       // Значки усилений — над камнями, вне bloom: их свечение уже нарисовано.
-      scene.addChild(field, vortexFx.view, rocksLayer, powerupView.view, glowLayer, tagsLayer);
+      scene.addChild(field, vortexFx.view, currentView.view, rocksLayer, powerupView.view, glowLayer, tagsLayer);
 
       // Счёт и FPS не уменьшаются вместе с отъездом камеры: свой слой в масштабе zoom.
       const hud = new Container();
@@ -714,6 +767,7 @@ export function createSpaceWarGame(): GameModule {
       notice.update(dtS);
       darkness.update(sim.waves.complication === 'dark', dtS);
       vortexFx.update(sim.waves.complication === 'vortex' || sim.boss?.kind === 'vortex', dtS);
+      currentView.update(sim.waves.complication === 'current', sim.waves.flow, dtS);
       camera.update(dtS);
       // Hit-stop: мир на мгновение замер — замирают и частицы, и следы; тряска и вспышка идут.
       if (sim.frozen) return;
@@ -798,6 +852,11 @@ export function createSpaceWarGame(): GameModule {
       scoreHud.draw();
       vortexFx.draw();
       powerupView.draw(sim.powerups, alpha, fxTimeS);
+      currentView.draw();
+      alienView.draw(sim.aliens, alpha, fxTimeS, (id) => {
+        const p = sim.pilots.get(id);
+        return p ? { x: p.ship.prev.x + (p.ship.pos.x - p.ship.prev.x) * alpha, y: p.ship.prev.y + (p.ship.pos.y - p.ship.prev.y) * alpha } : undefined;
+      });
       afterView.draw(
         sim.shards,
         sim.bombs,
