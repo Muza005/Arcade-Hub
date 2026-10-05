@@ -1,7 +1,7 @@
 // Усиления на поле — иконками из шаблона заказчика (space-war/assets/powerups/*.svg, неоновое свечение запечено в SVG).
 // Выпадение: кольцо-вспышка цветом усиления; значок выпрыгивает, потом мягко покачивается и светится ореолом,
 // медленно плывёт (дрейф — в симуляции); последние секунды мигает.
-import { Assets, Container, Graphics, Sprite, type Texture } from 'pixi.js';
+import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import {
   POWERUP_BLINK_HZ,
   POWERUP_BLINK_S,
@@ -45,9 +45,32 @@ const RING_LINE_PX = 3;
 const HALO_PULSE_HZ = 1.2;
 const HALO_PULSE = 0.35;
 const POP_FROM = 0.3; // значок выпрыгивает из маленького
-const HALO_LAYERS = 5;
+/** Ореол — гаусс: к краю текстуры гаснет до нуля, без ступенек и обрезки. */
+const HALO_TEXTURE_PX = 128;
+const HALO_STOPS = 12;
+const HALO_SIGMA = 0.38; // доля радиуса
 
 export type PowerupIcons = Record<PowerupKind, Texture>;
+
+function haloTexture(): Texture {
+  const r = HALO_TEXTURE_PX / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = HALO_TEXTURE_PX;
+  const g = canvas.getContext('2d');
+  if (g) {
+    const grad = g.createRadialGradient(r, r, 0, r, r, r);
+    for (let i = 0; i <= HALO_STOPS; i++) {
+      const t = i / HALO_STOPS;
+      // Гаусс, сдвинутый к нулю на краю.
+      const edge = Math.exp(-1 / (2 * HALO_SIGMA ** 2));
+      const a = (Math.exp(-(t * t) / (2 * HALO_SIGMA ** 2)) - edge) / (1 - edge);
+      grad.addColorStop(t, `rgba(255,255,255,${a.toFixed(4)})`);
+    }
+    g.fillStyle = grad;
+    g.fillRect(0, 0, HALO_TEXTURE_PX, HALO_TEXTURE_PX);
+  }
+  return Texture.from(canvas);
+}
 
 export async function loadPowerupIcons(): Promise<PowerupIcons> {
   const textures = await Promise.all(
@@ -62,11 +85,12 @@ export interface PowerupView {
   burst(x: number, y: number, kind: PowerupKind): void;
   update(dtS: number): void;
   draw(list: readonly Powerup[], alpha: number, timeS: number): void;
+  destroy(): void;
 }
 
 interface Item {
   node: Container;
-  halo: Graphics;
+  halo: Sprite;
   icon: Sprite;
 }
 
@@ -76,13 +100,16 @@ export function createPowerupView(icons: PowerupIcons): PowerupView {
   rings.blendMode = 'add';
   const items = new Map<number, Item>();
   const bursts: Array<{ x: number; y: number; color: string; ageS: number }> = [];
+  const glow = haloTexture();
   view.addChild(rings);
 
   const make = (p: Powerup): Item => {
     const node = new Container();
-    // Мягкий ореол: несколько кругов, к краю прозрачнее.
-    const halo = new Graphics();
-    for (let i = HALO_LAYERS; i >= 1; i--) halo.circle(0, 0, (POWERUP_HALO_PX * i) / HALO_LAYERS).fill({ color: POWERUP_COLOR[p.kind], alpha: 1 / HALO_LAYERS });
+    // Мягкий ореол цветом усиления.
+    const halo = new Sprite(glow);
+    halo.anchor.set(0.5);
+    halo.width = halo.height = POWERUP_HALO_PX * 2;
+    halo.tint = POWERUP_COLOR[p.kind];
     halo.blendMode = 'add';
     const icon = new Sprite(icons[p.kind]);
     icon.anchor.set(0.5);
@@ -133,6 +160,9 @@ export function createPowerupView(icons: PowerupIcons): PowerupView {
         item.node.destroy({ children: true });
         items.delete(id);
       }
+    },
+    destroy() {
+      glow.destroy(true);
     },
   };
 }

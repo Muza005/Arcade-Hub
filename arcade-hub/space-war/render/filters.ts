@@ -106,6 +106,19 @@ void main() {
 }
 `;
 
+/** Докуда реально дотягивается размытие PixiJS, px: первый проход — шаг strength/√Σ(¼)ⁱ, каждый следующий вдвое короче,
+ *  ядро — по 2 шага в каждую сторону. Поле фильтра меньше — свечение обрезается прямоугольником. */
+const BLUR_KERNEL_REACH = 2;
+function blurReach(strength: number, passes: number): number {
+  let sumOfSquares = 0;
+  let steps = 0;
+  for (let i = 0; i < passes; i++) {
+    sumOfSquares += 0.25 ** i;
+    steps += 0.5 ** i;
+  }
+  return Math.ceil((BLUR_KERNEL_REACH * strength * steps) / Math.sqrt(sumOfSquares)) + 1;
+}
+
 export class BloomFilter extends Filter {
   private readonly blur: BlurFilter;
   /** Копия входа: размытие PixiJS пишет промежуточные проходы прямо во входную текстуру. */
@@ -121,7 +134,7 @@ export class BloomFilter extends Filter {
     });
     this.bloomUniforms = bloomUniforms;
     this.blur = new BlurFilter({ strength: BLOOM_BLUR, quality: BLOOM_BLUR_QUALITY, ...SHARP });
-    this.padding = BLOOM_BLUR * 2;
+    this.padding = blurReach(BLOOM_BLUR, BLOOM_BLUR_QUALITY);
   }
 
   set strength(value: number) {

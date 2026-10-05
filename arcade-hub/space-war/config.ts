@@ -56,7 +56,7 @@ export const CHROMA_DECAY_S = 0.35;
 // Частицы
 export const SPARK_TEXTURE_PX = 16; // мягкая точка в атласе
 export const SHARD_TEXTURE_PX = 20; // чёрточка осколка
-export const ATLAS_GAP = 2;
+export const ATLAS_GAP = 4; // между кадрами: соседний кадр не просвечивает по краю
 // Счётчик FPS (этап Б0): обновляется дважды в секунду, мелко в углу
 export const FPS_SAMPLE_S = 0.5;
 export const FPS_FONT_PX = 22;
@@ -135,9 +135,11 @@ export const ASTEROID_JAGGED = 0.28; // разброс радиуса верши
 export const ASTEROID_COLOR = '#A99BFF';
 export const ASTEROID_FILL = '#0B0D1C';
 export const ASTEROID_LINE_PX = 3;
-export const ASTEROID_GLOW_PX = 9; // неоновый ореол контура
-export const ASTEROID_GLOW_ALPHA = 0.18;
-export const ASTEROID_TEXTURE_PAD = 6;
+export const ASTEROID_GLOW_PX = 16; // неоновый ореол контура: несколько полос, к краю прозрачнее
+export const ASTEROID_GLOW_LAYERS = 4;
+export const ASTEROID_GLOW_ALPHA = 0.22; // у самого контура
+/** Запас кадра за самой дальней вершиной и ореолом: свечение не обрезается краем кадра. */
+export const ASTEROID_TEXTURE_PAD = 4;
 // Осколки: только вид, урона не наносят
 export const DEBRIS_COUNT = { small: 5, medium: 7, large: 9 } as const;
 export const DEBRIS_SPEED = [120, 320] as const;
@@ -391,8 +393,8 @@ export const POWERUP_HOP_S = 0.7;
 export const POWERUP_HOP_PX = 30;
 export const POWERUP_BOB_PX = 4; // потом — мягко покачивается
 export const POWERUP_BOB_HZ = 0.8;
-export const POWERUP_HALO_PX = 34;
-export const POWERUP_HALO_ALPHA = 0.28;
+export const POWERUP_HALO_PX = 52; // радиус мягкого ореола (гаусс — гаснет к краю)
+export const POWERUP_HALO_ALPHA = 0.35;
 export const POWERUP_DROP_SPARKS = 18;
 export const POWERUP_DROP_RING_S = 0.45;
 export const POWERUP_DROP_RING_PX = 70;

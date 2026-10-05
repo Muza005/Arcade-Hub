@@ -7,6 +7,7 @@ import {
   ASTEROID_COLOR,
   ASTEROID_FILL,
   ASTEROID_GLOW_ALPHA,
+  ASTEROID_GLOW_LAYERS,
   ASTEROID_GLOW_PX,
   ASTEROID_JAGGED,
   ASTEROID_LINE_PX,
@@ -92,11 +93,13 @@ function drawCracks(g: Graphics, lines: number[][], color: string, width: number
 
 function rock(shape: number[], lines: number[][], state: RockState): Graphics {
   const edge = state === RockState.LastHit ? CRACK_GLOW : ASTEROID_COLOR;
-  const g = new Graphics()
-    .poly(shape)
-    .stroke({ color: edge, width: ASTEROID_GLOW_PX, alpha: ASTEROID_GLOW_ALPHA, join: 'round' })
-    .poly(shape)
-    .fill(ASTEROID_FILL);
+  const g = new Graphics();
+  // Ореол — полосы от широкой к узкой: у контура они складываются в ASTEROID_GLOW_ALPHA, к краю тают.
+  const layerAlpha = 1 - (1 - ASTEROID_GLOW_ALPHA) ** (1 / ASTEROID_GLOW_LAYERS);
+  for (let i = ASTEROID_GLOW_LAYERS; i >= 1; i--) {
+    g.poly(shape).stroke({ color: edge, width: (ASTEROID_GLOW_PX * i) / ASTEROID_GLOW_LAYERS, alpha: layerAlpha, join: 'round' });
+  }
+  g.poly(shape).fill(ASTEROID_FILL);
   if (state === RockState.Cracked) drawCracks(g, lines, CRACK_COLOR, CRACK_LINE_PX);
   if (state === RockState.LastHit) drawCracks(g, lines, CRACK_GLOW, CRACK_GLOW_PX);
   return g.poly(shape).stroke({ color: edge, width: ASTEROID_LINE_PX, join: 'round' });
@@ -125,7 +128,9 @@ export function bakeAtlas(renderer: Renderer): Atlas {
 
   for (const size of SIZES) {
     const radius = ASTEROID_RADIUS[size];
-    const side = (radius + ASTEROID_TEXTURE_PAD) * 2;
+    // Самая дальняя вершина — radius · (1 + JAGGED/2), за ней ореол: кадр с запасом, иначе свечение режется
+    // краем, а соседний кадр (тот же камень с жёлтым контуром последнего удара) просвечивает пятном.
+    const side = Math.ceil(radius * (1 + ASTEROID_JAGGED / 2) + ASTEROID_GLOW_PX / 2 + ASTEROID_TEXTURE_PAD) * 2;
     for (let v = 0; v < ASTEROID_SHAPE_VARIANTS; v++) {
       const shape = outline(radius, rng);
       const lines = cracks(radius, rng);

@@ -925,6 +925,7 @@ export function createSpaceWarGame(): GameModule {
       audio?.dispose();
       audio = null;
       darkness?.destroy();
+      powerupView?.destroy();
       stage?.destroy();
       atlas?.destroy();
       views.clear();
