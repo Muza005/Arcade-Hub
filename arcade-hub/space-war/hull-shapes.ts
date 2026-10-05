@@ -1,150 +1,68 @@
 // Геометрия корпусов (SPACE_WAR_SPEC §8) — одни данные для игры (PixiJS) и для иконок в лобби (SVG).
-// Без графических библиотек: манифест грузится сразу и тянет только эти числа.
-// Решение заказчика: 30 корпусов в пяти разделах по шесть — треугольные, круглые, гранёные, крылатые, особые.
-// Рисуем как на иконке — носом вверх, в долях SHIP_SIZE (u — вправо, v — вниз); в игре нос — вправо (угол 0).
+// Без графических библиотек: манифест грузится сразу и тянет только эти строки.
+// Решение заказчика: 30 корпусов в пяти разделах по шесть, контуры — точь-в-точь из его макета
+// (SVG-путь в квадрате 24×24, нос вверх). В игре тот же путь повёрнут носом вправо (угол 0).
 // Хитбокс у всех один (SHIP_HITBOX_RADIUS); рисунок — только вид.
-import { SHIP_SIZE, type Hull } from './config';
+import type { Hull } from './config';
 
 export const HULL_GROUPS = ['tri', 'round', 'facet', 'wing', 'special'] as const;
 export type HullGroup = (typeof HULL_GROUPS)[number];
 
-/** Часть рисунка: замкнутый контур, открытая линия или окружность; fill — полупрозрачная заливка. */
-export type HullPart =
-  | { poly: number[]; fill?: number }
-  | { line: number[] }
-  | { circle: [number, number, number]; fill?: number };
-
 export interface HullShape {
   group: HullGroup;
-  parts: HullPart[];
-  /** Корма: отсюда рисуется пламя тяги. */
-  tail: number;
+  /** Контур из макета: SVG-путь, квадрат 24×24, центр (12, 12), нос вверх. */
+  d: string;
+  /** Поворот в игре, рад: у «Кометы» шар смотрит по диагонали — в полёте он впереди, лучи сзади. */
+  tilt?: number;
 }
 
-const S = SHIP_SIZE;
-const ARC_STEPS = 12;
-
-/** Точки «как на иконке» (u, v — доли размера, нос вверх) → координаты корабля (нос вправо). */
-const pts = (...uv: number[]): number[] => {
-  const out: number[] = [];
-  for (let i = 0; i < uv.length; i += 2) out.push(-(uv[i + 1] ?? 0) * S, (uv[i] ?? 0) * S);
-  return out;
-};
-const poly = (...uv: number[]): HullPart => ({ poly: pts(...uv) });
-const line = (...uv: number[]): HullPart => ({ line: pts(...uv) });
-const circle = (u: number, v: number, r: number): HullPart => ({ circle: [-v * S, u * S, r * S] });
-
-/** Дуга (u, v, r) от угла a0 до a1 (радианы, 0 — вправо, по часовой на иконке) — точки для контура. */
-function arc(u: number, v: number, r: number, a0: number, a1: number, steps = ARC_STEPS): number[] {
-  const out: number[] = [];
-  for (let i = 0; i <= steps; i++) {
-    const a = a0 + ((a1 - a0) * i) / steps;
-    out.push(u + Math.cos(a) * r, v + Math.sin(a) * r);
-  }
-  return out;
-}
-
-/** Эллипс с наклоном — точки замкнутого контура. */
-function ellipse(rx: number, ry: number, tilt: number, steps = ARC_STEPS * 2): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < steps; i++) {
-    const a = (i / steps) * Math.PI * 2;
-    const x = Math.cos(a) * rx;
-    const y = Math.sin(a) * ry;
-    out.push(x * Math.cos(tilt) - y * Math.sin(tilt), x * Math.sin(tilt) + y * Math.cos(tilt));
-  }
-  return out;
-}
-
-/** Звезда носом вверх. */
-function star(points: number, outer: number, inner: number): number[] {
-  const out: number[] = [];
-  for (let i = 0; i < points * 2; i++) {
-    const a = -Math.PI / 2 + (i / (points * 2)) * Math.PI * 2;
-    const r = i % 2 === 0 ? outer : inner;
-    out.push(Math.cos(a) * r, Math.sin(a) * r);
-  }
-  return out;
-}
-
-const HALF = Math.PI;
-
-/** Корма — самая нижняя точка рисунка на иконке. */
-function shape(group: HullGroup, parts: HullPart[]): HullShape {
-  let tail = 0;
-  for (const p of parts) {
-    if ('circle' in p) tail = Math.min(tail, p.circle[0] - p.circle[2]);
-    else {
-      const xs = 'poly' in p ? p.poly : p.line;
-      for (let i = 0; i < xs.length; i += 2) tail = Math.min(tail, xs[i] ?? 0);
-    }
-  }
-  return { group, parts, tail };
-}
+/** Иконки и рисунок в игре: квадрат макета и толщина линии в нём. */
+export const HULL_VIEW = 24;
+export const HULL_CENTER = 12;
+export const HULL_ICON_STROKE = 1.75;
 
 export const HULL_SHAPES: Record<Hull, HullShape> = {
   // ─── Треугольные ───
-  arrow: shape('tri', [poly(0, -1, 0.62, 0.72, 0, 0.32, -0.62, 0.72)]),
-  spire: shape('tri', [poly(0, -1, 0.42, -0.45, 0.16, -0.45, 0.16, 0.5, 0.4, 0.95, 0, 0.75, -0.4, 0.95, -0.16, 0.5, -0.16, -0.45, -0.42, -0.45)]),
-  delta: shape('tri', [poly(0, -1, 0.16, 0.25, 0.8, 0.8, 0, 0.55, -0.8, 0.8, -0.16, 0.25)]),
-  needle: shape('tri', [poly(0, -1, 0.26, 0.9, 0, 0.62, -0.26, 0.9), line(0, -0.55, 0, 0.6)]),
-  stealth: shape('tri', [poly(0, -0.65, 0.95, 0.35, 0.45, 0.35, 0, -0.05, -0.45, 0.35, -0.95, 0.35), line(-0.45, 0.35, 0, 0.05, 0.45, 0.35)]),
-  chevron: shape('tri', [poly(0, -0.55, 1, 0.35, 0.72, 0.5, 0, -0.08, -0.72, 0.5, -1, 0.35)]),
+  arrow: { group: 'tri', d: 'M12 3l7 17-7-4-7 4z' },
+  spire: { group: 'tri', d: 'M12 3l5 8-3.5-1v8l2 3h-7l2-3v-8l-3.5 1z' },
+  delta: { group: 'tri', d: 'M12 3l3 12 5 5-8-3-8 3 5-5z' },
+  needle: { group: 'tri', d: 'M12 3l3.5 17-3.5-3-3.5 3z' },
+  stealth: { group: 'tri', d: 'M12 4l9 13-5-2-4 4-4-4-5 2z' },
+  chevron: { group: 'tri', d: 'M12 6l9 11-9-4-9 4z' },
   // ─── Круглые ───
-  planet: shape('round', [circle(0, 0, 0.5), { poly: pts(...ellipse(0.98, 0.3, -0.45)) }]),
-  jelly: shape('round', [
-    poly(...arc(0, 0.05, 0.72, HALF, HALF * 2), 0.72, 0.05),
-    line(-0.4, 0.05, -0.45, 0.85),
-    line(0, 0.05, 0, 0.95),
-    line(0.4, 0.05, 0.45, 0.85),
-  ]),
-  saucer: shape('round', [{ poly: pts(...ellipse(0.98, 0.34, 0)) }, poly(...arc(0, -0.1, 0.45, HALF, HALF * 2))]),
-  comet: shape('round', [circle(0.32, -0.42, 0.4), line(-0.02, -0.35, -0.8, 0.43), line(0.12, -0.12, -0.65, 0.78), line(0.35, -0.02, -0.25, 0.6)]),
-  arch: shape('round', [poly(...arc(0, 0, 0.82, HALF, HALF * 2), 0.82, 0.85, 0.4, 0.85, 0.4, 0, ...arc(0, 0, 0.4, 0, -HALF), -0.4, 0.85, -0.82, 0.85)]),
-  dome: shape('round', [poly(...arc(0, 0.3, 0.9, HALF, HALF * 2), ...arc(0, 1.4, 1.42, -0.885, -2.256))]),
+  planet: { group: 'round', d: 'M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zM3.5 15.1a9 3 -20 1 0 17-6.2 9 3 -20 1 0-17 6.2z' },
+  jelly: { group: 'round', d: 'M5 12a7 7 0 0 1 14 0zM8 12v6M12 12v8M16 12v6' },
+  saucer: { group: 'round', d: 'M4 14c0-2 3.6-3.5 8-3.5s8 1.5 8 3.5-3.6 3.5-8 3.5-8-1.5-8-3.5zM8.5 11a3.5 3.5 0 0 1 7 0' },
+  comet: { group: 'round', d: 'M15 5a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 12l-7 7M10.5 8.5L5 14M15.5 13.5L10 19', tilt: -Math.PI / 4 },
+  arch: { group: 'round', d: 'M8 20v-7a4 4 0 0 1 8 0v7h3v-7a7 7 0 0 0-14 0v7z' },
+  dome: { group: 'round', d: 'M5 17a8 8 0 1 1 14 0 9 9 0 0 0-14 0z' },
   // ─── Гранёные ───
-  diamond: shape('facet', [poly(0, -1, 0.58, 0, 0, 1, -0.58, 0)]),
-  gem: shape('facet', [poly(-0.5, -0.65, 0.5, -0.65, 0.68, -0.3, 0, 1, -0.68, -0.3), line(-0.68, -0.3, 0.68, -0.3), line(-0.2, -0.65, 0, 1, 0.2, -0.65)]),
-  crystal: shape('facet', [poly(0, -1, 0.42, -0.35, 0.26, 0.85, -0.26, 0.85, -0.42, -0.35), line(0, -1, 0.05, 0.85)]),
-  prism: shape('facet', [poly(0, -1, 0.45, -0.7, 0.45, 0.7, 0, 1, -0.45, 0.7, -0.45, -0.7), line(-0.45, -0.7, 0, -0.4, 0.45, -0.7), line(0, -0.4, 0, 1)]),
-  ark: shape('facet', [poly(-0.8, -0.05, 0.8, -0.05, 0.5, 0.65, -0.5, 0.65), poly(0, -0.9, 0.45, -0.05, -0.45, -0.05)]),
-  tower: shape('facet', [poly(0, -1, 0.22, -0.6, 0.22, -0.05, 0.6, 0.2, 0.6, 0.9, -0.6, 0.9, -0.6, 0.2, -0.22, -0.05, -0.22, -0.6)]),
+  diamond: { group: 'facet', d: 'M12 3l6 9-6 9-6-9z' },
+  gem: { group: 'facet', d: 'M12 3l5 6-5 12-5-12zM7 9h10' },
+  crystal: { group: 'facet', d: 'M13 3l5 9-4 9-7-6 2-7zM13 3l-1 9 2 9' },
+  prism: { group: 'facet', d: 'M12 3l4 5v11l-4 2-4-2V8zM8 8l4 2 4-2M12 10v11' },
+  ark: { group: 'facet', d: 'M12 3l7 10-3 6H8l-3-6zM5 13h14M9 13l3-10 3 10' },
+  tower: { group: 'facet', d: 'M12 3l3 5v13H9V8zM9 12l-4 2v7h4M15 12l4 2v7h-4' },
   // ─── Крылатые ───
-  rocket: shape('wing', [poly(0, -1, 0.3, -0.5, 0.3, 0.4, 0.62, 0.85, 0.15, 0.72, -0.15, 0.72, -0.62, 0.85, -0.3, 0.4, -0.3, -0.5)]),
-  jet: shape('wing', [poly(0, -1, 0.16, -0.35, 0.92, 0.32, 0.16, 0.22, 0.32, 0.85, 0, 0.65, -0.32, 0.85, -0.16, 0.22, -0.92, 0.32, -0.16, -0.35)]),
-  raptor: shape('wing', [poly(0, -1, 0.17, 0.2, 0.98, 0.72, 0.12, 0.55, 0, 0.85, -0.12, 0.55, -0.98, 0.72, -0.17, 0.2)]),
-  starship: shape('wing', [{ poly: pts(...star(5, 1, 0.48)) }]),
-  nova: shape('wing', [{ poly: pts(...star(5, 1, 0.3)) }, circle(0, 0.05, 0.16)]),
-  bat: shape('wing', [poly(0, -0.4, 0.3, -0.65, 0.98, -0.45, 0.78, 0.05, 0.45, 0.05, 0.3, 0.45, 0, 0.25, -0.3, 0.45, -0.45, 0.05, -0.78, 0.05, -0.98, -0.45, -0.3, -0.65)]),
+  rocket: { group: 'wing', d: 'M12 3c2 2 3 5 3 8l4 6v2h-4l-1 2h-4l-1-2H5v-2l4-6c0-3 1-6 3-8z' },
+  jet: { group: 'wing', d: 'M12 3l2 7 6 5v3l-6-2-2 4-2-4-6 2v-3l6-5z' },
+  raptor: { group: 'wing', d: 'M12 3l2 9 7 6-9-2-9 2 7-6z' },
+  starship: { group: 'wing', d: 'M12 3l2 6 7 3-6 2 1 6-4-3-4 3 1-6-6-2 7-3z' },
+  nova: { group: 'wing', d: 'M12 3l1.5 6H21l-7.5 4 1 6-2.5-2-2.5 2 1-6L3 9h7.5z' },
+  bat: { group: 'wing', d: 'M12 5l2 3 7-2c0 5-2 8-5 9l-2-2-2 4-2-4-2 2c-3-1-5-4-5-9l7 2z' },
   // ─── Особые ───
-  spark: shape('special', [{ poly: pts(...star(4, 1, 0.3)) }]),
-  star: shape('special', [{ poly: pts(...star(5, 1, 0.45)) }]),
-  bolt: shape('special', [poly(0.2, -1, -0.55, 0.12, 0, 0.12, -0.2, 1, 0.55, -0.12, 0, -0.12)]),
-  sword: shape('special', [poly(0, -1, 0.13, -0.82, 0.13, 0.3, 0.45, 0.3, 0.45, 0.47, 0.13, 0.47, 0.13, 0.85, 0, 1, -0.13, 0.85, -0.13, 0.47, -0.45, 0.47, -0.45, 0.3, -0.13, 0.3, -0.13, -0.82)]),
-  cat: shape('special', [poly(-0.72, -0.9, -0.3, -0.52, 0.3, -0.52, 0.72, -0.9, 0.76, 0.15, 0.5, 0.65, 0, 0.85, -0.5, 0.65, -0.76, 0.15)]),
-  ghost: shape('special', [poly(...arc(0, -0.15, 0.66, HALF, HALF * 2), 0.66, 0.9, 0.33, 0.62, 0, 0.9, -0.33, 0.62, -0.66, 0.9)]),
+  spark: { group: 'special', d: 'M12 3c.8 5 2.5 7.5 9 9-6.5 1.5-8.2 4-9 9-.8-5-2.5-7.5-9-9 6.5-1.5 8.2-4 9-9z' },
+  star: { group: 'special', d: 'M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6-4.5-4.2 6.1-.7z' },
+  bolt: { group: 'special', d: 'M13.5 3L6 13.5h5L9.5 21 18 10h-5z' },
+  sword: { group: 'special', d: 'M12 3l2 3v9h3v2h-4v4h-2v-4H7v-2h3V6z' },
+  cat: { group: 'special', d: 'M5 4l4 4h6l4-4v9a7 7 0 0 1-14 0z' },
+  ghost: { group: 'special', d: 'M6 20v-9a6 6 0 0 1 12 0v9l-3-2-3 2-3-2z' },
 };
 
-const ICON_VIEW = S + 4;
-const ICON_STROKE = 3.5;
-const r2 = (v: number): string => String(Math.round(v * 100) / 100);
-const pointList = (xs: number[]): string => {
-  const out = [];
-  for (let i = 0; i < xs.length; i += 2) out.push(`${r2(xs[i] ?? 0)},${r2(xs[i + 1] ?? 0)}`);
-  return out.join(' ');
-};
-
-/** Иконка корпуса носом вверх; цвет — currentColor. */
+/** Иконка корпуса как в макете (нос вверх); цвет — currentColor. */
 export function hullSvg(hull: Hull): string {
-  const parts = HULL_SHAPES[hull].parts.map((p) => {
-    if ('line' in p) return `<polyline points="${pointList(p.line)}"/>`;
-    const fill = p.fill ? `fill="currentColor" fill-opacity="${p.fill}" stroke="none"` : '';
-    if ('circle' in p) return `<circle cx="${r2(p.circle[0])}" cy="${r2(p.circle[1])}" r="${r2(p.circle[2])}" ${fill}/>`;
-    return `<polygon points="${pointList(p.poly)}" ${fill}/>`;
-  });
   return (
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-ICON_VIEW} ${-ICON_VIEW} ${ICON_VIEW * 2} ${ICON_VIEW * 2}" ` +
-    `fill="none" stroke="currentColor" stroke-width="${ICON_STROKE}" stroke-linejoin="round" stroke-linecap="round">` +
-    `<g transform="rotate(-90)">${parts.join('')}</g></svg>`
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${HULL_VIEW} ${HULL_VIEW}" fill="none" stroke="currentColor" ` +
+    `stroke-width="${HULL_ICON_STROKE}" stroke-linejoin="round" stroke-linecap="round"><path d="${HULL_SHAPES[hull].d}"/></svg>`
   );
 }

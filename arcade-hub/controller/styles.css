@@ -927,7 +927,7 @@ button {
   height: 64%;
 }
 
-.profile__art svg :is(polygon, circle):not([fill]) {
+.profile__art svg path:not([fill]) {
   fill: currentColor;
   fill-opacity: 0.18;
 }
