@@ -1,0 +1,864 @@
+/* Меню игр и окно игры (ARCADE_HUB_SPEC §6, §7, §18).
+   Размеры — px макета 1920×1080, переведённые в rem: calc(N rem / 24). */
+
+[hidden] {
+  display: none !important;
+}
+
+.icon {
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+  flex: none;
+}
+
+.icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* Общий вид фокуса (§8): белая рамка с отступом, свечение, увеличение. Виден всегда, не только с клавиатуры. */
+.card:focus,
+.btn:focus,
+.icon-btn:focus,
+.gw__close:focus {
+  outline: none;
+  z-index: 1;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus),
+    0 0 calc(28rem / 24) var(--accent);
+}
+
+/* ─── Раскладка меню ─────────────────────────────────────── */
+
+.menu {
+  --content-w: min(calc(1792rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--safe-zone) calc((100vw - var(--content-w)) / 2);
+}
+
+.topbar {
+  flex: none;
+  height: calc(72rem / 24);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: calc(28rem / 24);
+}
+
+.logo__mark {
+  width: calc(40rem / 24);
+  height: calc(40rem / 24);
+  border-radius: var(--radius-sm);
+  border: calc(4rem / 24) solid var(--text);
+  box-shadow: inset 0 0 0 calc(6rem / 24) var(--bg), inset 0 0 0 calc(20rem / 24) var(--text);
+}
+
+.topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.room {
+  height: calc(64rem / 24);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+
+.room__label {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.room__code {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-body);
+  letter-spacing: 0.14em;
+}
+
+.icon-btn {
+  width: calc(64rem / 24);
+  height: calc(64rem / 24);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text);
+  font-size: calc(28rem / 24);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.heading {
+  flex: none;
+  margin-top: var(--space-4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.heading__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-screen-title);
+  line-height: 1.1;
+}
+
+.heading__count {
+  margin: var(--space-1) 0 0;
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.heading__keys {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+
+/* ─── Сетка игр ──────────────────────────────────────────── */
+
+.grid {
+  /* Запас под рамку фокуса и увеличение: сетка шире на него, а визуально стоит на месте. */
+  --focus-room: calc(32rem / 24);
+  flex: 1;
+  min-height: 0;
+  margin: calc(var(--space-4) - var(--focus-room)) calc(-1 * var(--focus-room)) 0;
+  padding: var(--focus-room);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: var(--space-4);
+  overflow-y: auto;
+  scrollbar-width: none;
+  scroll-snap-type: y mandatory;
+  scroll-padding: var(--focus-room);
+}
+
+.grid::-webkit-scrollbar {
+  display: none;
+}
+
+.card {
+  position: relative;
+  aspect-ratio: 576 / 268;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  /* Заглушка-градиент из accent, пока грузится обложка (§16). */
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt, var(--accent)));
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    box-shadow var(--dur-fast) var(--ease);
+}
+
+.card__cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left top;
+}
+
+.card__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgb(7 9 18 / 0.92), rgb(7 9 18 / 0.55) 38%, transparent 70%);
+}
+
+.card__footer {
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  bottom: var(--space-3);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.card__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--fs-card-title);
+  line-height: 1.1;
+}
+
+.card__meta {
+  flex: none;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.badge {
+  position: absolute;
+  top: calc(20rem / 24);
+  left: calc(20rem / 24);
+  padding: calc(6rem / 24) calc(14rem / 24);
+  border-radius: var(--radius-full);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--bg);
+}
+
+.badge--yellow {
+  background: var(--warn);
+}
+
+.badge--white {
+  background: var(--text);
+}
+
+.card--soon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  background: none;
+  border: calc(3rem / 24) dashed rgb(255 255 255 / 0.16);
+  color: var(--text-3);
+  cursor: default;
+}
+
+.card__plus {
+  font-size: calc(48rem / 24);
+}
+
+.card__soon-label {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+}
+
+/* ─── Нижняя полоса ──────────────────────────────────────── */
+
+.bottombar {
+  flex: none;
+  height: calc(112rem / 24);
+  margin-top: var(--space-3);
+  padding-top: calc(20rem / 24);
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.join {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.join__qr {
+  border: 0;
+  cursor: zoom-in;
+  width: calc(92rem / 24);
+  height: calc(92rem / 24);
+  flex: none;
+  padding: calc(6rem / 24);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.join__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.join__title,
+.join__code {
+  margin: 0;
+}
+
+.join__title {
+  font-size: var(--fs-body);
+}
+
+.join__code {
+  margin-top: calc(4rem / 24);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.players {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.players__count {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.avatars {
+  display: flex;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avatar {
+  width: calc(96rem / 24); /* влезает ник из 8 символов */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(4rem / 24);
+}
+
+.avatar__circle {
+  position: relative;
+  width: calc(56rem / 24);
+  height: calc(56rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-body);
+}
+
+.avatar__nick {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.avatar__crown {
+  position: absolute;
+  top: calc(-16rem / 24);
+  left: 50%;
+  translate: -50% 0;
+  font-size: calc(22rem / 24);
+  color: var(--warn);
+}
+
+.avatar--offline .avatar__circle {
+  opacity: 0.45;
+}
+
+.avatar__offline {
+  position: absolute;
+  right: calc(-6rem / 24);
+  bottom: calc(-6rem / 24);
+  padding: calc(3rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: var(--bg);
+  font-size: calc(22rem / 24);
+}
+
+/* Новый игрок появляется заметно — вся комната видит, что кто-то зашёл (§6). */
+.avatar--new {
+  animation: avatar-in var(--dur-slow) var(--ease);
+}
+
+@keyframes avatar-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+}
+
+.avatar--more .avatar__circle {
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-secondary);
+}
+
+/* ─── Окно игры ──────────────────────────────────────────── */
+
+.gw-dialog {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
+.gw-dialog[open] {
+  display: grid;
+  place-items: center;
+}
+
+.gw-dialog::backdrop {
+  background: rgb(7 9 18 / 0.8);
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes window-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--enter-scale));
+  }
+}
+
+.gw {
+  width: min(calc(1400rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  /* Высота — по содержимому (у игр разное число режимов); не влезает — прокручивается тело окна. */
+  max-height: calc(100vh - var(--safe-zone));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: calc(32rem / 24);
+  background: var(--surface);
+  animation: window-in var(--dur-base) var(--ease);
+}
+
+.gw__cover {
+  position: relative;
+  flex: none;
+  height: calc(340rem / 24);
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt, var(--accent)));
+}
+
+.gw__cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: left top;
+}
+
+.gw__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, var(--surface), rgb(15 19 34 / 0.6) 45%, transparent 80%);
+}
+
+.gw__heading {
+  position: absolute;
+  left: calc(56rem / 24);
+  right: calc(56rem / 24);
+  bottom: var(--space-4);
+}
+
+.gw__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: calc(72rem / 24);
+  line-height: 1;
+}
+
+.gw__tagline {
+  margin: var(--space-2) 0 0;
+  font-size: var(--fs-body);
+}
+
+.gw__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  height: calc(64rem / 24);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 calc(8rem / 24) 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: rgb(7 9 18 / 0.7);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.gw__close-key {
+  font-family: var(--font-ui);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.gw__close-icon {
+  font-size: calc(32rem / 24);
+  padding: calc(8rem / 24);
+  box-sizing: content-box;
+}
+
+.gw__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 1fr calc(360rem / 24);
+  gap: var(--space-6);
+  padding: var(--space-4) calc(56rem / 24) calc(56rem / 24);
+}
+
+.gw__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.gw__facts,
+.gw__modes,
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gw__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  height: calc(48rem / 24);
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10rem / 24);
+  padding: 0 calc(20rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.chip__icon {
+  font-size: var(--fs-body);
+  color: var(--accent);
+}
+
+.gw__modes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(300rem / 24), 1fr));
+  gap: var(--space-2);
+}
+
+.mode {
+  display: grid;
+  grid-template-columns: calc(40rem / 24) 1fr;
+  align-items: center;
+  column-gap: var(--space-2);
+  padding: var(--space-2) calc(20rem / 24);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.mode__icon {
+  grid-row: span 2;
+  width: calc(40rem / 24);
+  height: calc(40rem / 24);
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.mode__desc {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.gw__label {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12rem / 24);
+  counter-reset: step;
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  counter-increment: step;
+}
+
+.step::before {
+  content: counter(step);
+  width: calc(40rem / 24);
+  height: calc(40rem / 24);
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-caption);
+}
+
+.gw__side {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.gw__record {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.gw__record .gw__label {
+  color: var(--text-2);
+}
+
+.gw__record-line {
+  margin: 0;
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  color: var(--text-2);
+}
+
+.gw__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.btn {
+  height: calc(80rem / 24);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.btn--play {
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.btn--ghost {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Кнопка «Рекорды и записи» и их экран в окне игры (§7). */
+.gw__records {
+  align-self: flex-start;
+}
+
+.gw__side .link-btn {
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+}
+
+.gw__side .link-btn:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--surface),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
+}
+
+/* Сервер недоступен (§15): вместо QR — сообщение и одно действие. */
+.join--offline {
+  gap: var(--space-2);
+}
+
+.join__offline-icon {
+  width: calc(92rem / 24);
+  height: calc(92rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--warn);
+  font-size: calc(44rem / 24);
+}
+
+.join__retry {
+  height: calc(64rem / 24);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.gw__error {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: rgb(255 90 110 / 0.14);
+  color: var(--danger);
+  font-size: var(--fs-caption);
+}
+
+/* Неподходящий браузер телефона (§15). */
+.avatar__warning {
+  position: absolute;
+  right: calc(-6rem / 24);
+  bottom: calc(-6rem / 24);
+  padding: calc(3rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--warn);
+  color: var(--bg);
+  font-size: calc(22rem / 24);
+}
+
+/* Убрать отключившегося: кнопка на его аватаре, видна всегда — он и так полупрозрачный. */
+.avatar {
+  position: relative;
+}
+
+.avatar__remove {
+  position: absolute;
+  top: calc(-8rem / 24);
+  right: calc(4rem / 24);
+  width: calc(32rem / 24);
+  height: calc(32rem / 24);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--danger);
+  color: var(--bg);
+  font-size: calc(18rem / 24);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.avatar__remove:focus {
+  outline: none;
+  transform: scale(1.2);
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
+}
+
+/* QR почти на весь экран: белая плашка по центру, под ней код комнаты; клик или Esc — закрыть. */
+.qr-zoom {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: zoom-out;
+}
+
+.qr-zoom[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.qr-zoom::backdrop {
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+}
+
+/* Крупно, но не во весь экран (решение заказчика: на 30 % меньше прежних 80vh). */
+.qr-zoom__plate {
+  width: min(56vh, 63vw);
+  height: min(56vh, 63vw);
+  padding: calc(24rem / 24);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.qr-zoom__code svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.qr-zoom__code {
+  width: 100%;
+  height: 100%;
+}
+
+.qr-zoom__room {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-card-title, 1.5rem);
+  letter-spacing: 0.14em;
+}

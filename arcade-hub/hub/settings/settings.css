@@ -1,0 +1,132 @@
+/* Настройки хаба (§13). Размеры — px макета 1920×1080 в rem. */
+.hs {
+  --content-w: min(calc(1792rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--safe-zone) calc((100vw - var(--content-w)) / 2);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.hs__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.hs__version {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-3);
+}
+
+.hs__head .rv__back {
+  background: var(--surface);
+}
+
+.hs__head .rv__back span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.hs__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-screen-title);
+}
+
+.hs__title-icon {
+  font-size: calc(48rem / 24);
+  color: var(--text-2);
+}
+
+.hs__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.hs__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.hs__card-title {
+  margin: 0 0 var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+
+.hs__card-icon {
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ok);
+  font-size: calc(28rem / 24);
+}
+
+/* Уровень громкости — заливка под значением. */
+.hs__meter {
+  border-radius: var(--radius-sm);
+  background: linear-gradient(to right, rgb(61 220 151 / 0.28) calc(var(--level) * 100%), var(--surface-2) 0);
+}
+
+.hs .field__option[aria-checked='true'] {
+  background: var(--ok);
+  color: var(--bg);
+}
+
+.hs .field--toggle[aria-checked='true']::after {
+  background:
+    radial-gradient(circle calc(12rem / 24) at calc(40rem / 24) 50%, var(--bg) 98%, transparent) no-repeat,
+    var(--ok);
+}
+
+.hs .btn {
+  height: calc(64rem / 24);
+}
+
+.hs__confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.hs__confirm-text {
+  flex: 1;
+  color: var(--warn);
+}
+
+.btn--danger-fill {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.hs .btn:focus,
+.hs .rv__back:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus),
+    0 0 calc(28rem / 24) var(--ok);
+}

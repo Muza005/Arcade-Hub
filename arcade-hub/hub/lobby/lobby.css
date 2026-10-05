@@ -1,0 +1,738 @@
+/* Лобби (§11). Размеры — px макета 1920×1080 в rem: calc(N rem / 24). */
+
+.lobby {
+  --content-w: min(calc(1792rem / 24), calc(100vw - 2 * var(--safe-zone)));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--safe-zone) calc((100vw - var(--content-w)) / 2);
+}
+
+.lobby__content {
+  display: contents;
+}
+
+.lobby__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.lobby__back {
+  height: calc(64rem / 24);
+}
+
+.lobby__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-screen-title);
+  line-height: 1.1;
+}
+
+.lobby__modes {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lobby__mode-name {
+  margin-right: var(--space-1);
+  font-size: var(--fs-secondary);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+/* Режим — иконкой; выбранный — ярче и в рамке цвета игры. */
+.mode-chip {
+  display: grid;
+  place-items: center;
+  width: calc(80rem / 24);
+  height: calc(64rem / 24);
+  padding: 0;
+  border: calc(3rem / 24) solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.mode-chip__icon {
+  width: calc(36rem / 24);
+  height: calc(36rem / 24);
+  opacity: 0.45;
+}
+
+.mode-chip[aria-checked='true'] {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.mode-chip[aria-checked='true'] .mode-chip__icon {
+  opacity: 1;
+}
+
+.lobby__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr calc(480rem / 24);
+  gap: var(--space-6);
+}
+
+.lobby__players {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* запас под рамку фокуса */
+  margin: calc(-1 * var(--space-3));
+  padding: var(--space-3);
+}
+
+.lobby__cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(calc(220rem / 24), 1fr));
+  gap: var(--space-2);
+}
+
+.lcard,
+.lslot {
+  position: relative;
+  min-height: calc(180rem / 24);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: center;
+}
+
+.lcard__avatar {
+  position: relative;
+  width: calc(72rem / 24);
+  height: calc(72rem / 24);
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-card-title);
+}
+
+.lcard--bot .lcard__avatar .icon {
+  font-size: calc(36rem / 24);
+}
+
+.lcard__crown {
+  position: absolute;
+  top: calc(-18rem / 24);
+  left: 50%;
+  translate: -50% 0;
+  font-size: calc(26rem / 24);
+  color: var(--warn);
+}
+
+.lcard__nick {
+  font-size: var(--fs-body);
+}
+
+.lcard__sub {
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.lcard--waiting {
+  opacity: 0.5;
+}
+
+/* «Цвет — команда»: карточки одной команды — одной подсветкой (рамка, оттенок и полоска её цвета). */
+.lcard--team {
+  background: color-mix(in srgb, var(--player) 14%, var(--surface));
+  box-shadow: inset 0 0 0 calc(3rem / 24) color-mix(in srgb, var(--player) 75%, transparent);
+}
+
+.lcard--team::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 25%;
+  right: 25%;
+  height: calc(6rem / 24);
+  border-radius: 0 0 var(--radius-full) var(--radius-full);
+  background: var(--player);
+}
+
+.lcard__remove {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-body);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.lslot {
+  background: none;
+  border: calc(3rem / 24) dashed rgb(255 255 255 / 0.16);
+  color: var(--text-2);
+  font-size: var(--fs-secondary);
+}
+
+.lslot--off {
+  color: var(--text-3);
+  opacity: 0.6;
+}
+
+.lobby__waiting {
+  margin-top: var(--space-4);
+}
+
+.lobby__note {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-secondary);
+  font-weight: 400;
+  color: var(--warn);
+}
+
+.lobby__side {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.lobby__settings {
+  /* Настроек много — столбец прокручивается, а «Старт» и боты всегда на экране.
+     Полоса прокрутки тонкая, в тон карточки, и не отнимает места у полей. */
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-2) transparent;
+  scrollbar-gutter: stable;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.lobby__label {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.field__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-2);
+}
+
+.field__icon {
+  width: calc(22rem / 24);
+  height: calc(22rem / 24);
+}
+
+/* Название выбранного варианта — справа, его цветом. */
+.field__current {
+  margin-left: auto;
+  font-weight: 700;
+}
+
+/* Поле без смысла сейчас (например, уровень ботов без ботов): погашено, значение сохраняется. */
+.field--off > .field__label,
+.field--off .field__value {
+  opacity: 0.4;
+}
+
+.field__options,
+.field__slider {
+  display: flex;
+  gap: calc(6rem / 24);
+}
+
+.field__option,
+.field__step,
+.field--toggle {
+  min-height: calc(56rem / 24);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-secondary);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.field__option {
+  flex: 1;
+}
+
+.field__option[aria-checked='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+/* Выбор иконками: иконка цветом варианта; выбранный — залит этим цветом. */
+.field__options--icons .field__option {
+  display: grid;
+  place-items: center;
+  color: var(--opt, var(--text));
+}
+
+.field__options--icons .field__option[aria-checked='true'] {
+  background: var(--opt, var(--accent));
+  color: var(--on-accent);
+}
+
+.field__option-icon {
+  width: calc(34rem / 24);
+  height: calc(34rem / 24);
+}
+
+.field__step {
+  width: calc(56rem / 24);
+}
+
+.field__value {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.field--toggle {
+  flex-direction: row;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  text-align: left;
+}
+
+.field--toggle .field__name {
+  flex: 1;
+}
+
+.field--toggle .field__icon {
+  color: var(--text-2);
+}
+
+.field--toggle::after {
+  flex-shrink: 0;
+  content: '';
+  width: calc(56rem / 24);
+  height: calc(32rem / 24);
+  border-radius: var(--radius-full);
+  background:
+    radial-gradient(circle calc(12rem / 24) at calc(16rem / 24) 50%, var(--text-2) 98%, transparent) no-repeat,
+    var(--bg);
+}
+
+.field--toggle[aria-checked='true']::after {
+  background:
+    radial-gradient(circle calc(12rem / 24) at calc(40rem / 24) 50%, var(--on-accent) 98%, transparent) no-repeat,
+    var(--accent);
+}
+
+.lcard .field {
+  width: 100%;
+}
+
+/* Выбор из длинного списка в карточке игрока (например, корпус): название между «−» и «+» не вылезает. */
+.lcard .field__value {
+  min-width: 0;
+  font-size: var(--fs-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.link-btn {
+  align-self: flex-start;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--fs-caption);
+  cursor: pointer;
+}
+
+.lobby__actions {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lobby__start {
+  height: calc(96rem / 24);
+  font-size: var(--fs-card-title);
+}
+
+.lobby button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Фокус в лобби — тот же вид, что в меню (§8). */
+.mode-chip:focus,
+.lcard__remove:focus,
+.field__option:focus,
+.field__step:focus,
+.field--toggle:focus,
+.link-btn:focus {
+  outline: none;
+  z-index: 1;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus),
+    0 0 calc(28rem / 24) var(--accent);
+}
+
+.lobby__settings::-webkit-scrollbar {
+  width: calc(6rem / 24);
+}
+
+.lobby__settings::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+}
+
+/* Аватар-иконка: выбранный вариант поля игрока (например, корпус) в цвет игрока. */
+.lcard__avatar--icon {
+  background: none;
+  color: var(--player);
+}
+
+.lcard__avatar--icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 calc(8rem / 24) color-mix(in srgb, var(--player) 50%, transparent));
+}
+
+.lcard__sub {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6rem / 24);
+}
+
+.lcard__sub--keys {
+  letter-spacing: 0.18em;
+}
+
+.lcard__sub .icon {
+  font-size: calc(26rem / 24);
+}
+
+.lcard__edit {
+  font-size: calc(22rem / 24);
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  width: calc(48rem / 24);
+  height: calc(48rem / 24);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.lcard__remove--back {
+  color: var(--ok);
+}
+
+.lobby__note--calm {
+  color: var(--text-3);
+}
+
+.lcard__edit:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow: 0 0 0 var(--focus-width) var(--focus);
+}
+
+/* ─── Окно профиля клавиатурного игрока ─── */
+/* Окно профиля — по SVG-макету заказчика (720×540): все размеры в единицах макета × --u.
+   Своя рамка и тень отделяют окно от лобби; углы скругляет само окно, содержимое их не перекрывает. */
+.pe-dialog {
+  --u: calc(1.8rem / 24);
+  max-width: none;
+  max-height: none;
+  padding: 0;
+  border: calc(1.5 * var(--u)) solid #333a52;
+  border-radius: calc(28 * var(--u));
+  background: #151826;
+  color: #e8ebf5;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 calc(1 * var(--u)) rgb(0 0 0 / 0.6),
+    0 calc(24 * var(--u)) calc(80 * var(--u)) rgb(0 0 0 / 0.7);
+}
+
+.pe-dialog::backdrop {
+  background: rgb(5 7 14 / 0.82);
+  backdrop-filter: blur(calc(6 * var(--u)));
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+.pe {
+  width: calc(720 * var(--u));
+  min-height: calc(540 * var(--u));
+  max-height: calc(100vh - 2 * var(--safe-zone));
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: calc(216 * var(--u)) 1fr;
+  column-gap: calc(20 * var(--u));
+  padding: calc(24 * var(--u));
+}
+
+.pe__side {
+  display: flex;
+  flex-direction: column;
+  padding: calc(20 * var(--u));
+  border-radius: calc(20 * var(--u));
+  background: #1d2132;
+}
+
+.pe__art {
+  flex: 1;
+  min-height: calc(200 * var(--u));
+  display: grid;
+  place-items: center;
+  border-radius: calc(14 * var(--u));
+  background: color-mix(in srgb, var(--player) 10%, transparent);
+  color: var(--player);
+}
+
+.pe__art svg {
+  width: calc(132 * var(--u));
+  height: calc(132 * var(--u));
+  stroke-width: 1.4;
+}
+
+.pe__art svg path:not([fill]) {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+.pe__letter {
+  font-family: var(--font-display);
+  font-size: calc(96 * var(--u));
+  font-weight: 700;
+}
+
+.pe__caption {
+  margin: calc(18 * var(--u)) 0 0;
+  font-size: calc(13 * var(--u));
+  color: #9aa1b8;
+  text-align: center;
+}
+
+.pe__nick-label {
+  margin: calc(16 * var(--u)) 0 calc(8 * var(--u));
+  font-size: calc(12 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9aa1b8;
+}
+
+.pe__nick {
+  height: calc(44 * var(--u));
+  padding: 0 calc(12 * var(--u));
+  border: calc(1 * var(--u)) solid #333a52;
+  border-radius: calc(12 * var(--u));
+  background: #151826;
+  color: #e8ebf5;
+  font: inherit;
+  font-size: calc(16 * var(--u));
+  font-weight: 600;
+  text-align: center;
+}
+
+.pe__nick::placeholder {
+  color: #9aa1b8;
+}
+
+.pe__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pe__block {
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+}
+
+.pe__title {
+  margin: 0 0 calc(4 * var(--u));
+  font-size: calc(15 * var(--u));
+  font-weight: 600;
+  line-height: calc(20 * var(--u));
+  color: #e8ebf5;
+}
+
+.pe__block + .pe__block {
+  margin-top: calc(16 * var(--u));
+}
+
+.pe__row {
+  height: calc(52 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(5.5 * var(--u));
+  padding: 0 calc(4 * var(--u)) 0 calc(12 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: #1d2132;
+}
+
+.pe__row-label {
+  flex: 1;
+  font-size: calc(12 * var(--u));
+  font-weight: 500;
+  color: #9aa1b8;
+}
+
+.pe__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(6 * var(--u));
+  padding: calc(6 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: #1d2132;
+}
+
+.pe__icon {
+  width: calc(47.5 * var(--u));
+  height: calc(42.5 * var(--u));
+  flex: none;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: calc(1.5 * var(--u)) solid transparent;
+  border-radius: calc(9.25 * var(--u));
+  background: none;
+  color: #c9cee0;
+  cursor: pointer;
+}
+
+.pe__icon svg {
+  width: calc(26 * var(--u));
+  height: calc(26 * var(--u));
+}
+
+.pe__icon[aria-checked='true'] {
+  border-color: var(--player, var(--accent));
+  background: #2b3149;
+  color: var(--player, var(--accent));
+}
+
+.pe__colors {
+  display: flex;
+  justify-content: space-between;
+  padding: calc(4 * var(--u)) calc(3.4 * var(--u));
+}
+
+.pe__color {
+  width: calc(24 * var(--u));
+  height: calc(38 * var(--u));
+  border: 0;
+  border-radius: calc(7 * var(--u));
+  background: var(--c);
+  cursor: pointer;
+}
+
+.pe__color[aria-checked='true'] {
+  box-shadow:
+    0 0 0 calc(3 * var(--u)) #151826,
+    0 0 0 calc(5 * var(--u)) #ffffff;
+}
+
+.pe__color:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.pe__buttons {
+  margin-top: auto;
+  display: flex;
+  justify-content: flex-end;
+  gap: calc(10.5 * var(--u));
+  padding-top: calc(20 * var(--u));
+}
+
+.pe__btn {
+  height: calc(44 * var(--u));
+  min-width: calc(97 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  border: calc(1 * var(--u)) solid #333a52;
+  border-radius: calc(12 * var(--u));
+  background: none;
+  color: #c9cee0;
+  font: inherit;
+  font-size: calc(16 * var(--u));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pe__btn--ok {
+  min-width: calc(128 * var(--u));
+  border-color: #3ddc97;
+  background: #3ddc97;
+  color: #0e2a1e;
+  font-weight: 700;
+}
+
+.pe :is(button, input):focus {
+  outline: none;
+  box-shadow: 0 0 0 var(--focus-width) var(--focus);
+}
+
+.pe__color[aria-checked='true']:focus {
+  box-shadow:
+    0 0 0 calc(3rem / 24) var(--surface-2),
+    0 0 0 calc(6rem / 24) var(--focus);
+}

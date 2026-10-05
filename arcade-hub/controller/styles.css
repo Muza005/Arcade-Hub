@@ -1,0 +1,1318 @@
+@import '../shared/ui/tokens.css';
+
+/* Телефон: своя шкала (§18) — минимум 16 px, основной 18–20, заголовки Unbounded 22–32. */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 500;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+  /* Не масштабировать по двойному тапу (iOS понимает manipulation на всей странице). */
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+#app {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: max(24px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.screen {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 26px;
+  text-align: center;
+}
+
+.muted {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-3);
+}
+
+.code__input,
+.nick {
+  width: 100%;
+  height: 72px;
+  border: 2px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface-2);
+  color: var(--text);
+  text-align: center;
+  outline: none;
+}
+
+.code__input {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.nick {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.code__input:focus,
+.nick:focus {
+  border-color: var(--player, var(--text));
+}
+
+.code__error {
+  min-height: 1.2em;
+  margin: 0;
+  color: var(--danger);
+  font-size: 16px;
+}
+
+.btn {
+  width: 100%;
+  min-height: 96px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.btn:active {
+  transform: scale(0.94);
+}
+
+
+
+.colors {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.color {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 50%;
+  background: var(--c);
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.color[aria-checked='true'] {
+  box-shadow:
+    0 0 0 3px var(--bg),
+    0 0 0 6px var(--text);
+}
+
+.color:disabled {
+  opacity: 0.2;
+}
+
+.color:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.banner {
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  left: max(12px, env(safe-area-inset-left));
+  right: max(12px, env(safe-area-inset-right));
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: var(--warn);
+  color: var(--bg);
+  font-size: 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ─── «Готов играть» ─── */
+.ready {
+  height: 100%;
+}
+
+.ready__btn {
+  width: 100%;
+  min-height: 55vh;
+  border: 0;
+  border-radius: 40px;
+  background: var(--player, var(--text));
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  transition: transform var(--dur-fast) var(--ease);
+}
+
+.ready__btn:active {
+  transform: scale(0.94);
+}
+
+/* ─── Контроллер ───
+   Эталон вертикально 390×844: джойстик Ø220 (слева 10, верх 460), кнопка Ø136 (слева 222, верх 612).
+   Держим их от нижнего края, чтобы раскладка работала на любой высоте. */
+/* Вырез камеры и «островок»: экран управления целиком внутри безопасной зоны (горизонтально вырез — сбоку). */
+.pad {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: env(safe-area-inset-left);
+  right: env(safe-area-inset-right);
+  overflow: hidden;
+  touch-action: none;
+  --edge: 10px;
+  --btn-edge: 32px;
+  --stick: 220px;
+  --stick-bottom: 164px;
+  --main: 136px;
+  --main-bottom: 96px;
+  --cell: 96px;
+}
+
+.pad__top {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 16px;
+  right: 16px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pad__pause {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border: 2px solid var(--text);
+  border-radius: 12px;
+  background:
+    linear-gradient(var(--text), var(--text)) 18px 50% / 6px 20px no-repeat,
+    linear-gradient(var(--text), var(--text)) 28px 50% / 6px 20px no-repeat,
+    transparent;
+}
+
+.pad__pause.is-empty {
+  visibility: hidden;
+}
+
+.pad__settings {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 26px;
+}
+
+.pad__settings::before {
+  content: '⚙';
+}
+
+.plate {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px 6px 6px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+
+.plate__avatar {
+  width: 36px;
+  height: 36px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.plate__nick {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.pad__notice {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 68px);
+  left: 16px;
+  right: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 16px;
+}
+
+.stick,
+.tilt {
+  position: absolute;
+  left: var(--edge);
+  bottom: calc(var(--stick-bottom) + env(safe-area-inset-bottom));
+}
+
+/* Зона джойстика (как в Brawl Stars): касание в любом её месте ставит центр под палец.
+   Сторона — та, где джойстик; главная кнопка лежит поверх и ловит свои касания сама. */
+.stick-zone {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 68px);
+  bottom: 0;
+  left: 0;
+  width: 62%;
+}
+
+/* Рисунок джойстика — очень тусклый: только подсказка, где управлять. При касании переезжает под палец и
+   становится заметнее, но дальше стоит на месте. Отпустили — плавно возвращается на своё место. */
+.stick {
+  width: var(--stick);
+  height: var(--stick);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: inset 0 0 0 2px var(--line);
+  opacity: 0.22;
+  pointer-events: none;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.stick.is-active {
+  opacity: 0.7;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+.stick__knob {
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background: var(--player);
+  pointer-events: none;
+}
+
+.tilt {
+  width: var(--stick);
+  height: var(--stick);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--line);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.tilt__dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--player);
+  transform: translate(calc(var(--tx, 0) * var(--stick) * 0.4), calc(var(--ty, 0) * var(--stick) * 0.4));
+}
+
+.pad__recal {
+  position: absolute;
+  left: calc(var(--edge) + var(--stick) - 56px);
+  bottom: calc(var(--stick-bottom) + var(--stick) + 8px + env(safe-area-inset-bottom));
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 26px;
+}
+
+.pad__recal::before {
+  content: '↺';
+}
+
+.main-btn {
+  position: absolute;
+  right: var(--btn-edge);
+  bottom: calc(var(--main-bottom) + env(safe-area-inset-bottom));
+  width: var(--main);
+  height: var(--main);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--player);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    background-color var(--dur-fast) var(--ease);
+}
+
+/* Ободок из st.mainButton.progress: заполненная часть — готовность. */
+.main-btn.has-ring::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  background: conic-gradient(var(--text) calc(var(--progress, 1) * 1turn), var(--surface-2) 0);
+  mask: radial-gradient(farthest-side, transparent calc(100% - 6px), #000 calc(100% - 5px));
+  transition: opacity var(--dur-fast) var(--ease);
+}
+
+/* Число на кнопке дошло до нуля (например, патроны кончились) — кнопка серая. */
+.main-btn.is-empty {
+  background: var(--surface-2);
+  color: var(--text-3);
+}
+
+/* Кнопка погашена игрой (Глушилка): серая и перечёркнута. */
+.main-btn__off {
+  display: none;
+  position: absolute;
+  width: 70%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--danger, #ff4d5e);
+  transform: rotate(-45deg);
+}
+
+.main-btn.is-off .main-btn__off {
+  display: block;
+}
+
+/* Три сигнала нажатия: заливка белеет, кнопка сжимается, вспыхивает кольцо. */
+.main-btn.is-pressed {
+  background: var(--text);
+  transform: scale(0.94);
+}
+
+.main-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px var(--player);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.main-btn.is-flash::after {
+  animation: ring 360ms var(--ease);
+}
+
+@keyframes ring {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
+.main-btn__value {
+  position: relative;
+  pointer-events: none;
+}
+
+/* Гость в меню: кнопка приглушена до 40 %, джойстик и так тусклый — оба не отвечают. */
+.pad--muted :is(.tilt, .main-btn, .pad__recal) {
+  opacity: 0.4;
+}
+
+.pad--muted :is(.stick-zone, .main-btn, .pad__recal),
+.pad--paused :is(.stick-zone, .main-btn, .pad__recal) {
+  pointer-events: none;
+}
+
+/* Пауза у всех: кнопки гаснут до серого. */
+.pad--paused :is(.stick, .tilt, .main-btn, .pad__recal) {
+  filter: grayscale(1);
+}
+
+.pad--paused :is(.tilt, .main-btn, .pad__recal) {
+  opacity: 0.3;
+}
+
+/* Горизонтально: джойстик Ø208 под левым большим пальцем, кнопка Ø156 под правым, 48 px под вырез камеры. */
+@media (orientation: landscape) {
+  .pad {
+    /* Вырез камеры уже учтён безопасной зоной .pad — здесь только отступ от края. */
+    --edge: 24px;
+    --btn-edge: 24px;
+    --stick: 208px;
+    --stick-bottom: 24px;
+    --main: 156px;
+    --main-bottom: 48px;
+  }
+
+  .stick-zone {
+    width: 50%;
+  }
+
+  .pad__recal {
+    left: calc(var(--edge) + var(--stick) + 16px);
+    bottom: calc(var(--stick-bottom) + var(--stick) - 56px);
+  }
+}
+
+/* Левша: джойстик и кнопка меняются местами. */
+[data-hand='left'] .pad :is(.stick, .tilt, .stick-zone) {
+  left: auto;
+  right: var(--edge);
+}
+
+[data-hand='left'] .pad .stick-zone {
+  right: 0;
+}
+
+[data-hand='left'] .pad .main-btn {
+  right: auto;
+  left: var(--btn-edge);
+}
+
+[data-hand='left'] .pad .pad__recal {
+  left: auto;
+  right: calc(var(--edge) + var(--stick) - 56px);
+}
+
+/* ─── Пауза у ведущего ─── */
+.pause-modal {
+  position: fixed;
+  inset: calc(max(12px, env(safe-area-inset-top)) + 68px) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  background: rgb(7 9 18 / 0.92);
+  text-align: center;
+}
+
+.pause-modal p {
+  margin: 0;
+}
+
+.pause-modal__icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background:
+    linear-gradient(var(--text), var(--text)) 24px 50% / 9px 32px no-repeat,
+    linear-gradient(var(--text), var(--text)) 39px 50% / 9px 32px no-repeat,
+    var(--surface-2);
+}
+
+.pause-modal .btn {
+  width: min(100%, 360px);
+}
+
+.btn--player {
+  background: var(--player);
+}
+
+.btn--danger {
+  min-height: 72px;
+  background: none;
+  color: var(--danger);
+  box-shadow: inset 0 0 0 2px var(--danger);
+  font-size: 20px;
+}
+
+.btn--ghost {
+  min-height: 64px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* ─── Настройки ─── */
+.settings {
+  position: fixed;
+  inset: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
+  background: var(--bg);
+}
+
+.settings__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings__head .title {
+  text-align: left;
+}
+
+.settings__back {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 22px;
+}
+
+.warning {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--warn);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface-2);
+  text-align: left;
+}
+
+.who__nick {
+  flex: 1;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.who__edit {
+  color: var(--text-2);
+  font-size: 24px;
+}
+
+.set-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.set-row__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-3);
+}
+
+.seg {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.seg__opt {
+  flex: 1;
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+/* Выбранный вариант залит цветом игрока, текст тёмный. */
+.seg__opt[aria-checked='true'] {
+  background: var(--player);
+  color: var(--bg);
+}
+
+.seg__opt:disabled {
+  opacity: 0.35;
+}
+
+/* Чувствительность — одной строкой: подпись слева, цветные полоски справа. */
+.sens {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sens__opts {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.sens__opt {
+  width: 56px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--opt);
+}
+
+.sens__opt svg {
+  width: 26px;
+  height: 26px;
+}
+
+.sens__opt[aria-checked='true'] {
+  background: var(--opt);
+  color: var(--bg);
+}
+
+/* Квадраты с иконкой и подписью под ней: вид управления, рука. Выбранный залит цветом игрока. */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.tile svg {
+  width: 40px;
+  height: 40px;
+}
+
+.tile__label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tile[aria-checked='true'] {
+  background: var(--player);
+  color: var(--bg);
+}
+
+.tile:disabled {
+  opacity: 0.35;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 60px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  font-weight: 600;
+  text-align: left;
+}
+
+.toggle::after {
+  content: '';
+  width: 52px;
+  height: 32px;
+  flex: none;
+  border-radius: 16px;
+  background:
+    radial-gradient(circle 12px at 16px 50%, var(--text-2) 98%, transparent) no-repeat,
+    var(--surface-2);
+}
+
+.toggle[aria-checked='true']::after {
+  background:
+    radial-gradient(circle 12px at 36px 50%, var(--bg) 98%, transparent) no-repeat,
+    var(--player);
+}
+
+.handoff {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.handoff__player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface-2);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.settings__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.link {
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.done {
+  width: 72px;
+  height: 72px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--player);
+  color: var(--bg);
+  font-size: 32px;
+  font-weight: 700;
+}
+
+/* ─── Вспышка по краям от игры ─── */
+.flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 48px 16px var(--flash, transparent);
+  opacity: 0;
+}
+
+.flash.is-on {
+  animation: flash 420ms var(--ease);
+}
+
+@keyframes flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* «Вы уже играли?» */
+.claim__list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.claim__player {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface-2);
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.claim__player:active {
+  transform: scale(0.97);
+}
+
+.claim .btn--ghost {
+  width: 100%;
+}
+
+/* ─── Профиль (макет заказчика) ───
+   Вертикально: карточка (превью, раздел и название, ник) → корпуса рядами по разделам → цвета → «Отмена» и «Сохранить».
+   Горизонтально — три колонки: карточка | корпуса | цвета и кнопки. Всё внутри безопасной зоны (.settings). */
+.profile {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: 'card' 'fields' 'colors' 'buttons';
+  gap: 14px;
+}
+
+.profile__card {
+  grid-area: card;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.profile__art {
+  width: 92px;
+  height: 92px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--player) 18%, var(--surface));
+  color: var(--player);
+}
+
+.profile__art svg {
+  width: 64%;
+  height: 64%;
+}
+
+.profile__art svg path:not([fill]) {
+  fill: currentColor;
+  fill-opacity: 0.18;
+}
+
+.profile__letter {
+  font-family: var(--font-display);
+  font-size: 44px;
+  font-weight: 700;
+}
+
+.profile__who {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__caption {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.profile__nick {
+  height: 48px;
+  border-radius: 12px;
+  font-size: 17px;
+}
+
+.profile__fields {
+  grid-area: fields;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__colors {
+  grid-area: colors;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.profile__buttons {
+  grid-area: buttons;
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 10px;
+}
+
+.profile__cancel,
+.profile__save {
+  height: 52px;
+  border-radius: 14px;
+  font-weight: 700;
+}
+
+.profile__cancel {
+  border: 2px solid var(--line);
+  background: none;
+}
+
+.profile__save {
+  border: 0;
+  background: var(--ok);
+  color: var(--bg);
+}
+
+/* Корпуса: ряд раздела — шесть иконок поровну; выбранный — в рамке цвета игрока. */
+.hulls {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.hull {
+  aspect-ratio: 1.15;
+  display: grid;
+  place-items: center;
+  padding: 9px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-2);
+}
+
+.hull svg {
+  width: 100%;
+  height: 100%;
+}
+
+.hull[aria-checked='true'] {
+  border-color: var(--player);
+  background: var(--surface-2);
+  color: var(--player);
+}
+
+@media (orientation: landscape) {
+  .profile {
+    grid-template-columns: minmax(0, 0.95fr) minmax(0, 2fr) minmax(0, 0.95fr);
+    grid-template-rows: 1fr auto;
+    grid-template-areas: 'card fields colors' 'card fields buttons';
+    align-items: stretch;
+  }
+
+  .profile__card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .profile__art {
+    width: 100%;
+    height: auto;
+    flex: 1;
+    min-height: 120px;
+  }
+
+  .profile__art svg {
+    width: 48%;
+    height: auto;
+  }
+
+  .profile__caption {
+    text-align: center;
+  }
+
+  .profile__fields {
+    gap: 6px;
+  }
+
+  .profile__fields .hull {
+    aspect-ratio: auto;
+    height: 40px;
+    padding: 7px;
+  }
+
+  .profile__colors .colors {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+
+  .profile__buttons {
+    grid-template-columns: 1fr;
+    align-self: end;
+  }
+
+  .profile__cancel {
+    order: 2;
+  }
+}
+
+.plate__avatar.plate__avatar--icon {
+  padding: 6px;
+  background: none;
+  color: var(--player);
+}
+
+.plate__avatar--icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+/* ─── Раскладка «прицел» (§10 «Особые раскладки»): карточки снарядов и рамка поля ───
+   Контраст от обратного: фон почти чёрный, карточки и рамка светятся. */
+.aim {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  padding: max(12px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  overflow: hidden;
+  touch-action: none;
+  background: #04050a;
+  --card: 96px;
+}
+
+.aim__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.aim__body {
+  min-height: 0;
+  display: flex;
+  gap: 16px;
+}
+
+[data-hand='left'] .aim__body {
+  flex-direction: row-reverse;
+}
+
+.aim__cards {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Зона нажатия шире рисунка на 12 точек: рисунок — внутренний квадрат. */
+.aim-card {
+  position: relative;
+  width: calc(var(--card) + 12px);
+  height: calc(var(--card) + 12px);
+  padding: 6px;
+  border: 0;
+  background: none;
+  color: var(--player);
+  --left: 0;
+}
+
+.aim-card::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  background: #0d1020;
+  box-shadow: 0 0 18px color-mix(in srgb, var(--player) 25%, transparent);
+  border: 2px solid color-mix(in srgb, var(--player) 45%, transparent);
+  transition: opacity var(--dur-fast, 0.15s);
+}
+
+/* Выбранная — рамкой в цвет игрока. */
+.aim-card.is-selected::before {
+  border: 4px solid var(--player);
+}
+
+/* Индикатор кулдауна по рамке: стирается против часовой стрелки. */
+.aim-card::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 18px;
+  padding: 4px;
+  background: conic-gradient(var(--player) calc(var(--left) * 360deg), transparent 0);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+}
+
+.aim-card.is-cooling::after {
+  opacity: 1;
+}
+
+.aim-card__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+}
+
+.aim-card__icon svg {
+  width: 56%;
+  height: 56%;
+}
+
+.aim-card.is-cooling .aim-card__icon {
+  opacity: 0.2;
+}
+
+.aim-card__secs {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 32px;
+  color: var(--text);
+}
+
+.aim-card.is-ready-flash::before {
+  animation: aim-ready 0.4s ease-out;
+}
+
+@keyframes aim-ready {
+  from {
+    opacity: 0.2;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.aim__area {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.aim__area.is-muted .aim__frame {
+  opacity: 0.35;
+}
+
+.aim__frame {
+  position: absolute;
+  border: 2px solid var(--player);
+  border-radius: 16px;
+  box-shadow: 0 0 22px color-mix(in srgb, var(--player) 30%, transparent);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.aim__diag {
+  width: 100%;
+  height: 100%;
+}
+
+.aim__diag line {
+  stroke: color-mix(in srgb, var(--player) 45%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.aim__overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.aim__line {
+  stroke-width: 6;
+  stroke-linecap: round;
+}
+
+.aim__anchor {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 3;
+}
+
+.aim__finger {
+  fill: none;
+  stroke: #ff4d5e;
+  stroke-width: 3;
+}
+
+.aim__shot {
+  fill: none;
+  stroke: #ffd23f;
+  stroke-width: 4;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.aim__shot.is-on {
+  animation: aim-shot 0.35s ease-out;
+}
+
+@keyframes aim-shot {
+  from {
+    opacity: 1;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.4);
+  }
+}
+
+.aim__hint {
+  margin: 0;
+  text-align: center;
+  font-size: 16px;
+  color: var(--text-3);
+}
+
+.aim--paused .aim__body {
+  filter: grayscale(1);
+  opacity: 0.3;
+}

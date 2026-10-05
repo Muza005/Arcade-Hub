@@ -1,0 +1,282 @@
+@import '../shared/ui/tokens.css';
+@import './menu/menu.css';
+@import './ui/podium.css';
+@import './menu/records-view.css';
+@import './lobby/lobby.css';
+@import './results/results.css';
+@import './settings/settings.css';
+@import './attract.css';
+
+/* Корневой масштаб от высоты окна: при 1080 это 24 px, всё остальное — в rem (ARCADE_HUB_SPEC §18). */
+html {
+  font-size: calc(100vh / 45 * var(--ui-scale, 1));
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  font-weight: 600;
+  -webkit-font-smoothing: antialiased;
+}
+
+#hub {
+  position: fixed;
+  inset: 0;
+}
+
+.game-mount {
+  position: absolute;
+  inset: 0;
+}
+
+.game-mount canvas {
+  display: block;
+}
+
+/* Пауза на большом экране: затемнение 74 % поверх замершей игры. */
+.pause {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: rgb(7 9 18 / 0.74);
+  text-align: center;
+  animation: fade-in var(--dur-base) var(--ease);
+}
+
+.pause p {
+  margin: 0;
+}
+
+.pause__icon {
+  width: calc(96rem / 24);
+  height: calc(96rem / 24);
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(var(--text), var(--text)) calc(30rem / 24) 50% / calc(12rem / 24) 45% no-repeat,
+    linear-gradient(var(--text), var(--text)) calc(54rem / 24) 50% / calc(12rem / 24) 45% no-repeat,
+    var(--surface-2);
+}
+
+.pause__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: var(--fs-hero);
+  letter-spacing: 0.08em;
+}
+
+.pause__by {
+  font-size: var(--fs-body);
+}
+
+.pause__actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.pause__resume {
+  background: var(--text);
+  color: var(--bg);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.pause__end {
+  box-shadow: inset 0 0 0 calc(2rem / 24) var(--danger);
+}
+
+.pause .btn:focus {
+  outline: none;
+  transform: scale(var(--focus-scale));
+  box-shadow:
+    0 0 0 var(--focus-offset) var(--bg),
+    0 0 0 calc(var(--focus-offset) + var(--focus-width)) var(--focus);
+}
+
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--safe-zone) + calc(140rem / 24));
+  translate: -50% 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  box-shadow:
+    inset 0 0 0 calc(3rem / 24) var(--player, var(--focus)),
+    0 calc(12rem / 24) calc(40rem / 24) rgb(0 0 0 / 0.5);
+  font-size: var(--fs-body);
+  z-index: 10;
+}
+
+.toast--in {
+  animation: toast-in var(--dur-slow) var(--ease);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(24rem / 24)) scale(var(--enter-scale));
+  }
+}
+
+.pause__rejoin {
+  margin-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  text-align: left;
+}
+
+.pause__qr {
+  width: calc(140rem / 24);
+  height: calc(140rem / 24);
+  padding: calc(8rem / 24);
+  border-radius: var(--radius-sm);
+  background: #fff;
+}
+
+.pause__qr svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.pause__rejoin-text {
+  max-width: calc(360rem / 24);
+  font-size: var(--fs-secondary);
+}
+
+.pause__code {
+  margin-top: var(--space-1) !important;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: var(--fs-body);
+  letter-spacing: 0.14em;
+  color: var(--text-2);
+}
+
+/* ─── Просмотр записи (§12): сцена игры и полоса управления внизу ─── */
+.rplayer {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  background: var(--bg);
+}
+
+.rplayer__bar {
+  position: absolute;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  opacity: 0.85;
+}
+
+.rplayer__btn,
+.rplayer__speed {
+  flex: none;
+  height: calc(48rem / 24);
+  min-width: calc(48rem / 24);
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 var(--fs-caption) var(--font-display);
+  cursor: pointer;
+}
+
+.rplayer__btn .icon {
+  font-size: calc(24rem / 24);
+}
+
+.rplayer__track {
+  position: relative;
+  flex: 1;
+  height: calc(10rem / 24);
+  border-radius: var(--radius-full);
+  background: var(--surface-2);
+  cursor: pointer;
+}
+
+.rplayer__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--accent, var(--text));
+}
+
+.rplayer__marks {
+  position: absolute;
+  inset: 0;
+}
+
+.rplayer__mark {
+  position: absolute;
+  top: 50%;
+  translate: -50% -50%;
+  width: calc(2rem / 24);
+  height: calc(22rem / 24);
+  background: var(--text-2);
+}
+
+/* Волны — тонкие линии, гибели — красные точки. */
+.rplayer__mark--wave {
+  width: calc(2rem / 24);
+  height: calc(22rem / 24);
+  background: var(--text-2);
+}
+
+.rplayer__mark--death {
+  width: calc(10rem / 24);
+  height: calc(10rem / 24);
+  border-radius: 50%;
+  background: var(--danger);
+}
+
+.rplayer__time {
+  flex: none;
+  font: 700 var(--fs-caption) var(--font-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.rplayer__seeking {
+  position: absolute;
+  top: var(--space-3);
+  left: 50%;
+  translate: -50% 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  color: var(--text-2);
+}

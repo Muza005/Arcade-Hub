@@ -1,0 +1,323 @@
+// Вид корабля: неоновый контур в цвет игрока, язычок тяги, под ним жизни сердечками и патроны полосками (шаблон заказчика),
+// цифра множителя над кораблём. Эффекты подбора: вспышка корпуса, подросшее сердечко, яркие полоски патронов.
+// Корпус рисуется носом вправо (угол 0) и поворачивается целиком; подписи не поворачиваются.
+// Множитель (SPACE_WAR_SPEC §5 «Показ множителя»): цифра только с ×2, корпус ярче по ступеням, с ×3 — свечение.
+import { Container, Graphics, Text } from 'pixi.js';
+import {
+  FLAME_ALPHA,
+  FLAME_LENGTH,
+  FLAME_WIDTH_K,
+  HUD_POP_S,
+  HUD_POP_SCALE,
+  GHOST_ALPHA,
+  INVULN_ALPHA,
+  LIVES_LOST_ALPHA,
+  LIVES_Y,
+  HEART_POP_S,
+  HEART_POP_SCALE,
+  HEART_STEP,
+  AMMO_GLOW_S,
+  AMMO_GLOW_SCALE,
+  AMMO_GLOW_ALPHA,
+  AMMO_JAMMED_COLOR,
+  PICKUP_FLASH_ALPHA,
+  PICKUP_FLASH_PX,
+  PICKUP_FLASH_S,
+  AMMO_BAR_GAP,
+  AMMO_BAR_H,
+  AMMO_BAR_W,
+  AMMO_BARS,
+  AMMO_EMPTY_COLOR,
+  AMMO_Y,
+  MULT_FONT_PX,
+  MULT_GLOW_ALPHA,
+  MULT_GLOW_PX,
+  MULT_HULL_ALPHA,
+  LABEL_GAP_PX,
+  OVERLOAD_COLOR,
+  POWERUP_COLOR,
+  SHIELD_ALPHA,
+  SHIELD_LINE_PX,
+  SHIELD_RADIUS_K,
+  SHIP_LINE_PX,
+  SHIP_SIZE,
+  type Hull,
+} from '../config';
+import { drawHull, HULL_TAIL_X } from './hulls';
+
+export interface ShipView {
+  /** Корпус и пламя — в слой свечения. */
+  readonly node: Container;
+  /** Цифра множителя и жизни — отдельным слоем без bloom, чтобы оставались чёткими. */
+  readonly tag: Container;
+  setVisible(visible: boolean): void;
+  /** Положение, поворот носа и тяга 0…1. */
+  set(x: number, y: number, angle: number, thrust: number): void;
+  /** Поле: подписи у стены не уходят за край, у верхней — встают под корабль. */
+  setBounds(bounds: { left: number; top: number; right: number }): void;
+  paint(color: string, hull: Hull): void;
+  /** Жизни сердечками под кораблём. */
+  setLives(lives: number, max: number): void;
+  /** Ремонт: сердечко с этим номером (с нуля) на секунду подрастает. */
+  popHeart(index: number): void;
+  /** Полный боезапас: все полоски на секунду ярче и чуть больше. */
+  glowAmmo(): void;
+  /** Глушилка: полоски патронов серые. */
+  setJammed(jammed: boolean): void;
+  /** Подбор: неяркая вспышка корпуса цветом усиления. */
+  flash(color: string): void;
+  /** Патроны полосками под жизнями: каждая полоска — max / AMMO_BARS патронов. */
+  setAmmo(ammo: number, max: number): void;
+  /** Мигание неуязвимости. */
+  setBlink(dim: boolean): void;
+  /** Призрак: полупрозрачный корпус, без подписи. */
+  setGhost(ghost: boolean): void;
+  /** Ступень множителя ×1…×5. */
+  setMult(mult: number): void;
+  /** Перегрузка: цвет корпуса и пламени (бордовый, к концу тускнеет) и значок «×2»; null — нет. */
+  setOverload(hullColor: string | null): void;
+  /** Пузырь щита; blink — последние секунды мигает. */
+  setShield(on: boolean, blink: boolean): void;
+  /** Анимации подписи — по шагам симуляции. */
+  update(dtS: number): void;
+}
+
+const FONT_DISPLAY = 'Unbounded';
+const FONT_FALLBACK = 'sans-serif';
+
+/** Сердечко из шаблона (9 × 8,5 px), центр в (x, y), масштаб k. Заливку делает вызывающий. */
+function heart(g: Graphics, x: number, y: number, k: number): void {
+  const p = (px: number, py: number): [number, number] => [x + px * k, y + py * k];
+  g.moveTo(...p(3.86, -3.358))
+    .bezierCurveTo(...p(4.685, -2.531), ...p(4.716, -1.201), ...p(3.932, -0.335))
+    .lineTo(...p(0, 4))
+    .lineTo(...p(-3.932, -0.335))
+    .bezierCurveTo(...p(-4.716, -1.201), ...p(-4.685, -2.531), ...p(-3.86, -3.358))
+    .bezierCurveTo(...p(-2.939, -4.282), ...p(-1.422, -4.197), ...p(-0.608, -3.178))
+    .lineTo(...p(0, -2.416))
+    .lineTo(...p(0.608, -3.178))
+    .bezierCurveTo(...p(1.421, -4.197), ...p(2.939, -4.282), ...p(3.86, -3.358))
+    .closePath();
+}
+
+
+export function createShipView(textColor: string): ShipView {
+  const node = new Container();
+  const body = new Container();
+  const flame = new Graphics();
+  const glow = new Graphics();
+  const outline = new Graphics();
+  const flashG = new Graphics();
+  body.addChild(flame, glow, outline, flashG);
+  const pips = new Graphics();
+  pips.y = LIVES_Y;
+  const ammoBars = new Graphics();
+  ammoBars.y = AMMO_Y;
+  const label = new Container();
+  const multText = new Text({
+    text: '',
+    style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: MULT_FONT_PX, fill: textColor },
+  });
+  multText.anchor.set(0.5, 1);
+  // «×5 ×2»: значок Перегрузки — отдельно от накопленного множителя, бордовым.
+  const overText = new Text({
+    text: '×2',
+    style: { fontFamily: [FONT_DISPLAY, FONT_FALLBACK], fontWeight: '700', fontSize: MULT_FONT_PX, fill: OVERLOAD_COLOR },
+  });
+  overText.anchor.set(0.5, 1);
+  overText.visible = false;
+  label.addChild(multText, overText);
+  const shield = new Graphics().circle(0, 0, SHIP_SIZE * SHIELD_RADIUS_K);
+  shield.visible = false;
+  node.addChild(body, shield);
+  const tag = new Container();
+  tag.addChild(pips, ammoBars, label);
+
+  let hull: Hull = 'arrow';
+  const above = -SHIP_SIZE - LABEL_GAP_PX;
+  let color = textColor;
+  let bounds = { left: -Infinity, top: -Infinity, right: Infinity };
+  let lastLives = -1;
+  let jammed = false;
+  /** Таймеры эффектов, 0…1 — сколько осталось. */
+  let heartPop = 0;
+  let heartIndex = -1;
+  let ammoGlow = 0;
+  let flashK = 0;
+  let flashColor = textColor;
+  let lastAmmo = -1;
+  let maxAmmo = 0;
+  let maxLives = 0;
+  let mult = 1;
+  let pop = 0;
+  /** Цвет корпуса поверх цвета игрока (Перегрузка). */
+  let hullColor: string | null = null;
+
+  const drawPips = (): void => {
+    const x0 = (-(maxLives - 1) * HEART_STEP) / 2;
+    pips.clear();
+    for (let i = 0; i < maxLives; i++) {
+      // Сердечко Ремонта за секунду подрастает и плавно возвращается.
+      const k = heartPop > 0 && i === heartIndex ? 1 + HEART_POP_SCALE * Math.sin(Math.PI * (1 - heartPop)) : 1;
+      heart(pips, x0 + i * HEART_STEP, 0, k);
+      pips.fill({ color, alpha: i < lastLives ? 1 : LIVES_LOST_ALPHA });
+    }
+  };
+
+  /** Полоска — доля патронов в ней: целая, половина или пусто (серая); под Глушилкой — всё серое. */
+  const drawAmmo = (): void => {
+    const per = maxAmmo / AMMO_BARS;
+    const step = AMMO_BAR_W + AMMO_BAR_GAP;
+    const x0 = (-(AMMO_BARS - 1) * step) / 2 - AMMO_BAR_W / 2;
+    const tint = jammed ? AMMO_JAMMED_COLOR : color;
+    ammoBars.clear();
+    // Полный боезапас: за секунду полоски чуть подрастают и возвращаются.
+    ammoBars.scale.set(ammoGlow > 0 ? 1 + AMMO_GLOW_SCALE * Math.sin(Math.PI * (1 - ammoGlow)) : 1);
+    for (let i = 0; i < AMMO_BARS; i++) {
+      const x = x0 + i * step;
+      const fill = Math.min(1, Math.max(0, (lastAmmo - i * per) / per));
+      ammoBars.rect(x, -AMMO_BAR_H / 2, AMMO_BAR_W, AMMO_BAR_H).fill({ color: AMMO_EMPTY_COLOR });
+      if (fill <= 0) continue;
+      // Полный боезапас: поверх — мягкое свечение полосок.
+      if (ammoGlow > 0) ammoBars.rect(x - 1, -AMMO_BAR_H / 2 - 1, AMMO_BAR_W * fill + 2, AMMO_BAR_H + 2).fill({ color: tint, alpha: AMMO_GLOW_ALPHA * ammoGlow });
+      ammoBars.rect(x, -AMMO_BAR_H / 2, AMMO_BAR_W * fill, AMMO_BAR_H).fill({ color: tint });
+    }
+  };
+
+  const drawFlash = (): void => {
+    flashG.clear();
+    if (flashK <= 0) return;
+    drawHull(flashG, hull, { color: flashColor, width: SHIP_LINE_PX + PICKUP_FLASH_PX, alpha: PICKUP_FLASH_ALPHA * flashK, join: 'round' });
+  };
+
+  const repaint = (): void => {
+    const i = mult - 1;
+    const tint = hullColor ?? color;
+    drawHull(glow.clear(), hull, { color: tint, width: MULT_GLOW_PX[i] ?? SHIP_LINE_PX, alpha: MULT_GLOW_ALPHA[i] ?? 0, join: 'round' });
+    drawHull(outline.clear(), hull, { color: tint, width: SHIP_LINE_PX, alpha: MULT_HULL_ALPHA[i] ?? 1, join: 'round' });
+  };
+
+  /** Над кораблём — только цифра множителя, с ×2 (ников в игре нет: игрока находят по цвету). */
+  const layoutLabel = (): void => {
+    multText.visible = mult >= 2;
+    overText.visible = hullColor !== null;
+    // Обе цифры — рядом по центру; одна — по центру.
+    const gap = MULT_FONT_PX / 3;
+    if (multText.visible && overText.visible) {
+      multText.x = -(overText.width + gap) / 2;
+      overText.x = (multText.width + gap) / 2;
+    } else {
+      multText.x = 0;
+      overText.x = 0;
+    }
+  };
+
+  return {
+    node,
+    tag,
+    setVisible(visible) {
+      node.visible = visible;
+      tag.visible = visible;
+    },
+    set(x, y, angle, thrust) {
+      node.position.set(x, y);
+      tag.position.set(x, y);
+      body.rotation = angle;
+      const half = label.width / 2;
+      label.x = Math.min(Math.max(0, bounds.left + half - x), bounds.right - half - x);
+      const flip = y + above - label.height < bounds.top;
+      label.y = flip ? -above + label.height : above;
+      multText.scale.set(1 + HUD_POP_SCALE * pop);
+      flame.clear();
+      if (thrust <= 0) return;
+      const len = FLAME_LENGTH * thrust;
+      const w = SHIP_SIZE * FLAME_WIDTH_K;
+      const tailX = HULL_TAIL_X[hull];
+      flame.poly([tailX, -w / 2, tailX - len, 0, tailX, w / 2]).fill({ color: hullColor ?? color, alpha: FLAME_ALPHA * thrust });
+    },
+    setBounds(next) {
+      bounds = next;
+    },
+    paint(nextColor, nextHull) {
+      color = nextColor;
+      hull = nextHull;
+      multText.style.fill = color;
+      repaint();
+      layoutLabel();
+      if (maxLives > 0) drawPips();
+      if (maxAmmo > 0) drawAmmo();
+    },
+    setLives(lives, max) {
+      if (lives === lastLives && max === maxLives) return;
+      lastLives = lives;
+      maxLives = max;
+      drawPips();
+    },
+    popHeart(index) {
+      heartIndex = index;
+      heartPop = 1;
+      drawPips();
+    },
+    glowAmmo() {
+      ammoGlow = 1;
+      drawAmmo();
+    },
+    setJammed(next) {
+      if (next === jammed) return;
+      jammed = next;
+      drawAmmo();
+    },
+    flash(next) {
+      flashColor = next;
+      flashK = 1;
+      drawFlash();
+    },
+    setAmmo(ammo, max) {
+      if (ammo === lastAmmo && max === maxAmmo) return;
+      lastAmmo = ammo;
+      maxAmmo = max;
+      drawAmmo();
+    },
+    setBlink(dim) {
+      body.alpha = dim ? INVULN_ALPHA : 1;
+    },
+    setGhost(ghost) {
+      node.alpha = ghost ? GHOST_ALPHA : 1;
+      if (ghost) tag.visible = false;
+    },
+    setMult(next) {
+      if (next === mult) return;
+      if (next > mult) pop = 1;
+      mult = next;
+      multText.text = `×${mult}`;
+      repaint();
+      layoutLabel();
+    },
+    setOverload(next) {
+      if (next === hullColor) return;
+      const was = hullColor !== null;
+      hullColor = next;
+      repaint();
+      if (was !== (next !== null)) layoutLabel();
+    },
+    setShield(on, blink) {
+      shield.visible = on && !blink;
+      if (shield.visible) shield.clear().circle(0, 0, SHIP_SIZE * SHIELD_RADIUS_K).stroke({ color: POWERUP_COLOR.shield, width: SHIELD_LINE_PX, alpha: SHIELD_ALPHA });
+    },
+    update(dtS) {
+      pop = Math.max(0, pop - dtS / HUD_POP_S);
+      if (heartPop > 0) {
+        heartPop = Math.max(0, heartPop - dtS / HEART_POP_S);
+        drawPips();
+      }
+      if (ammoGlow > 0) {
+        ammoGlow = Math.max(0, ammoGlow - dtS / AMMO_GLOW_S);
+        drawAmmo();
+      }
+      if (flashK > 0) {
+        flashK = Math.max(0, flashK - dtS / PICKUP_FLASH_S);
+        drawFlash();
+      }
+    },
+  };
+}
