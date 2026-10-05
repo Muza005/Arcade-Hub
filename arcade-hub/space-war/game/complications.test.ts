@@ -57,13 +57,17 @@ describe('осложнения', () => {
     const pilot = sim.pilots.get('p')!;
     run(sim, 2); // камни успели войти в поле
     pilot.ammo = 10;
-    const before = { ...pilot.ship.vel };
+    const before = { ...pilot.ship.knock };
+    const start = { ...pilot.ship.pos };
     sim.step(DT, () => ({ x: 0, y: 0, btn: true }));
     expect(sim.bullets.length).toBeGreaterThan(0);
     const b = sim.bullets[sim.bullets.length - 1]!;
-    const dv = { x: pilot.ship.vel.x - before.x, y: pilot.ship.vel.y - before.y };
-    // Толчок против полёта снаряда, порядка RECOIL_SPEED (сопротивление съело чуть-чуть).
-    expect((dv.x * b.vel.x + dv.y * b.vel.y) / Math.hypot(b.vel.x, b.vel.y)).toBeLessThan(-RECOIL_SPEED * 0.8);
+    const dir = { x: b.vel.x / Math.hypot(b.vel.x, b.vel.y), y: b.vel.y / Math.hypot(b.vel.x, b.vel.y) };
+    const dk = { x: pilot.ship.knock.x - before.x, y: pilot.ship.knock.y - before.y };
+    // Толчок против полёта снаряда, порядка RECOIL_SPEED; импульс не режется пределом скорости корабля.
+    expect(dk.x * dir.x + dk.y * dir.y).toBeLessThan(-RECOIL_SPEED * 0.8);
+    run(sim, 0.4);
+    expect((pilot.ship.pos.x - start.x) * dir.x + (pilot.ship.pos.y - start.y) * dir.y).toBeLessThan(-150);
   });
 
   it('Инопланетяне: летят к кораблю, прилипают и замедляют (до пяти); в конце волны уходят', () => {

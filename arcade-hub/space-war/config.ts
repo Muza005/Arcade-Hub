@@ -278,7 +278,7 @@ export const CURRENT_STREAK_ALPHA = 0.12;
 // Скользкий космос: сопротивление ниже — корабль тормозит гораздо дольше.
 export const SLIPPERY_DRAG_K = 0.22;
 // Отдача: каждый выстрел толкает корабль назад.
-export const RECOIL_SPEED = 240; // TUNE: px/с — средне
+export const RECOIL_SPEED = 1200; // px/с — отброс назад (заказчик: ×5); импульсом, мимо предела скорости
 // Инопланетяне: мельче мелкого камня, быстрее камней; с краёв летят к ближайшему кораблю сквозь камни;
 // три попадания; цепляются к кораблю и замедляют его (до пяти — дальше не хуже); в конце волны отстают и уходят.
 export const ALIEN_RADIUS = 11;
@@ -467,9 +467,10 @@ export const VORTEX_ARM_TURNS = 1.2;
 export const VORTEX_SPIN = 1.4;
 
 // ─── Усиления ────────────────────────────────────────────────────
-export const POWERUP_DROP_CHANCE = 1 / 20; // с разрушенного астероида — «Редко»
-/** Настройка лобби «Частота усилений» (решение заказчика): множитель шанса выпадения. «Редко» — как было, «Очень часто» — в 6 раз чаще. */
-export const POWERUP_RATES = { rare: 1, normal: 2, often: 4, max: 6 } as const;
+export const POWERUP_DROP_CHANCE = 1 / 20; // база шанса с разрушенного астероида; × множитель частоты из лобби
+/** Настройка лобби «Частота усилений» (решение заказчика): множитель шанса выпадения. Подняты на ступень:
+ *  «Редко» — как прежнее «Обычно», «Обычно» — как «Часто», «Часто» — как «Очень часто», «Очень часто» — вдвое чаще. */
+export const POWERUP_RATES = { rare: 2, normal: 4, often: 6, max: 12 } as const;
 export type PowerupRate = keyof typeof POWERUP_RATES;
 export const POWERUP_RATE_KEYS = Object.keys(POWERUP_RATES) as PowerupRate[];
 export const POWERUP_RATE_DEFAULT: PowerupRate = 'normal';

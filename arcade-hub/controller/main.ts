@@ -173,6 +173,11 @@ pauseModal.append(
 resumeBtn.addEventListener('click', () => send({ t: 'cmd', cmd: 'resume' }));
 endBtn.addEventListener('click', () => send({ t: 'cmd', cmd: 'end' }));
 
+// Отсчёт после «Продолжить»: крупная цифра у всех.
+const countdown = el('div', 'resume-count');
+countdown.hidden = true;
+let shownCount: number | undefined;
+
 const flash = el('div', 'flash');
 const banner = el('div', 'banner', t('ctrl.reconnecting'));
 banner.hidden = true;
@@ -186,7 +191,7 @@ const screens: Record<Screen, HTMLElement> = {
   pad: pad.el,
   error: errorScreen,
 };
-app.append(...Object.values(screens), aim.el, pauseModal, settings.el, flash, banner);
+app.append(...Object.values(screens), aim.el, pauseModal, countdown, settings.el, flash, banner);
 let screen: Screen = 'connecting';
 
 function show(next: Screen): void {
@@ -277,9 +282,18 @@ function render(): void {
   });
   pad.setMainButton(inMenu ? undefined : st.mainButton);
   // Пауза: у ведущего — окно, у остальных — карточка сверху и серые кнопки.
-  pauseModal.hidden = !(screen === 'pad' && st.paused && leader && !settings.open);
+  const counting = st.resumeIn !== undefined;
+  pauseModal.hidden = !(screen === 'pad' && st.paused && leader && !settings.open && !counting);
+  countdown.hidden = !(screen === 'pad' && counting);
+  if (counting && st.resumeIn !== shownCount) {
+    countdown.textContent = String(st.resumeIn);
+    countdown.classList.remove('is-tick');
+    void countdown.offsetWidth;
+    countdown.classList.add('is-tick');
+  }
+  shownCount = st.resumeIn;
   pauseStatus.textContent = st.status ?? '';
-  pad.notice.hidden = !(st.paused && !leader);
+  pad.notice.hidden = !(st.paused && !leader) || counting;
   pad.notice.textContent = st.pausedBy ? t('ctrl.pause.guest', { nick: st.pausedBy }) : '';
   if (settings.open && slot) settings.update(settingsContext());
   if (!controlsLive()) sender.release();

@@ -1316,3 +1316,37 @@ button {
   filter: grayscale(1);
   opacity: 0.3;
 }
+
+/* Отсчёт после «Продолжить»: 3, 2, 1 крупно поверх управления. */
+.resume-count {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-size: 160px;
+  font-weight: 700;
+  color: var(--text);
+  text-shadow: 0 0 32px var(--player, var(--text));
+}
+
+.resume-count.is-tick {
+  animation: resume-tick 1s var(--ease) both;
+}
+
+@keyframes resume-tick {
+  from {
+    opacity: 0;
+    transform: scale(1.6);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0.2;
+    transform: scale(0.85);
+  }
+}

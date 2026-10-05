@@ -12,6 +12,8 @@ export interface PauseOverlay {
   readonly el: HTMLElement;
   /** paused = false — убрать. by — ник поставившего (пусто — с клавиатуры). */
   show(paused: boolean, by?: string, roomCode?: string | null): void;
+  /** Отсчёт перед продолжением: крупная цифра поверх игры; null — убрать. */
+  countdown(left: number | null): void;
 }
 
 export interface PauseActions {
@@ -43,8 +45,19 @@ export function createPauseOverlay(actions: PauseActions): PauseOverlay {
     rejoin,
   );
   el.addEventListener(BACK_EVENT, () => actions.resume());
+  const count = h('div', { class: 'resume-count', hidden: true, 'aria-live': 'assertive' });
   return {
     el,
+    countdown(left) {
+      if (!count.isConnected) el.parentElement?.append(count);
+      count.hidden = left === null;
+      if (left === null) return;
+      count.textContent = String(left);
+      // Каждая цифра заново «выпрыгивает».
+      count.classList.remove('is-tick');
+      void count.offsetWidth;
+      count.classList.add('is-tick');
+    },
     show(paused, nick = '', roomCode) {
       const wasHidden = el.hidden;
       el.hidden = !paused;
