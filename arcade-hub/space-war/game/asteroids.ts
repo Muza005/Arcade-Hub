@@ -36,6 +36,8 @@ export interface Asteroid {
   immortal: boolean;
   /** Ведёт босс: не удаляется за краем, пока его держат. */
   held: boolean;
+  /** Броня Крепости: неуязвима, но автонаведение в неё целится — патроны уходят в броню. */
+  armor: boolean;
   /** Камень саботажника: кто бросил (контур в его цвет); обычный — null. */
   owner: string | null;
 }
@@ -97,6 +99,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
       spin: 0,
       immortal: false,
       held: false,
+      armor: false,
       owner: null,
     }),
     () => undefined,
@@ -120,6 +123,7 @@ export function createAsteroidField(rng: Rng, bounds: Bounds): Field {
     a.spin = rng.range(-ASTEROID_SPIN, ASTEROID_SPIN);
     a.immortal = false;
     a.held = false;
+    a.armor = false;
     a.owner = null;
     list.push(a);
     return a;

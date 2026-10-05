@@ -287,7 +287,8 @@ export function createSim(
       best = boss;
     }
     for (const a of field.list) {
-      if (a.immortal || !inside(bounds, a.pos)) continue;
+      // Камни Роя — не цель; броня Крепости — цель (в неё и уходят патроны издалека).
+      if ((a.immortal && !a.armor) || !inside(bounds, a.pos)) continue;
       const d = (a.pos.x - from.x) ** 2 + (a.pos.y - from.y) ** 2;
       if (d < bestD) {
         bestD = d;
@@ -570,7 +571,11 @@ export function createSim(
       if (wave) {
         events.waves.push(wave);
         if (wave.kind === 'start' && waves.boss) {
-          bossCtl = createBoss(waves.boss, rng, field, bounds, playerIds.length, growth(WAVE_SPEED_GROWTH));
+          bossCtl = createBoss(waves.boss, rng, field, bounds, playerIds.length, growth(WAVE_SPEED_GROWTH), () =>
+            [...pilots.values()]
+              .filter((p) => p.alive)
+              .map((p) => ({ id: p.ship.id, pos: p.ship.pos, vel: p.ship.vel, invulnerable: p.invulnS > 0 })),
+          );
         }
         if (wave.kind === 'end') {
           // Испытание пройдено или цель ушла недобитой.

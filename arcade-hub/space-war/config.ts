@@ -57,6 +57,8 @@ export const CHROMA_DECAY_S = 0.35;
 export const SPARK_TEXTURE_PX = 16; // мягкая точка в атласе
 export const SHARD_TEXTURE_PX = 20; // чёрточка осколка
 export const ATLAS_GAP = 4; // между кадрами: соседний кадр не просвечивает по краю
+/** Прозрачный запас вокруг искры и осколка внутри кадра: при повороте и сглаживании край не режется. */
+export const ATLAS_FX_PAD = 6;
 // Счётчик FPS (этап Б0): обновляется дважды в секунду, мелко в углу
 export const FPS_SAMPLE_S = 0.5;
 export const FPS_FONT_PX = 22;
@@ -285,40 +287,97 @@ export const CAMERA_ZOOM_STEP = 0.15; // TUNE: на столько мир шир
 /** Размер мира под экран и число игроков: камера отъезжает, пропорции поля не меняются. */
 export const worldZoom = (players: number): number =>
   1 + CAMERA_ZOOM_STEP * Math.floor(Math.max(0, players - 1) / CAMERA_ZOOM_STEP_PLAYERS);
+/** Настройка лобби «Размер поля» (решение заказчика): «Авто» — по числу игроков, или любой из шагов вручную. */
+export const FIELD_SIZES = [1, 2, 3, 4, 5] as const; // шаг 1 — как на 1–2 игроков, 5 — как на 9–10
+export type FieldSize = (typeof FIELD_SIZES)[number];
+export const FIELD_SIZE_DEFAULT = 'auto';
+export const fieldZoom = (size: unknown, players: number): number =>
+  FIELD_SIZES.includes(size as FieldSize) ? 1 + CAMERA_ZOOM_STEP * ((size as FieldSize) - 1) : worldZoom(players);
 
 // ─── Боссы ───────────────────────────────────────────────────────
 export const BOSS_HP_PLAYER_K = 0.7; // прочность = база · (1 + 0.7 · (N − 1))
-export const BOSS_BASE_HP = { seeder: 25, giant: 30 } as const;
+export const BOSS_BASE_HP = { seeder: 25, hunter: 26, fortress: 18, giant: 30 } as const;
 export const SWARM_DURATION_S = 25;
 export const VORTEX_DURATION_S = 30;
-export type BossKind = 'seeder' | 'swarm' | 'giant' | 'vortex';
-/** Волна → босс. Цели (seeder, giant) идут, пока живы; испытания (swarm, vortex) — ровно своё время. */
-export const BOSS_OF_WAVE: Readonly<Record<number, BossKind>> = { 5: 'seeder', 10: 'swarm', 15: 'giant', 20: 'vortex' };
+export type BossKind = 'seeder' | 'hunter' | 'swarm' | 'fortress' | 'giant' | 'vortex';
+export type TargetBossKind = keyof typeof BOSS_BASE_HP;
+/** Волна → босс (решение заказчика: боссы чаще — 4, 8, 11, 14, 17, 20; поздние волны и без того длиннее).
+ *  Цели (seeder, hunter, fortress, giant) идут, пока живы; испытания (swarm, vortex) — ровно своё время. */
+export const BOSS_OF_WAVE: Readonly<Record<number, BossKind>> = {
+  4: 'seeder',
+  8: 'hunter',
+  11: 'swarm',
+  14: 'fortress',
+  17: 'giant',
+  20: 'vortex',
+};
 /** Волны боссов: в них осложнений нет. */
 export const BOSS_WAVES: readonly number[] = Object.keys(BOSS_OF_WAVE).map(Number);
 export const BOSS_HITBOX_K = 0.9; // тело босса чуть меньше рисунка
 /** Цель, которую никто не добивает (одни слабые боты), уходит через столько секунд — без очков за босса. */
 export const BOSS_TARGET_MAX_S = 120;
 /** Поток камней с краёв в волне босса (доля обычного). */
-export const BOSS_FLOW: Record<BossKind, number> = { seeder: 0.3, swarm: 0.3, giant: 0.5, vortex: 1 };
+export const BOSS_FLOW: Record<BossKind, number> = { seeder: 0.3, hunter: 0.4, swarm: 0.3, fortress: 0.35, giant: 0.5, vortex: 1 };
 export const BOSS_ENTRY_SPEED = 160; // цель вплывает из-за верхнего края
 export const BOSS_ROAM_INSET = 0.25; // цель бродит по середине поля
 export const BOSS_ROAM_S = 5; // и меняет точку, к которой плывёт
 export const BOSS_STEER = 0.8; // 1/с: насколько быстро цель поворачивает к точке
 export const BOSS_COLOR = '#FF5DA2';
+/** Свой цвет у каждого босса: рисунок, полоска прочности, взрыв. Охотник красится в цвет жертвы, это — без жертвы. */
+export const BOSS_COLORS: Record<BossKind, string> = {
+  seeder: '#5CFFB0',
+  hunter: '#FF3B5C',
+  swarm: '#FF8A8A',
+  fortress: '#FFC46B',
+  giant: '#FF8A3D',
+  vortex: '#B57BFF',
+};
 export const BOSS_LINE_PX = 5;
 export const BOSS_HP_RING_PX = 6;
 export const BOSS_HP_RING_GAP = 14;
 export const BOSS_EXPLOSION_SHARDS = 60;
 export const SHAKE_BOSS_DEATH = 1;
-export const BOSS_BAR_W = 360; // полоска прочности вверху — вместо таймера
-export const BOSS_BAR_H = 8;
+export const BOSS_BAR_W = 440; // полоска вверху: у цели — прочность, у испытания — сколько осталось
+export const BOSS_BAR_H = 10;
+// Полоска босса вверху (решение заказчика: эффектно и понятно): имя, деления, след урона, вспышка от попадания
+export const BOSS_BAR_SEGMENTS = 10;
+export const BOSS_BAR_TRAIL_S = 0.6; // белый «след» отнятой прочности догоняет за столько
+export const BOSS_FLASH_S = 0.12; // рисунок босса белеет от попадания
+export const BOSS_HINT_S = 6; // подсказка «как победить» под полоской в начале волны
+export const BOSS_HINT_FONT_PX = 22;
 // Сеятель: не атакует, выбрасывает камни, пока жив.
 export const SEEDER_RADIUS = 90;
 export const SEEDER_SPEED = 70;
 export const SEEDER_EMIT_PER_S = 0.9; // TUNE; × (1 + FLOW_PLAYER_K · (N − 1))
 export const SEEDER_MEDIUM_CHANCE = 0.35; // остальное — мелкие
 export const SEEDER_SPIN = 0.4;
+// Охотник (решение заказчика): гонится за ближайшим живым кораблём (без неуязвимости), красится в его цвет,
+// чуть медленнее камней и с небольшой инерцией — резкий манёвр уводит; расталкивает камни перед собой и
+// бросает мелкие камни в жертву. Удар о него — минус жизнь и множитель, ему ничего. Убить — прочностью.
+export const HUNTER_RADIUS = 46;
+export const HUNTER_SPEED = 165; // TUNE: px/с — медленнее большинства камней
+export const HUNTER_STEER = 1.6; // TUNE: 1/с — инерция: чем меньше, тем дальше проскакивает
+export const HUNTER_SWITCH_K = 0.75; // другая жертва — только если она ближе на четверть
+export const HUNTER_PUSH_RADIUS = 150; // камни ближе — отталкиваются
+export const HUNTER_PUSH = 900; // px/с²
+export const HUNTER_SHOT_S = 2.4; // TUNE: бросок мелкого камня в жертву; ÷ (1 + FLOW_PLAYER_K · (N − 1))
+export const HUNTER_SHOT_SPEED = 300;
+export const HUNTER_SHOT_RANGE = 900; // дальше жертвы не бросает
+export const HUNTER_TETHER_ALPHA = 0.35; // пунктир «на прицеле» от Охотника к жертве
+// Крепость (решение заказчика): ядро в центре, два кольца камней-брони вращаются навстречу, в кольцах разрывы.
+// Автонаведение бьёт в ближайшее — издалека патроны уходят в броню; влетел в разрыв ближе к ядру — бей ядро.
+// С игроками растут прочность и скорость колец. Ядро убито — броня разлетается обычными камнями.
+export const FORTRESS_CORE_RADIUS = 56;
+export const FORTRESS_ROCK: AsteroidSize = 'medium';
+/** Кольца: радиус, мест для камней, разрывы (сколько мест подряд пусто, сколько таких разрывов), скорость, рад/с. */
+export const FORTRESS_RINGS = [
+  { radius: 195, slots: 15, gap: 2, gaps: 2, spin: 0.32 },
+  { radius: 345, slots: 27, gap: 2, gaps: 2, spin: -0.22 },
+] as const;
+export const FORTRESS_SPIN_PLAYER_K = 0.08; // вращение × (1 + 0.08 · (N − 1))
+export const FORTRESS_FORM_S = 1.6; // кольца разворачиваются от ядра
+export const FORTRESS_BREAK_SPEED = 220; // броня разлетается, когда ядро убито
+export const FORTRESS_TINT = '#FFD27A';
 // Гигант: от каждого попадания откалывается живой кусок.
 export const GIANT_RADIUS = 150;
 export const GIANT_SPEED = 45;

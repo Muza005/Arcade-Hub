@@ -16,6 +16,7 @@ import {
   ASTEROID_SHAPE_VARIANTS,
   ASTEROID_TEXTURE_PAD,
   ASTEROID_VERTICES,
+  ATLAS_FX_PAD,
   ATLAS_GAP,
   CRACK_COLOR,
   CRACK_GLOW,
@@ -139,11 +140,11 @@ export function bakeAtlas(renderer: Renderer): Atlas {
   }
   const spark = new Graphics();
   for (let i = SPARK_RINGS; i >= 1; i--) spark.circle(0, 0, (SPARK_TEXTURE_PX / 2) * (i / SPARK_RINGS)).fill({ color: 0xffffff, alpha: 1 / SPARK_RINGS });
-  place('spark', spark, SPARK_TEXTURE_PX, SPARK_TEXTURE_PX);
+  place('spark', spark, SPARK_TEXTURE_PX + ATLAS_FX_PAD * 2, SPARK_TEXTURE_PX + ATLAS_FX_PAD * 2);
   const shard = new Graphics()
     .roundRect(-SHARD_TEXTURE_PX / 2, -SHARD_THICK_PX / 2, SHARD_TEXTURE_PX, SHARD_THICK_PX, SHARD_THICK_PX / 2)
     .fill(0xffffff);
-  place('shard', shard, SHARD_TEXTURE_PX, SHARD_THICK_PX + ATLAS_GAP);
+  place('shard', shard, SHARD_TEXTURE_PX + ATLAS_FX_PAD * 2, SHARD_THICK_PX + ATLAS_FX_PAD * 2);
 
   const height = y + shelf;
   // Прозрачная подложка задаёт границы: координаты кадров совпадают с координатами листа.

@@ -36,6 +36,19 @@ export const DIFFICULTY_ICONS: Record<Difficulty, string> = {
   hard: gauge(17.8, 13.6),
 };
 
+/** Размер поля: рамка экрана, внутри — поле этого размера; «Авто» — стрелки «под игроков». */
+export const FIELD_FIELD_ICON = svg('<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M7 9.5V8h1.5M17 9.5V8h-1.5M7 14.5V16h1.5M17 14.5V16h-1.5"/>');
+export const FIELD_AUTO_ICON = svg('<rect x="2.5" y="4.5" width="19" height="15" rx="2.5" stroke-dasharray="3 2.5"/><path d="M9 10l-3-2.5M15 10l3-2.5M9 14l-3 2.5M15 14l3 2.5"/>');
+const FIELD_MAX_W = 19;
+const FIELD_MAX_H = 15;
+/** Поле шага k из n: прямоугольник растёт от трети до всей рамки. */
+export const fieldIcon = (k: number, n: number): string => {
+  const f = 0.35 + (0.65 * (k - 1)) / Math.max(1, n - 1);
+  const w = FIELD_MAX_W * f;
+  const h = FIELD_MAX_H * f;
+  return svg(`<rect x="${12 - w / 2}" y="${12 - h / 2}" width="${w}" height="${h}" rx="${1 + 1.5 * f}" fill="currentColor" fill-opacity="0.35"/>`);
+};
+
 /** Уровень ботов — голова робота. */
 export const BOTS_FIELD_ICON = svg(
   '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 8V4.5"/><circle cx="12" cy="3.5" r="1" fill="currentColor"/><circle cx="9" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="15" cy="14" r="1.3" fill="currentColor" stroke="none"/>',

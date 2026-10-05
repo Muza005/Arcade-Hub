@@ -1,4 +1,4 @@
-// Боссы (SPACE_WAR_SPEC §5 «Боссы»): Сеятель (5), Рой (10), Гигант (15), Воронка (20).
+// Боссы (SPACE_WAR_SPEC §5 «Боссы»): Сеятель (4), Охотник (8), Рой (11), Крепость (14), Гигант (17), Воронка (20).
 // Цель — с прочностью, волна идёт, пока она жива; испытание — без прочности, ровно своё время.
 // Модуль двигает босса и его камни; удары, очки и события — в симуляции.
 import type { Rng } from '../../engine/rng';
@@ -12,6 +12,21 @@ import {
   BOSS_ROAM_S,
   BOSS_STEER,
   FLOW_PLAYER_K,
+  FORTRESS_BREAK_SPEED,
+  FORTRESS_CORE_RADIUS,
+  FORTRESS_FORM_S,
+  FORTRESS_RINGS,
+  FORTRESS_ROCK,
+  FORTRESS_SPIN_PLAYER_K,
+  HUNTER_PUSH,
+  HUNTER_PUSH_RADIUS,
+  HUNTER_RADIUS,
+  HUNTER_SHOT_RANGE,
+  HUNTER_SHOT_S,
+  HUNTER_SHOT_SPEED,
+  HUNTER_SPEED,
+  HUNTER_STEER,
+  HUNTER_SWITCH_K,
   GIANT_CHUNK,
   GIANT_CHUNK_SPREAD_RAD,
   GIANT_RADIUS,
@@ -39,9 +54,29 @@ import {
   VORTEX_SHIP_PULL,
   VORTEX_SPIN,
   type BossKind,
+  type TargetBossKind,
 } from '../config';
 import type { Asteroid, Field } from './asteroids';
+import { leadDirection } from './bullets';
 import type { Bounds, Vec } from './ship';
+
+/** Кольцо Крепости для рисунка: текущий радиус, поворот, места и где разрывы. */
+export interface FortressRing {
+  radius: number;
+  angle: number;
+  slots: number;
+  /** Пустые места кольца (разрывы). */
+  empty: readonly number[];
+}
+
+/** Корабль, за которым может гнаться Охотник. */
+export interface Prey {
+  id: string;
+  pos: Vec;
+  vel: Vec;
+  /** Неуязвимого (только что ударенного) Охотник не преследует. */
+  invulnerable: boolean;
+}
 
 export interface Boss {
   readonly kind: BossKind;
@@ -59,6 +94,10 @@ export interface Boss {
   rockPull: number;
   /** Сколько раз по боссу попали — для вида повреждений. */
   hits: number;
+  /** Охотник: за кем гонится (рисунок красится в его цвет); у других — null. */
+  prey: string | null;
+  /** Крепость: кольца брони; у других — пусто. */
+  rings: FortressRing[];
 }
 
 export interface BossControl {
@@ -71,10 +110,20 @@ export interface BossControl {
   release(): void;
 }
 
-export const bossHp = (kind: 'seeder' | 'giant', players: number): number =>
+export const bossHp = (kind: TargetBossKind, players: number): number =>
   Math.round(BOSS_BASE_HP[kind] * (1 + BOSS_HP_PLAYER_K * (players - 1)));
 
-export function createBoss(kind: BossKind, rng: Rng, field: Field, bounds: Bounds, players: number, speedK: number): BossControl {
+const NO_PREY = (): readonly Prey[] => [];
+
+export function createBoss(
+  kind: BossKind,
+  rng: Rng,
+  field: Field,
+  bounds: Bounds,
+  players: number,
+  speedK: number,
+  prey: () => readonly Prey[] = NO_PREY,
+): BossControl {
   const cx = (bounds.left + bounds.right) / 2;
   const cy = (bounds.top + bounds.bottom) / 2;
   const w = bounds.right - bounds.left;
@@ -91,6 +140,8 @@ export function createBoss(kind: BossKind, rng: Rng, field: Field, bounds: Bound
     shipPull: 0,
     rockPull: 0,
     hits: 0,
+    prey: null,
+    rings: [],
   };
   const noop = (): void => undefined;
 
@@ -112,6 +163,8 @@ export function createBoss(kind: BossKind, rng: Rng, field: Field, bounds: Bound
   }
 
   if (kind === 'swarm') return createSwarm(boss, rng, field, bounds, players);
+  if (kind === 'hunter') return createHunter(boss, field, bounds, players, speedK, prey);
+  if (kind === 'fortress') return createFortress(boss, rng, field, bounds, players);
 
   // Цели: вплывают из-за верхнего края и бродят по середине поля.
   const seeder = kind === 'seeder';
@@ -278,5 +331,204 @@ function createSwarm(boss: Boss, rng: Rng, field: Field, bounds: Bounds, players
         }
       }
     },
+  };
+}
+
+/** Цель вплывает из-за верхнего края с полной прочностью. */
+function enter(boss: Boss, bounds: Bounds): void {
+  boss.pos.y = boss.prev.y = bounds.top - boss.radius;
+  boss.vel.y = BOSS_ENTRY_SPEED;
+  boss.hp = boss.maxHp;
+}
+
+/** Охотник: гонится за ближайшим, расталкивает камни, бросает мелкие камни в жертву. */
+function createHunter(
+  boss: Boss,
+  field: Field,
+  bounds: Bounds,
+  players: number,
+  speedK: number,
+  prey: () => readonly Prey[],
+): BossControl {
+  boss.radius = HUNTER_RADIUS;
+  boss.maxHp = bossHp('hunter', players);
+  enter(boss, bounds);
+  const shotEveryS = HUNTER_SHOT_S / (1 + FLOW_PLAYER_K * (players - 1));
+  let shotS = shotEveryS;
+  let entering = true;
+
+  /** Ближайший; нынешняя жертва держится, пока другой не ближе заметно. */
+  const choose = (): Prey | null => {
+    const all = prey();
+    const open = all.filter((p) => !p.invulnerable);
+    const pool = open.length > 0 ? open : all;
+    let best: Prey | null = null;
+    let bestD = Infinity;
+    let current: Prey | null = null;
+    let currentD = Infinity;
+    for (const p of pool) {
+      const d = Math.hypot(p.pos.x - boss.pos.x, p.pos.y - boss.pos.y);
+      if (d < bestD) {
+        bestD = d;
+        best = p;
+      }
+      if (p.id === boss.prey) {
+        current = p;
+        currentD = d;
+      }
+    }
+    if (current && bestD > currentD * HUNTER_SWITCH_K) return current;
+    return best;
+  };
+
+  return {
+    boss,
+    target: true,
+    step(dtS) {
+      boss.prev.x = boss.pos.x;
+      boss.prev.y = boss.pos.y;
+      if (entering && boss.pos.y >= bounds.top + boss.radius) entering = false;
+      const victim = entering ? null : choose();
+      boss.prey = victim?.id ?? boss.prey;
+      if (victim) {
+        // Небольшая инерция: скорость догоняет желаемую не сразу — резкий манёвр уводит.
+        const dx = victim.pos.x - boss.pos.x;
+        const dy = victim.pos.y - boss.pos.y;
+        const d = Math.hypot(dx, dy) || 1;
+        const k = Math.min(1, HUNTER_STEER * dtS);
+        boss.vel.x += ((dx / d) * HUNTER_SPEED - boss.vel.x) * k;
+        boss.vel.y += ((dy / d) * HUNTER_SPEED - boss.vel.y) * k;
+        boss.angle = Math.atan2(boss.vel.y, boss.vel.x);
+        // Бросок мелкого камня в жертву — с упреждением.
+        shotS -= dtS;
+        if (shotS <= 0 && d < HUNTER_SHOT_RANGE) {
+          shotS = shotEveryS;
+          const from = { x: boss.pos.x + (dx / d) * boss.radius, y: boss.pos.y + (dy / d) * boss.radius };
+          const dir = leadDirection(from, victim);
+          const v = HUNTER_SHOT_SPEED * speedK;
+          const r = ASTEROID_RADIUS.small;
+          field.launch('small', from.x + dir.x * r, from.y + dir.y * r, dir.x * v, dir.y * v);
+        }
+      }
+      boss.pos.x += boss.vel.x * dtS;
+      boss.pos.y += boss.vel.y * dtS;
+      if (!entering) {
+        boss.pos.x = Math.min(bounds.right - boss.radius, Math.max(bounds.left + boss.radius, boss.pos.x));
+        boss.pos.y = Math.min(bounds.bottom - boss.radius, Math.max(bounds.top + boss.radius, boss.pos.y));
+      }
+      // Камни перед собой расталкивает.
+      for (const a of field.list) {
+        if (a.held) continue;
+        const ax = a.pos.x - boss.pos.x;
+        const ay = a.pos.y - boss.pos.y;
+        const d = Math.hypot(ax, ay);
+        if (d === 0 || d > HUNTER_PUSH_RADIUS + a.radius) continue;
+        a.vel.x += (ax / d) * HUNTER_PUSH * dtS;
+        a.vel.y += (ay / d) * HUNTER_PUSH * dtS;
+      }
+    },
+    hit() {
+      boss.hits++;
+      boss.hp = Math.max(0, boss.hp - 1);
+      return boss.hp <= 0;
+    },
+    release: () => undefined,
+  };
+}
+
+/** Крепость: ядро в центре поля, два кольца брони навстречу друг другу с разрывами. */
+function createFortress(boss: Boss, rng: Rng, field: Field, bounds: Bounds, players: number): BossControl {
+  const cx = (bounds.left + bounds.right) / 2;
+  const cy = (bounds.top + bounds.bottom) / 2;
+  boss.radius = FORTRESS_CORE_RADIUS;
+  boss.maxHp = bossHp('fortress', players);
+  enter(boss, bounds);
+  const spinK = 1 + FORTRESS_SPIN_PLAYER_K * (players - 1);
+  let ageS = 0;
+  let entering = true;
+  const armor: Array<{ rock: Asteroid; ring: number; slot: number }> = [];
+  FORTRESS_RINGS.forEach((def, ring) => {
+    // Разрывы — равномерно по кругу, с поворотом из сида.
+    const empty: number[] = [];
+    const first = Math.floor(rng.next() * def.slots);
+    for (let g = 0; g < def.gaps; g++) {
+      const at = first + Math.round((g * def.slots) / def.gaps);
+      for (let k = 0; k < def.gap; k++) empty.push((at + k) % def.slots);
+    }
+    boss.rings.push({ radius: 0, angle: rng.range(0, Math.PI * 2), slots: def.slots, empty });
+    for (let slot = 0; slot < def.slots; slot++) {
+      if (empty.includes(slot)) continue;
+      const rock = field.launch(FORTRESS_ROCK, boss.pos.x, boss.pos.y, 0, 0);
+      if (!rock) continue;
+      rock.immortal = true;
+      rock.held = true;
+      rock.armor = true;
+      armor.push({ rock, ring, slot });
+    }
+  });
+
+  /** Куда камню к концу шага: кольцо разворачивается от ядра за FORTRESS_FORM_S. */
+  const place = (dtS: number): void => {
+    const form = Math.min(1, ageS / FORTRESS_FORM_S);
+    const ease = 1 - (1 - form) ** 3;
+    boss.rings.forEach((ring, i) => {
+      const def = FORTRESS_RINGS[i];
+      if (!def) return;
+      ring.radius = def.radius * ease;
+      ring.angle += def.spin * spinK * dtS;
+    });
+    for (const a of armor) {
+      if (!a.rock.held) continue;
+      const ring = boss.rings[a.ring];
+      if (!ring) continue;
+      const t = ring.angle + (a.slot / ring.slots) * Math.PI * 2;
+      const x = boss.pos.x + Math.cos(t) * ring.radius;
+      const y = boss.pos.y + Math.sin(t) * ring.radius;
+      // Точно на место к концу шага (сам сдвиг делает field.step).
+      a.rock.vel.x = (x - a.rock.pos.x) / dtS;
+      a.rock.vel.y = (y - a.rock.pos.y) / dtS;
+    }
+  };
+
+  const release = (): void => {
+    // Броня разлетается обычными камнями — их можно добить.
+    for (const { rock } of armor) {
+      if (!rock.held) continue;
+      rock.held = false;
+      rock.immortal = false;
+      rock.armor = false;
+      const dx = rock.pos.x - boss.pos.x;
+      const dy = rock.pos.y - boss.pos.y;
+      const d = Math.hypot(dx, dy) || 1;
+      rock.vel.x = (dx / d) * FORTRESS_BREAK_SPEED;
+      rock.vel.y = (dy / d) * FORTRESS_BREAK_SPEED;
+    }
+  };
+
+  return {
+    boss,
+    target: true,
+    step(dtS) {
+      ageS += dtS;
+      boss.prev.x = boss.pos.x;
+      boss.prev.y = boss.pos.y;
+      boss.angle += dtS;
+      if (entering) {
+        boss.pos.y += boss.vel.y * dtS;
+        if (boss.pos.y >= cy) {
+          boss.pos.y = cy;
+          boss.vel.y = 0;
+          entering = false;
+        }
+      }
+      boss.pos.x = cx;
+      place(dtS);
+    },
+    hit() {
+      boss.hits++;
+      boss.hp = Math.max(0, boss.hp - 1);
+      return boss.hp <= 0;
+    },
+    release,
   };
 }

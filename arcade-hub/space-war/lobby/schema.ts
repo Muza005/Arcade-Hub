@@ -9,6 +9,8 @@ import {
   DIFFICULTIES,
   DIFFICULTY_COLOR,
   DIFFICULTY_DEFAULT,
+  FIELD_SIZE_DEFAULT,
+  FIELD_SIZES,
   RATE_COLOR,
   ROCK_BOUNCE_DEFAULT,
   POWERUP_RATE_DEFAULT,
@@ -25,6 +27,9 @@ import {
   BOTS_FIELD_ICON,
   DIFFICULTY_FIELD_ICON,
   DIFFICULTY_ICONS,
+  FIELD_AUTO_ICON,
+  FIELD_FIELD_ICON,
+  fieldIcon,
   RATE_FIELD_ICON,
   RATE_ICONS,
 } from './icons';
@@ -66,6 +71,18 @@ export const lobbySchema: LobbySchema = {
       icon: DIFFICULTY_FIELD_ICON,
       options: DIFFICULTIES.map((d) => ({ value: d, label: `diff_${d}`, icon: DIFFICULTY_ICONS[d], color: DIFFICULTY_COLOR[d] })),
       default: DIFFICULTY_DEFAULT,
+    },
+    // Размер поля — решение заказчика: «Авто» по числу игроков или любой шаг вручную.
+    {
+      key: 'fieldSize',
+      label: 'setField',
+      kind: 'select',
+      icon: FIELD_FIELD_ICON,
+      options: [
+        { value: FIELD_SIZE_DEFAULT, label: 'field_auto', icon: FIELD_AUTO_ICON },
+        ...FIELD_SIZES.map((s) => ({ value: s, label: `field_${s}`, icon: fieldIcon(s, FIELD_SIZES.length) })),
+      ],
+      default: FIELD_SIZE_DEFAULT,
     },
     // Работает сейчас: «Авто» — берётся из настроек хаба.
     {

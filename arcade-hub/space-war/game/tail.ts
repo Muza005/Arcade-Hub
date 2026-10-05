@@ -37,7 +37,9 @@ export function snapshot(sim: Sim): Sim {
   const pilots = new Map(
     [...sim.pilots].map(([id, p]) => [id, { ...p, ship: shipOf.get(id) ?? p.ship, sabS: { ...p.sabS }, stats: { ...p.stats } }]),
   );
-  const boss = sim.boss ? { ...sim.boss, pos: vec(sim.boss.pos), prev: vec(sim.boss.prev), vel: vec(sim.boss.vel) } : null;
+  const boss = sim.boss
+    ? { ...sim.boss, pos: vec(sim.boss.pos), prev: vec(sim.boss.prev), vel: vec(sim.boss.vel), rings: sim.boss.rings.map((r) => ({ ...r })) }
+    : null;
   const waves = {
     wave: sim.waves.wave,
     phase: sim.waves.phase,

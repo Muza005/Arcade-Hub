@@ -49,6 +49,13 @@ export type SpaceWarKey =
   | 'diff_easy'
   | 'diff_normal'
   | 'diff_hard'
+  | 'setField'
+  | 'field_auto'
+  | 'field_1'
+  | 'field_2'
+  | 'field_3'
+  | 'field_4'
+  | 'field_5'
   | 'setQuality'
   | 'q_auto'
   | 'q_low'
@@ -79,10 +86,19 @@ export type SpaceWarKey =
   | 'boss_swarm'
   | 'boss_giant'
   | 'boss_vortex'
+  | 'boss_hunter'
+  | 'boss_fortress'
+  | 'hint_seeder'
+  | 'hint_hunter'
+  | 'hint_swarm'
+  | 'hint_fortress'
+  | 'hint_giant'
+  | 'hint_vortex'
   | 'noticeBoss'
   | 'noticeBossFinal'
   | 'noticeBossDown'
   | 'hudBoss'
+  | 'hudTrial'
   | 'statusBoss'
   | 'award_livingShield'
   | 'award_untouched'
@@ -179,6 +195,13 @@ export const strings: GameStrings<SpaceWarKey> = {
     diff_easy: 'Лёгкая',
     diff_normal: 'Обычная',
     diff_hard: 'Тяжёлая',
+    setField: 'Размер поля',
+    field_auto: 'Авто — по игрокам',
+    field_1: 'Малое',
+    field_2: 'Компактное',
+    field_3: 'Среднее',
+    field_4: 'Большое',
+    field_5: 'Огромное',
     setQuality: 'Качество графики',
     q_auto: 'Авто',
     q_low: 'Низкое',
@@ -210,10 +233,19 @@ export const strings: GameStrings<SpaceWarKey> = {
     boss_swarm: 'Рой',
     boss_giant: 'Гигант',
     boss_vortex: 'Воронка',
+    boss_hunter: 'Охотник',
+    boss_fortress: 'Крепость',
+    hint_seeder: 'Сеет камни, пока жив',
+    hint_hunter: 'Гонится за ближайшим — уводи, остальные стреляют',
+    hint_swarm: 'Стены камней — ищи проход',
+    hint_fortress: 'Влети в разрыв и бей ядро вблизи',
+    hint_giant: 'Каждое попадание откалывает кусок',
+    hint_vortex: 'Затягивает в центр — держись на краю',
     noticeBoss: 'Волна {n} · {boss}',
     noticeBossFinal: 'Волна {n} · {boss} · финал',
     noticeBossDown: '{boss} повержен · +{score}',
     hudBoss: '{n}/{of} · {boss}',
+    hudTrial: '{n}/{of} · {boss} · {time}',
     statusBoss: 'Волна {n} · {boss}',
     award_livingShield: 'Живой щит',
     award_untouched: 'Ни царапины',
@@ -309,6 +341,13 @@ export const strings: GameStrings<SpaceWarKey> = {
     diff_easy: 'Easy',
     diff_normal: 'Normal',
     diff_hard: 'Hard',
+    setField: 'Field size',
+    field_auto: 'Auto — by players',
+    field_1: 'Small',
+    field_2: 'Compact',
+    field_3: 'Medium',
+    field_4: 'Large',
+    field_5: 'Huge',
     setQuality: 'Graphics quality',
     q_auto: 'Auto',
     q_low: 'Low',
@@ -340,10 +379,19 @@ export const strings: GameStrings<SpaceWarKey> = {
     boss_swarm: 'Swarm',
     boss_giant: 'Giant',
     boss_vortex: 'Vortex',
+    boss_hunter: 'Hunter',
+    boss_fortress: 'Fortress',
+    hint_seeder: 'Sows rocks while alive',
+    hint_hunter: 'Chases the closest ship — lead it, others shoot',
+    hint_swarm: 'Walls of rocks — find the gap',
+    hint_fortress: 'Fly through a gap and hit the core up close',
+    hint_giant: 'Every hit chips off a chunk',
+    hint_vortex: 'Pulls to the centre — stay on the edge',
     noticeBoss: 'Wave {n} · {boss}',
     noticeBossFinal: 'Wave {n} · {boss} · final',
     noticeBossDown: '{boss} down · +{score}',
     hudBoss: '{n}/{of} · {boss}',
+    hudTrial: '{n}/{of} · {boss} · {time}',
     statusBoss: 'Wave {n} · {boss}',
     award_livingShield: 'Living shield',
     award_untouched: 'Not a scratch',

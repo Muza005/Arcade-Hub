@@ -30,6 +30,7 @@ import type {
 import { createAim } from './aim';
 import { createDirectLink } from './direct';
 import { createGyro, requestGyroPermission } from './gyro';
+import { lockZoom } from './no-zoom';
 import { createPad } from './pad';
 import { loadPrefs, savePrefs, type Prefs } from './prefs';
 import { createInputSender } from './sender';
@@ -42,6 +43,7 @@ const MENU_LAYOUT: ControllerLayout = { screen: 'menu', modes: ['joystick'], mai
 const ALL_MODES: ControlMode[] = ['joystick', 'gyro'];
 
 document.documentElement.lang = getLang();
+lockZoom();
 const app = document.getElementById('app');
 if (!app) throw new Error('#app not found');
 

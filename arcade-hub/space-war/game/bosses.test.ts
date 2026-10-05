@@ -1,27 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { createRng } from '../../engine/rng';
 import { FIXED_STEP_HZ } from '../../shared/config';
-import { AMMO_MAX, BOSS_TARGET_MAX_S, SCORE_BOSS, SWARM_DURATION_S, SWARM_ROCKS, VORTEX_DURATION_S } from '../config';
+import {
+  AMMO_MAX,
+  BOSS_OF_WAVE,
+  BOSS_TARGET_MAX_S,
+  FORTRESS_RINGS,
+  HUNTER_SHOT_S,
+  SCORE_BOSS,
+  SWARM_DURATION_S,
+  SWARM_ROCKS,
+  VORTEX_DURATION_S,
+} from '../config';
 import { createAsteroidField } from './asteroids';
-import { bossHp, createBoss } from './bosses';
+import { bossHp, createBoss, type Prey } from './bosses';
 import { createSim, fieldBounds } from './sim';
 import { waveLengthS } from './waves';
 
 const DT = 1 / FIXED_STEP_HZ;
 const IDLE = { x: 0, y: 0, btn: false };
 const bounds = fieldBounds(1920);
-const setup = (kind: Parameters<typeof createBoss>[0], players = 1) => {
+const setup = (kind: Parameters<typeof createBoss>[0], players = 1, prey: () => readonly Prey[] = () => []) => {
   const rng = createRng(5);
   const field = createAsteroidField(rng, bounds);
-  return { field, ctl: createBoss(kind, rng, field, bounds, players, 1) };
+  return { field, ctl: createBoss(kind, rng, field, bounds, players, 1, prey) };
 };
 
 describe('боссы', () => {
-  it('на своих волнах; испытания — ровно своё время, цели — пока живы', () => {
-    expect(waveLengthS(10)).toBe(SWARM_DURATION_S);
+  it('на своих волнах (4, 8, 11, 14, 17, 20); испытания — ровно своё время, цели — пока живы', () => {
+    expect(BOSS_OF_WAVE).toEqual({ 4: 'seeder', 8: 'hunter', 11: 'swarm', 14: 'fortress', 17: 'giant', 20: 'vortex' });
+    expect(waveLengthS(11)).toBe(SWARM_DURATION_S);
     expect(waveLengthS(20)).toBe(VORTEX_DURATION_S);
-    expect(waveLengthS(5)).toBe(BOSS_TARGET_MAX_S);
-    expect(waveLengthS(15)).toBe(BOSS_TARGET_MAX_S);
+    for (const w of [4, 8, 14, 17]) expect(waveLengthS(w)).toBe(BOSS_TARGET_MAX_S);
   });
 
   it('прочность целей × (1 + 0.7·(N−1))', () => {
@@ -68,6 +78,64 @@ describe('боссы', () => {
     expect(setup('swarm', 10).field.list.length).toBeGreaterThan(SWARM_ROCKS);
   });
 
+  it('Охотник гонится за ближайшим, бросает в него камни и расталкивает камни перед собой', () => {
+    const near: Prey = { id: 'near', pos: { x: 900, y: 600 }, vel: { x: 0, y: 0 }, invulnerable: false };
+    const far: Prey = { id: 'far', pos: { x: 1700, y: 900 }, vel: { x: 0, y: 0 }, invulnerable: false };
+    const { field, ctl } = setup('hunter', 1, () => [near, far]);
+    expect(ctl.target).toBe(true);
+    let threw = false;
+    for (let i = 0; i < FIXED_STEP_HZ * (HUNTER_SHOT_S + 3); i++) {
+      ctl.step(DT);
+      field.step(DT);
+      threw ||= field.list.some((a) => a.size === 'small');
+    }
+    expect(ctl.boss.prey).toBe('near');
+    expect(Math.hypot(ctl.boss.pos.x - near.pos.x, ctl.boss.pos.y - near.pos.y)).toBeLessThan(400);
+    expect(threw).toBe(true);
+    // Неуязвимого (только что ударенного) не преследует — переключается на другого.
+    near.invulnerable = true;
+    ctl.step(DT);
+    expect(ctl.boss.prey).toBe('far');
+    // Камень рядом отталкивается.
+    const rock = field.launch('medium', ctl.boss.pos.x + ctl.boss.radius + 40, ctl.boss.pos.y, 0, 0)!;
+    ctl.step(DT);
+    expect(rock.vel.x).toBeGreaterThan(0);
+  });
+
+  it('Крепость: кольца брони с разрывами — неуязвимы, но в них целятся; ядро убито — броня разлетается', () => {
+    const { field, ctl } = setup('fortress');
+    const armor = field.list.filter((a) => a.armor);
+    const expected = FORTRESS_RINGS.reduce((n, r) => n + r.slots - r.gap * r.gaps, 0);
+    expect(armor.length).toBe(expected);
+    expect(armor.every((a) => a.immortal && a.held)).toBe(true);
+    for (let i = 0; i < FIXED_STEP_HZ * 6; i++) {
+      ctl.step(DT);
+      field.step(DT);
+    }
+    // Кольца на своих радиусах и крутятся навстречу.
+    const [inner, outer] = ctl.boss.rings;
+    expect(inner!.radius).toBeCloseTo(FORTRESS_RINGS[0].radius, 0);
+    expect(outer!.radius).toBeCloseTo(FORTRESS_RINGS[1].radius, 0);
+    const a0 = [inner!.angle, outer!.angle];
+    ctl.step(DT);
+    expect(Math.sign(inner!.angle - a0[0]!)).toBe(-Math.sign(outer!.angle - a0[1]!));
+    let dead = false;
+    for (let i = 0; i < ctl.boss.maxHp && !dead; i++) dead = ctl.hit(ctl.boss.pos);
+    expect(dead).toBe(true);
+    ctl.release();
+    expect(field.list.some((a) => a.armor || a.held)).toBe(false);
+  });
+
+  it('с игроками кольца Крепости крутятся быстрее', () => {
+    const spin = (players: number): number => {
+      const { ctl } = setup('fortress', players);
+      const before = ctl.boss.rings[0]!.angle;
+      ctl.step(DT);
+      return ctl.boss.rings[0]!.angle - before;
+    };
+    expect(spin(10)).toBeGreaterThan(spin(1));
+  });
+
   it('Воронка неуязвима, тяга растёт с игроками', () => {
     const one = setup('vortex').ctl;
     expect(one.target).toBe(false);
@@ -78,7 +146,7 @@ describe('боссы', () => {
 
 describe('боссы в матче', () => {
   it('цель убита — очки добившему и конец волны', () => {
-    const sim = createSim(['p'], 1920, 9, undefined, { startWave: 5 });
+    const sim = createSim(['p'], 1920, 9, undefined, { startWave: 4 });
     sim.step(DT, () => IDLE);
     expect(sim.boss?.kind).toBe('seeder');
     const pilot = sim.pilots.get('p')!;

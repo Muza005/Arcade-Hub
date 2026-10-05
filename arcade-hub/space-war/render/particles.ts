@@ -2,6 +2,8 @@
 // Общий лимит зависит от качества (PARTICLES_MAX). Когда места нет, новая частица занимает место
 // самой старой: эффекты у всех становятся короче, но ничей не пропадает целиком (SPACE_WAR_SPEC §5).
 // Время — по шагам симуляции (на паузе замирают); случайность — своя, только для вида.
+// Любая смена состава сразу помечает контейнер: иначе частица, рождённая во время hit-stop (шаги без
+// update), рисовалась со старыми размером и кадром текстуры — пропадала или выглядела чужой.
 import { Particle, ParticleContainer, type Texture } from 'pixi.js';
 import type { Rng } from '../../engine/rng';
 
@@ -40,7 +42,6 @@ export function createParticles(rng: Rng, blend: 'add' | 'normal' = 'add'): Part
   const live: Live[] = [];
   const spare: Particle[] = [];
   let limit = 0;
-  let dirty = false;
 
   const kill = (i: number): void => {
     const last = live.length - 1;
@@ -50,7 +51,7 @@ export function createParticles(rng: Rng, blend: 'add' | 'normal' = 'add'): Part
     live.pop();
     view.particleChildren[i] = view.particleChildren[last] as Particle;
     view.particleChildren.pop();
-    dirty = true;
+    view.update();
   };
 
   const oldest = (): number => {
@@ -89,8 +90,8 @@ export function createParticles(rng: Rng, blend: 'add' | 'normal' = 'add'): Part
         p.alpha = 1;
         live.push({ p, vx, vy, age: 0, life: o.life, aligned: o.aligned === true });
         view.particleChildren.push(p);
-        dirty = true;
       }
+      view.update();
     },
     update(dtS) {
       for (let i = live.length - 1; i >= 0; i--) {
@@ -103,10 +104,6 @@ export function createParticles(rng: Rng, blend: 'add' | 'normal' = 'add'): Part
         item.p.x += item.vx * dtS;
         item.p.y += item.vy * dtS;
         item.p.alpha = 1 - item.age / item.life;
-      }
-      if (dirty) {
-        view.update();
-        dirty = false;
       }
     },
     clear() {

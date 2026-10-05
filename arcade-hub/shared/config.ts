@@ -10,7 +10,7 @@ export const MAX_FRAME_S = 0.25;
 export const MAX_PLAYERS = 10;
 export const MAX_KEYBOARD_PLAYERS = 2; // игра может разрешить меньше (keyboardMax в манифесте)
 /** Выбор из списка в лобби: больше вариантов — рисуется переключателем «− значение +», а не рядом кнопок. */
-export const LOBBY_SELECT_CHIPS_MAX = 4;
+export const LOBBY_SELECT_CHIPS_MAX = 6;
 export const NICK_MAX_LEN = 8;
 /** Цвета игроков (§4, §23): 12, не меньше MAX_PLAYERS. Тёмный #070912 на каждом — не ниже 7.3:1. */
 export const PLAYER_COLORS = [
@@ -104,6 +104,8 @@ export const INPUT_REFRESH_S = 0.1; // по прямому каналу теку
 /** Джойстик: доля радиуса для полного отклонения по чувствительности. */
 export const JOYSTICK_FULL = { low: 1, mid: 0.8, high: 0.6 } as const;
 export const JOYSTICK_DEADZONE = 0.08;
+/** Касание быстрее этого после предыдущего на экране управления не масштабирует страницу. */
+export const DOUBLE_TAP_GUARD_MS = 350;
 /** Чувствительность в настройках телефона — цветом: от спокойного к резкому. */
 export const SENS_COLORS = { low: '#4ADE80', mid: '#FFC46B', high: '#FF5D5D' } as const;
 /** Меню с телефона (§8): порог оси, задержка и шаг автоповтора. */
