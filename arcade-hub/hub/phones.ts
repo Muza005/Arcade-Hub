@@ -1,6 +1,7 @@
 // Телефоны на стороне хаба (ARCADE_HUB_SPEC §8, §10): в меню джойстик ведущего ведёт фокус,
 // в матче — пауза, «Завершить матч», ободок главной кнопки и состояние для контроллеров.
 import {
+  RESUME_COUNTDOWN_S,
   INPUT_SEND_HZ,
   MAIN_BUTTON_STEP,
   MENU_NAV_REPEAT_DELAY_MS,
@@ -47,6 +48,8 @@ export interface PhonesOptions {
   nav: { move(dir: Direction): void; select(): void; back(): void };
   /** Пауза на большом экране: показать (by — ник поставившего, пусто — с клавиатуры) или убрать. */
   showPause(paused: boolean, by: string): void;
+  /** Отсчёт перед продолжением: секунды или null — убрать. */
+  showCountdown(left: number | null): void;
   nickOf(playerId: string): string;
   /** Лобби: поля игрока для телефона и выбор с телефона (ARCADE_HUB_SPEC §11). */
   lobby: { panelFor(playerId: string): LobbyPanel | undefined; setPlayerField(playerId: string, key: string, value: unknown): void };
@@ -63,12 +66,21 @@ export interface Phones {
   refresh(): void;
 }
 
-export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOptions): Phones {
+export function connectPhones({ room, nav, showPause, showCountdown, nickOf, lobby }: PhonesOptions): Phones {
   let layout: ControllerLayout = MENU_LAYOUT;
   let match: Match | null = null;
   let paused = false;
   /** Кто поставил паузу; пусто — с клавиатуры. */
   let pausedBy = '';
+  /** Отсчёт после «Продолжить»: сколько секунд осталось (null — нет отсчёта). */
+  let resumeIn: number | null = null;
+  let countdown: ReturnType<typeof setInterval> | null = null;
+  const stopCountdown = (): void => {
+    if (countdown) clearInterval(countdown);
+    countdown = null;
+    resumeIn = null;
+    showCountdown(null);
+  };
   /** Последний отправленный ободок по игрокам — шлём только заметные изменения. */
   const sentButton = new Map<string, string>();
 
@@ -84,6 +96,7 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
       layout: aim ? { ...layout, aim } : layout,
       ...(mainButton ? { mainButton } : {}),
       ...(pausedBy ? { pausedBy } : {}),
+      ...(resumeIn !== null ? { resumeIn } : {}),
       ...(status && playerId === room.leaderId() ? { status } : {}),
       ...(panel ? { lobby: panel } : {}),
     };
@@ -122,6 +135,14 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
   });
 
   const pause = (by = ''): void => {
+    // Пауза во время отсчёта — отсчёт отменяется, снова окно паузы.
+    if (match?.paused && resumeIn !== null) {
+      stopCountdown();
+      pausedBy = by;
+      showPause(true, by);
+      broadcast();
+      return;
+    }
     if (!match || match.paused) return;
     match.pause();
     paused = true;
@@ -129,17 +150,34 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
     showPause(true, by);
     broadcast();
   };
+  /** «Продолжить»: окно паузы уходит, но матч стоит ещё RESUME_COUNTDOWN_S — у всех отсчёт 3, 2, 1. */
   const resume = (): void => {
-    if (!match?.paused) return;
-    match.resume();
-    paused = false;
-    pausedBy = '';
+    if (!match?.paused || resumeIn !== null) return;
+    const m = match;
     showPause(false, '');
+    resumeIn = RESUME_COUNTDOWN_S;
+    showCountdown(resumeIn);
     broadcast();
+    countdown = setInterval(() => {
+      if (resumeIn === null) return;
+      resumeIn--;
+      if (resumeIn > 0) {
+        showCountdown(resumeIn);
+        broadcast();
+        return;
+      }
+      stopCountdown();
+      if (match !== m) return;
+      m.resume();
+      paused = false;
+      pausedBy = '';
+      broadcast();
+    }, MS_PER_S);
   };
   const end = (): void => {
     if (!match) return;
     // Итоги открываются поверх: пауза с экрана уходит, счёт сохраняется.
+    stopCountdown();
     paused = false;
     pausedBy = '';
     showPause(false, '');
@@ -180,6 +218,7 @@ export function connectPhones({ room, nav, showPause, nickOf, lobby }: PhonesOpt
 
   return {
     enterMenu() {
+      stopCountdown();
       layout = MENU_LAYOUT;
       match = null;
       paused = false;

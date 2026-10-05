@@ -302,6 +302,7 @@ if (fixtureRoom) {
     room: client,
     nav: focus,
     showPause: (paused, by) => pause.show(paused, by, client.room.code),
+    showCountdown: (left) => pause.countdown(left),
     nickOf: (id) => client.room.players.find((p) => p.id === id)?.nick ?? '',
     lobby,
   });

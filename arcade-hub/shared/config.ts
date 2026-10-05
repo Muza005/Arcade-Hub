@@ -68,6 +68,8 @@ export const MAIN_BUTTON_STEP = 0.1;
 // Меню игр (§6)
 export const MENU_AVATARS_MAX = 8; // дальше — «+N»
 export const QR_SIZE_PX = 92;
+/** После «Продолжить» матч стоит ещё столько секунд — отсчёт у всех, чтобы успели взяться за управление. */
+export const RESUME_COUNTDOWN_S = 3;
 export const QR_ZOOM_SIZE_PX = 960; // QR во весь экран — по нажатию в меню
 
 // Dev: тестовые телефоны с имитацией ввода по протоколу (§2)

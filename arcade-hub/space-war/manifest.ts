@@ -38,7 +38,7 @@ export const spaceWarManifest: GameManifest = {
     { id: 'teams', title: 'modeTeams', description: 'modeTeamsDesc', icon: modeTeamsIcon, sharedColors: true },
   ],
   status: 'available',
-  version: '12', // 11 — сильнее бомбы, быстрее течение; 12 — 30 корпусов
+  version: '13', // 12 — 30 корпусов; 13 — отдача ×5, заморозка держит Рой и Крепость
   load: async () => (await import('./game')).createSpaceWarGame(),
   strings,
   // Главная кнопка — Power (патроны и ободок накопления — этап Б3).

@@ -442,8 +442,8 @@ export function createSim(
     // Отдача: выстрел толкает корабль назад.
     if (waves.complication === 'recoil') {
       const v = Math.hypot(shot.vel.x, shot.vel.y) || 1;
-      pilot.ship.vel.x -= (shot.vel.x / v) * RECOIL_SPEED;
-      pilot.ship.vel.y -= (shot.vel.y / v) * RECOIL_SPEED;
+      pilot.ship.knock.x -= (shot.vel.x / v) * RECOIL_SPEED;
+      pilot.ship.knock.y -= (shot.vel.y / v) * RECOIL_SPEED;
     }
     pilot.ammo--;
     pilot.stats.shots++;
@@ -707,7 +707,9 @@ export function createSim(
 
       // Камни идут только во время волны; на передышке и после финиша поле пустеет.
       const comp = waves.complication;
-      bossCtl?.step(dtS);
+      // Заморозка держит и камни боссов: стены Роя и кольца Крепости стоят вместе с остальными.
+      const bossRocks = bossCtl?.boss.kind === 'swarm' || bossCtl?.boss.kind === 'fortress';
+      if (!(freezeS > 0 && bossRocks)) bossCtl?.step(dtS);
       const bossFlow = waves.boss ? BOSS_FLOW[waves.boss] : 1;
       if (waves.phase === 'wave') {
         spawnDebt += spawnPerS * growth(WAVE_DENSITY_GROWTH) * (comp ? COMPLICATION_FLOW[comp] : 1) * bossFlow * dtS;
