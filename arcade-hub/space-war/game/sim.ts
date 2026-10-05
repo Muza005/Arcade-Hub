@@ -8,6 +8,7 @@ import {
   ALIEN_SCORE,
   BOOM_HIT_PUSH,
   BOOM_PUSH,
+  BOOM_PUSH_K,
   BOOM_RADIUS,
   CURRENT_ROCK_ACCEL,
   CURRENT_SHIP_ACCEL,
@@ -540,12 +541,12 @@ export function createSim(
       const dy = pos.y - y;
       const d = Math.hypot(dx, dy);
       if (d >= radius) return;
-      const k = BOOM_PUSH * (1 - d / radius);
+      const k = BOOM_PUSH * BOOM_PUSH_K[bomb.size] * (1 - d / radius);
       vel.x += (d > 0 ? dx / d : 1) * k;
       vel.y += (d > 0 ? dy / d : 0) * k;
     };
     for (const a of field.list) if (a.bomb && !a.held) push(a.pos, a.vel);
-    for (const p of pilots.values()) if (p.alive) push(p.ship.pos, p.ship.vel);
+    for (const p of pilots.values()) if (p.alive) push(p.ship.pos, p.ship.knock);
   };
 
   /** Бомба о бомбу — обе взрываются. */
@@ -824,8 +825,8 @@ export function createSim(
           const dy = pilot.ship.pos.y - rock.pos.y;
           const d = Math.hypot(dx, dy) || 1;
           explode(rock);
-          pilot.ship.vel.x += (dx / d) * BOOM_HIT_PUSH;
-          pilot.ship.vel.y += (dy / d) * BOOM_HIT_PUSH;
+          pilot.ship.knock.x += (dx / d) * BOOM_HIT_PUSH;
+          pilot.ship.knock.y += (dy / d) * BOOM_HIT_PUSH;
           if (pilot.shieldS <= 0) hitShip(pilot, null);
         } else if (pilot.shieldS > 0) {
           if (!rock.immortal) shatter(rock);

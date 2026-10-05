@@ -113,6 +113,23 @@ describe('осложнения', () => {
   });
 });
 
+describe('Бомбы — отброс', () => {
+  it('корабль, врезавшийся в бомбу, отлетает далеко — сильнее предела своей скорости', () => {
+    const sim = simWith('bombs');
+    run(sim, 3);
+    const ship = sim.pilots.get('p')!.ship;
+    const bomb = sim.asteroids.find((a) => a.bomb)!;
+    bomb.vel.x = bomb.vel.y = 0;
+    bomb.pos.x = bomb.prev.x = ship.pos.x + bomb.radius;
+    bomb.pos.y = bomb.prev.y = ship.pos.y;
+    const start = { ...ship.pos };
+    sim.step(DT, () => IDLE);
+    expect(sim.events.booms.length).toBe(1);
+    run(sim, 0.5);
+    expect(start.x - ship.pos.x).toBeGreaterThan(400);
+  });
+});
+
 describe('Рой', () => {
   it('в начале все камни поля взрываются', () => {
     const sim = createSim(['p'], 1920, 4, undefined, { startWave: 10 });

@@ -35,7 +35,7 @@ function copyEvents(e: SimEvents): SimEvents {
 
 /** Снимок шага: всё, что рисуется, скопировано; шаг и выстрелы — пустышки. */
 export function snapshot(sim: Sim): Sim {
-  const ships = sim.ships.map((s) => ({ ...s, pos: vec(s.pos), prev: vec(s.prev), vel: vec(s.vel) }));
+  const ships = sim.ships.map((s) => ({ ...s, pos: vec(s.pos), prev: vec(s.prev), vel: vec(s.vel), knock: vec(s.knock) }));
   const shipOf = new Map(ships.map((s) => [s.id, s]));
   const pilots = new Map(
     [...sim.pilots].map(([id, p]) => [id, { ...p, ship: shipOf.get(id) ?? p.ship, sabS: { ...p.sabS }, stats: { ...p.stats } }]),

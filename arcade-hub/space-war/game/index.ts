@@ -93,6 +93,9 @@ import {
   BOOM_SPARKS,
   PHANTOM_ALPHA,
   PHANTOM_FADE_S,
+  PHANTOM_REVEAL_IN_S,
+  PHANTOM_REVEAL_OUT_S,
+  PHANTOM_REVEAL_S,
   PHANTOM_HIDE_S,
   PHANTOM_SHOW_S,
   BOSS_EXPLOSION_SHARDS,
@@ -367,7 +370,9 @@ export function createSpaceWarGame(): GameModule {
       const shape = atlas.asteroids[rock.size][rock.shape] ?? atlas.asteroids[rock.size][0]!;
       sprite.texture = rock.bomb ? atlas.bombs[rock.size] : (shape[rockState(rock.hp, rock.maxHp)] ?? shape[0]!);
       // Призрак: камень почти не виден, кроме вспышек и попаданий.
-      sprite.alpha = phantomK > 0 && rock.seenS <= 0 ? 1 - phantomK * (1 - PHANTOM_ALPHA) : 1;
+      // Попадание: камень плавно проявляется и плавно гаснет.
+      const shown = rock.seenS > 0 ? Math.min(1, (PHANTOM_REVEAL_S - rock.seenS) / PHANTOM_REVEAL_IN_S, rock.seenS / PHANTOM_REVEAL_OUT_S) : 0;
+      sprite.alpha = 1 - phantomK * (1 - shown) * (1 - PHANTOM_ALPHA);
       // Камни Роя — другим оттенком: их не разбить; камень саботажника — в цвет бросившего; бомба мигает.
       sprite.tint = rock.bomb
         ? fuseOn

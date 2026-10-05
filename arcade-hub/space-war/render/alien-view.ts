@@ -1,6 +1,6 @@
 // Инопланетяне и Течение — рисунок осложнений.
-// Инопланетянин: зелёное тельце с фиолетовым глазом и тремя короткими фиолетовыми лучами-следом за ним
-// (решение заказчика: след не длиннее пары сантиметров); прилипший — без следа, с усиками к кораблю.
+// Инопланетянин: зелёное тельце с фиолетовым глазом; за ним — неоновый фиолетовый след, который гаснет со временем
+// (решение заказчика); прилипший новый след не оставляет, к кораблю тянутся усики.
 // Течение: бледные чёрточки плывут через поле по течению — видно, куда сносит.
 import { Graphics } from 'pixi.js';
 import type { Rng } from '../../engine/rng';
@@ -10,6 +10,7 @@ import {
   ALIEN_EYE,
   ALIEN_RADIUS,
   ALIEN_TRAIL_PX,
+  ALIEN_TRAIL_S,
   CURRENT_STREAK_ALPHA,
   CURRENT_STREAK_PX,
   CURRENT_STREAKS,
@@ -18,8 +19,10 @@ import {
 import type { Alien } from '../game/aliens';
 import type { Bounds, Vec } from '../game/ship';
 
-const BEAMS = 3;
-const BEAM_SPREAD = 0.35;
+const TRAIL_LAYERS = [
+  { w: 2.6, a: 0.18 },
+  { w: 1, a: 0.85 },
+] as const;
 const WOBBLE_HZ = 6;
 /** Чёрточки течения бегут быстрее кораблей, которых оно сносит. */
 const STREAK_SPEED = CURRENT_SHIP_ACCEL;
@@ -32,25 +35,35 @@ export interface AlienView {
 
 export function createAlienView(): AlienView {
   const view = new Graphics();
+  /** След каждого: точки с временем — старые тускнеют и тоньшают, потом пропадают. */
+  const trails = new Map<number, Array<{ x: number; y: number; t: number }>>();
   return {
     view,
     draw(list, alpha, timeS, ships) {
       view.clear();
+      const alive = new Set<number>();
       for (const a of list) {
+        alive.add(a.id);
         const x = a.prev.x + (a.pos.x - a.prev.x) * alpha;
         const y = a.prev.y + (a.pos.y - a.prev.y) * alpha;
         const wob = Math.sin(timeS * WOBBLE_HZ * Math.PI * 2 + a.id);
-        if (!a.host) {
-          // Лучи-след: против скорости, чуть расходятся и подрагивают.
-          const v = Math.hypot(a.vel.x, a.vel.y) || 1;
-          const back = Math.atan2(-a.vel.y, -a.vel.x);
-          for (let i = 0; i < BEAMS; i++) {
-            const t = back + (i - (BEAMS - 1) / 2) * BEAM_SPREAD + wob * 0.08;
-            const len = ALIEN_TRAIL_PX * (i === 1 ? 1 : 0.7) * Math.min(1, v / 100);
-            view.moveTo(x, y).lineTo(x + Math.cos(t) * len, y + Math.sin(t) * len);
+        let trail = trails.get(a.id);
+        if (!trail) trails.set(a.id, (trail = []));
+        // Прилипший след не оставляет — старый догорает.
+        if (!a.host) trail.push({ x, y, t: timeS });
+        while (trail.length > 0 && timeS - (trail[0] as { t: number }).t > ALIEN_TRAIL_S) trail.shift();
+        // Неоновый фиолетовый след: широкий бледный ореол и яркая линия, к хвосту тоньше и прозрачнее.
+        for (const layer of TRAIL_LAYERS) {
+          for (let i = 1; i < trail.length; i++) {
+            const p0 = trail[i - 1] as { x: number; y: number; t: number };
+            const p1 = trail[i] as { x: number; y: number; t: number };
+            const k = 1 - (timeS - p1.t) / ALIEN_TRAIL_S;
+            if (k <= 0) continue;
+            view.moveTo(p0.x, p0.y).lineTo(p1.x, p1.y);
+            view.stroke({ color: ALIEN_BEAM, width: ALIEN_TRAIL_PX * k * layer.w, alpha: k * layer.a, cap: 'round' });
           }
-          view.stroke({ color: ALIEN_BEAM, width: 3, alpha: 0.55, cap: 'round' });
-        } else {
+        }
+        if (a.host) {
           // Усики к кораблю.
           const host = ships(a.host);
           if (host) {
@@ -64,6 +77,7 @@ export function createAlienView(): AlienView {
         view.circle(x, y, r * 0.45).fill({ color: ALIEN_EYE });
         view.circle(x + r * 0.12, y - r * 0.12, r * 0.15).fill({ color: '#FFFFFF' });
       }
+      for (const id of trails.keys()) if (!alive.has(id)) trails.delete(id);
     },
   };
 }

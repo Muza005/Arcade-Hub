@@ -2,6 +2,7 @@
 // Границы жёсткие: у стены гасится только скорость в стену — без отскока, и от стены можно сразу отлететь.
 import type { InputState } from '../../engine/input';
 import {
+  KNOCK_DRAG,
   SHIP_DRAG,
   SHIP_FACE_MIN_SPEED,
   SHIP_WALL_MARGIN,
@@ -33,10 +34,12 @@ export interface Ship {
   prevAngle: number;
   /** Тяга на этом шаге, 0…1 — для язычка пламени. */
   thrust: number;
+  /** Отброс взрывом: импульс поверх скорости, не режется её пределом и гаснет сам. */
+  knock: Vec;
 }
 
 export function createShip(id: string, pos: Vec, angle: number): Ship {
-  return { id, pos: { ...pos }, prev: { ...pos }, vel: { x: 0, y: 0 }, angle, prevAngle: angle, thrust: 0 };
+  return { id, pos: { ...pos }, prev: { ...pos }, vel: { x: 0, y: 0 }, angle, prevAngle: angle, thrust: 0, knock: { x: 0, y: 0 } };
 }
 
 /** Кратчайшая разница углов в (−π, π]. */
@@ -91,23 +94,30 @@ export function stepShip(ship: Ship, input: InputState, dtS: number, bounds: Bou
     ship.vel.y *= max / speed;
   }
 
-  ship.pos.x += ship.vel.x * dtS;
-  ship.pos.y += ship.vel.y * dtS;
+  ship.pos.x += (ship.vel.x + ship.knock.x) * dtS;
+  ship.pos.y += (ship.vel.y + ship.knock.y) * dtS;
+  const fade = Math.exp(-KNOCK_DRAG * dtS);
+  ship.knock.x *= fade;
+  ship.knock.y *= fade;
 
   const r = SHIP_WALL_MARGIN;
   if (ship.pos.x < bounds.left + r) {
     ship.pos.x = bounds.left + r;
     ship.vel.x = Math.max(0, ship.vel.x);
+    ship.knock.x = Math.max(0, ship.knock.x);
   } else if (ship.pos.x > bounds.right - r) {
     ship.pos.x = bounds.right - r;
     ship.vel.x = Math.min(0, ship.vel.x);
+    ship.knock.x = Math.min(0, ship.knock.x);
   }
   if (ship.pos.y < bounds.top + r) {
     ship.pos.y = bounds.top + r;
     ship.vel.y = Math.max(0, ship.vel.y);
+    ship.knock.y = Math.max(0, ship.knock.y);
   } else if (ship.pos.y > bounds.bottom - r) {
     ship.pos.y = bounds.bottom - r;
     ship.vel.y = Math.min(0, ship.vel.y);
+    ship.knock.y = Math.min(0, ship.knock.y);
   }
 
   // Нос — по направлению полёта, с ограниченной скоростью поворота.

@@ -266,11 +266,11 @@ export const COMPLICATION_FLOW: Record<Complication, number> = {
 /** Множитель скорости камней. */
 export const COMPLICATION_SPEED: Record<Complication, number> = {
   dark: 1, fast: 1.5, dense: 0.6, vortex: 1, jam: 1, small: 1, large: 1,
-  current: 1.4, slippery: 1, recoil: 1, aliens: 1, phantom: 1, bombs: 1,
+  current: 2, slippery: 1, recoil: 1, aliens: 1, phantom: 1, bombs: 1,
 };
 // Течение: постоянная сила сносит корабли и камни в одну сторону (из сида: ←, →, ↑ или ↓); камни идут только по ней.
-export const CURRENT_SHIP_ACCEL = 460; // TUNE: px/с²; с сопротивлением корабль сносит ~150 px/с
-export const CURRENT_ROCK_ACCEL = 60; // px/с² — камни разгоняются по течению
+export const CURRENT_SHIP_ACCEL = 920; // TUNE: px/с²; с сопротивлением корабль сносит ~300 px/с (заказчик: ×2)
+export const CURRENT_ROCK_ACCEL = 120; // px/с² — камни разгоняются по течению
 export const CURRENT_SPREAD_RAD = 0.25; // камни идут почти параллельно
 export const CURRENT_STREAKS = 40; // на поле — бледные чёрточки по течению
 export const CURRENT_STREAK_PX = 70;
@@ -294,18 +294,24 @@ export const ALIEN_SCORE = 30; // × множитель
 export const ALIEN_BODY = '#7CFF8A';
 export const ALIEN_EYE = '#B05CFF';
 export const ALIEN_BEAM = '#B05CFF';
-export const ALIEN_TRAIL_PX = 44; // лучи-след — не длиннее пары сантиметров
+export const ALIEN_TRAIL_S = 0.35; // неоновый фиолетовый след гаснет за столько
+export const ALIEN_TRAIL_PX = 5; // толщина следа у тельца
 // Призрак: камни гаснут на 2 с, вспыхивают на 1 с; попадание — видно 0,5 с. Удариться можно и о погасший.
 export const PHANTOM_HIDE_S = 2;
 export const PHANTOM_SHOW_S = 1;
-export const PHANTOM_REVEAL_S = 0.5;
+export const PHANTOM_REVEAL_S = 0.25; // заказчик: вдвое короче
+export const PHANTOM_REVEAL_IN_S = 0.06; // попадание — камень плавно проявляется
+export const PHANTOM_REVEAL_OUT_S = 0.15; // и плавно гаснет
 export const PHANTOM_ALPHA = 0.05;
 export const PHANTOM_FADE_S = 0.25;
 // Бомбы: вместо камней — бомбы трёх размеров. Бомба о бомбу — обе взрываются; выстрел — взрыв;
 // корабль врезался — минус жизнь и сильный отброс. Взрыв отталкивает бомбы и корабли: ближе — сильнее.
 export const BOOM_RADIUS = { small: 170, medium: 230, large: 300 } as const;
-export const BOOM_PUSH = 700; // px/с у центра, к краю радиуса — до нуля
-export const BOOM_HIT_PUSH = 900; // корабль, врезавшийся в бомбу, отлетает сильно
+export const BOOM_PUSH = 2100; // px/с у центра, к краю радиуса — до нуля (заказчик: ×3)
+export const BOOM_PUSH_K = { small: 0.8, medium: 1, large: 1.4 } as const; // большая бомба толкает сильнее
+export const BOOM_HIT_PUSH = 2700; // корабль, врезавшийся в бомбу, отлетает сильно
+/** Отброс корабля — отдельный импульс поверх его скорости: не режется пределом скорости, гаснет сам. */
+export const KNOCK_DRAG = 3.5; // 1/с
 export const BOOM_COLOR = '#FF6B3D';
 export const BOOM_SPARKS = 26;
 export const BOMB_FUSE_TINT = '#FFB8A0'; // бомба мигает: светлее и обратно
