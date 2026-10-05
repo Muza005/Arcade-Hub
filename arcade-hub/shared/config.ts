@@ -104,6 +104,8 @@ export const INPUT_REFRESH_S = 0.1; // по прямому каналу теку
 /** Джойстик: доля радиуса для полного отклонения по чувствительности. */
 export const JOYSTICK_FULL = { low: 1, mid: 0.8, high: 0.6 } as const;
 export const JOYSTICK_DEADZONE = 0.08;
+/** Чувствительность в настройках телефона — цветом: от спокойного к резкому. */
+export const SENS_COLORS = { low: '#4ADE80', mid: '#FFC46B', high: '#FF5D5D' } as const;
 /** Меню с телефона (§8): порог оси, задержка и шаг автоповтора. */
 export const MENU_NAV_THRESHOLD = 0.5;
 export const MENU_NAV_REPEAT_DELAY_MS = 400;

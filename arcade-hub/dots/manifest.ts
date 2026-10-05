@@ -35,7 +35,7 @@ export const dotsManifest: GameManifest = {
   logo,
   players: { min: 1, max: 10, keyboardMax: 2 },
   sessionMinutes: [1, 2],
-  controls: ['keyboard', 'phone-joystick', 'phone-gyro', 'phone-buttons'],
+  controls: ['keyboard', 'phone-joystick', 'phone-gyro'],
   modes: [{ id: 'ffa', title: 'modeFfa', description: 'modeFfaDesc', icon: modeFfaIcon }],
   status: 'available',
   version: '3', // 2 — поле под ширину экрана; 3 — бросок звёзд

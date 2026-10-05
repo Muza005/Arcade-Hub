@@ -25,7 +25,7 @@
 | accent | `#3DDC97` |
 | players | 1–10, keyboardMax 2 |
 | sessionMinutes | 1–2 |
-| controls | keyboard, phone-joystick, phone-gyro, phone-buttons |
+| controls | keyboard, phone-joystick, phone-gyro |
 | howToPlay | «Двигайся джойстиком» · «Пролетай через звёзды» · «Кнопка — рывок» |
 
 ## Как сделать из «Точек» новую игру

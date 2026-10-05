@@ -17,12 +17,15 @@ const KEY = 'arcade-hub:controls';
 
 export const defaultPrefs = (): Prefs => ({
   mode: 'joystick',
-  sensitivity: { arrows: 'mid', gyro: 'mid', joystick: 'mid' },
+  sensitivity: { gyro: 'mid', joystick: 'mid' },
   invertX: false,
   invertY: false,
   hand: 'right',
   vibration: true,
 });
+
+const MODES: readonly ControlMode[] = ['joystick', 'gyro'];
+const SENSITIVITIES: readonly Sensitivity[] = ['low', 'mid', 'high'];
 
 export function loadPrefs(): Prefs {
   try {
@@ -30,7 +33,11 @@ export function loadPrefs(): Prefs {
     if (!raw) return defaultPrefs();
     const saved = JSON.parse(raw) as Partial<Prefs>;
     const base = defaultPrefs();
-    return { ...base, ...saved, sensitivity: { ...base.sensitivity, ...saved.sensitivity } };
+    // Старые настройки могли выбрать стрелки — их больше нет; чужие значения — по умолчанию.
+    const mode = MODES.includes(saved.mode as ControlMode) ? (saved.mode as ControlMode) : base.mode;
+    const sens = (m: ControlMode): Sensitivity =>
+      SENSITIVITIES.includes(saved.sensitivity?.[m] as Sensitivity) ? (saved.sensitivity?.[m] as Sensitivity) : base.sensitivity[m];
+    return { ...base, ...saved, mode, sensitivity: { joystick: sens('joystick'), gyro: sens('gyro') } };
   } catch {
     return defaultPrefs();
   }

@@ -11,8 +11,8 @@ export type Role = 'leader' | 'guest';
 /** Команды ведущего. */
 export type LeaderCommand = 'start' | 'pause' | 'resume' | 'end' | 'again' | 'back' | 'select' | 'handoff' | 'claim';
 
-/** Вид управления на телефоне (§10). */
-export type ControlMode = 'arrows' | 'gyro' | 'joystick';
+/** Вид управления на телефоне (§10): кнопок-стрелок нет (решение заказчика) — только джойстик и гироскоп. */
+export type ControlMode = 'gyro' | 'joystick';
 
 /** Что рисует контроллер: платформа решает экран, игра — виды управления и главную кнопку. */
 export interface ControllerLayout {

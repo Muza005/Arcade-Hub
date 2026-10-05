@@ -39,7 +39,7 @@ import { button, el } from './ui';
 
 const MS_PER_S = 1000;
 const MENU_LAYOUT: ControllerLayout = { screen: 'menu', modes: ['joystick'], mainButton: true };
-const ALL_MODES: ControlMode[] = ['arrows', 'gyro', 'joystick'];
+const ALL_MODES: ControlMode[] = ['joystick', 'gyro'];
 
 document.documentElement.lang = getLang();
 const app = document.getElementById('app');

@@ -30,7 +30,7 @@ export const spaceWarManifest: GameManifest = {
   logo,
   players: { min: 1, max: 10, keyboardMax: KEYBOARD_MAX },
   sessionMinutes: [15, 25],
-  controls: ['keyboard', 'phone-joystick', 'phone-gyro', 'phone-buttons'],
+  controls: ['keyboard', 'phone-joystick', 'phone-gyro'],
   modes: [
     { id: 'coop', title: 'modeCoop', description: 'modeCoopDesc', icon: modeCoopIcon },
     { id: 'versus', title: 'modeVersus', description: 'modeVersusDesc', icon: modeVersusIcon },

@@ -8,7 +8,7 @@ import type { Sensitivity } from './prefs';
 import { button, el } from './ui';
 
 export interface PadCallbacks {
-  /** Оси управления (джойстик или стрелки) изменились. Гироскоп шлёт свои оси сам. */
+  /** Оси джойстика изменились. Гироскоп шлёт свои оси сам. */
   axes(x: number, y: number): void;
   button(pressed: boolean): void;
   pause(): void;
@@ -53,19 +53,12 @@ export function createPad(cb: PadCallbacks): Pad {
   top.append(pauseBtn, plate, settingsBtn);
   const notice = el('div', 'pad__notice');
 
-  // Джойстик
+  // Джойстик — плавающий (как в Brawl Stars): тусклый рисунок показывает, где управлять; касание в любом месте
+  // зоны ставит центр под палец, дальше рисунок стоит на месте, а ручка ходит за пальцем.
+  const zone = el('div', 'stick-zone');
   const stick = el('div', 'stick');
   const knob = el('div', 'stick__knob');
   stick.append(knob);
-
-  // Стрелки
-  const dpad = el('div', 'dpad');
-  const arrows = (['up', 'left', 'right', 'down'] as const).map((dir) => {
-    const b = button(`dpad__btn dpad__btn--${dir}`, undefined, dir);
-    b.dataset.dir = dir;
-    dpad.append(b);
-    return b;
-  });
 
   // Наклон: едва заметный круг — справка краем глаза
   const tilt = el('div', 'tilt');
@@ -78,7 +71,8 @@ export function createPad(cb: PadCallbacks): Pad {
   const mainOff = el('span', 'main-btn__off');
   main.append(mainValue, mainOff);
 
-  root.append(top, notice, stick, dpad, tilt, recal, main);
+  // Зона — первой: всё остальное лежит поверх и ловит свои касания само.
+  root.append(zone, top, notice, stick, tilt, recal, main);
 
   let view: PadView = {
     mode: 'joystick',
@@ -91,11 +85,13 @@ export function createPad(cb: PadCallbacks): Pad {
 
   // ─── Джойстик ───
   let stickPointer: number | null = null;
+  /** Центр — точка касания; рисунок не догоняет палец, как бы далеко тот ни ушёл. */
+  let centerX = 0;
+  let centerY = 0;
   const moveStick = (e: PointerEvent): void => {
-    const rect = stick.getBoundingClientRect();
-    const radius = rect.width / 2;
-    const dx = e.clientX - (rect.left + radius);
-    const dy = e.clientY - (rect.top + radius);
+    const radius = stick.offsetWidth / 2;
+    const dx = e.clientX - centerX;
+    const dy = e.clientY - centerY;
     const full = radius * JOYSTICK_FULL[view.sensitivity];
     const knobPos = clampUnit(dx / radius, dy / radius);
     knob.style.transform = `translate(${knobPos.x * radius}px, ${knobPos.y * radius}px)`;
@@ -106,42 +102,30 @@ export function createPad(cb: PadCallbacks): Pad {
   const releaseStick = (): void => {
     stickPointer = null;
     knob.style.transform = '';
+    stick.style.transform = '';
+    stick.classList.remove('is-active');
     cb.axes(0, 0);
   };
-  stick.addEventListener('pointerdown', (e) => {
+  zone.addEventListener('pointerdown', (e) => {
+    if (stickPointer !== null) return;
     stickPointer = e.pointerId;
-    stick.setPointerCapture(e.pointerId);
+    zone.setPointerCapture(e.pointerId);
+    // Рисунок переезжает центром под палец со своего места.
+    stick.style.transform = '';
+    const home = stick.getBoundingClientRect();
+    centerX = e.clientX;
+    centerY = e.clientY;
+    stick.style.transform = `translate(${centerX - (home.left + home.width / 2)}px, ${centerY - (home.top + home.height / 2)}px)`;
+    stick.classList.add('is-active');
     moveStick(e);
   });
-  stick.addEventListener('pointermove', (e) => {
+  zone.addEventListener('pointermove', (e) => {
     if (e.pointerId === stickPointer) moveStick(e);
   });
   for (const type of ['pointerup', 'pointercancel'] as const) {
-    stick.addEventListener(type, (e) => {
+    zone.addEventListener(type, (e) => {
       if (e.pointerId === stickPointer) releaseStick();
     });
-  }
-
-  // ─── Стрелки ───
-  const held = new Map<number, string>();
-  const emitArrows = (): void => {
-    const dirs = new Set(held.values());
-    const x = (dirs.has('right') ? 1 : 0) - (dirs.has('left') ? 1 : 0);
-    const y = (dirs.has('down') ? 1 : 0) - (dirs.has('up') ? 1 : 0);
-    const v = clampUnit(x, y);
-    for (const b of arrows) b.classList.toggle('is-pressed', dirs.has(b.dataset.dir ?? ''));
-    cb.axes(v.x, v.y);
-  };
-  for (const b of arrows) {
-    b.addEventListener('pointerdown', (e) => {
-      held.set(e.pointerId, b.dataset.dir ?? '');
-      emitArrows();
-    });
-    for (const type of ['pointerup', 'pointercancel', 'pointerleave'] as const) {
-      b.addEventListener(type, (e) => {
-        if (held.delete(e.pointerId)) emitArrows();
-      });
-    }
   }
 
   // ─── Главная кнопка ───
@@ -171,8 +155,6 @@ export function createPad(cb: PadCallbacks): Pad {
 
   const release = (): void => {
     if (stickPointer !== null) releaseStick();
-    held.clear();
-    for (const b of arrows) b.classList.remove('is-pressed');
     if (mainPointer !== null) {
       mainPointer = null;
       main.classList.remove('is-pressed');
@@ -189,7 +171,7 @@ export function createPad(cb: PadCallbacks): Pad {
       view = next;
       root.dataset.mode = next.mode;
       stick.hidden = next.mode !== 'joystick';
-      dpad.hidden = next.mode !== 'arrows';
+      zone.hidden = next.mode !== 'joystick';
       tilt.hidden = next.mode !== 'gyro';
       recal.hidden = next.mode !== 'gyro';
       main.hidden = !next.mainButton;

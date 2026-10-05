@@ -2,7 +2,7 @@
 import type { GameStrings } from './i18n';
 import type { AimLayout, FxMsg, GamePayload, InputState, LobbyValue, MainButtonState } from './protocol';
 
-export type GameControl = 'keyboard' | 'phone-buttons' | 'phone-gyro' | 'phone-joystick';
+export type GameControl = 'keyboard' | 'phone-gyro' | 'phone-joystick';
 
 export interface GameMode {
   id: string;

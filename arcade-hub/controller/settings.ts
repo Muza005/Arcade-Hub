@@ -1,8 +1,9 @@
 // Меню настроек телефона (§10): на весь экран, изменения применяются сразу.
 // Настройки не ставят игру на паузу — это не убежище.
-import { NICK_MAX_LEN, PLAYER_COLORS } from '../shared/config';
+import { NICK_MAX_LEN, PLAYER_COLORS, SENS_COLORS } from '../shared/config';
 import { t, type I18nKey } from '../shared/i18n';
 import type { ControlMode, LobbyPanel, LobbyValue, PhoneField, SlotMsg } from '../shared/protocol';
+import { HAND_ICONS, MODE_ICONS, SENS_ICONS } from './icons';
 import { defaultPrefs, type Prefs, type Sensitivity } from './prefs';
 import { button, el } from './ui';
 
@@ -36,20 +37,24 @@ export interface Settings {
   hide(): void;
 }
 
-const MODES: ControlMode[] = ['arrows', 'gyro', 'joystick'];
+const MODES: ControlMode[] = ['joystick', 'gyro'];
 const SENS: Sensitivity[] = ['low', 'mid', 'high'];
 
-function segmented<T extends string>(
+/** Крупные квадраты: иконка и подпись под ней (вид управления, рука). */
+function tiles<T extends string>(
   options: readonly T[],
   current: T,
+  icon: (v: T) => string,
   label: (v: T) => string,
   pick: (v: T) => void,
   disabled: (v: T) => boolean = () => false,
 ): HTMLElement {
-  const group = el('div', 'seg');
+  const group = el('div', 'tiles');
   group.setAttribute('role', 'radiogroup');
   for (const option of options) {
-    const b = button('seg__opt', label(option));
+    const b = button('tile');
+    b.innerHTML = icon(option);
+    b.append(el('span', 'tile__label', label(option)));
     b.setAttribute('role', 'radio');
     b.setAttribute('aria-checked', String(option === current));
     b.disabled = disabled(option);
@@ -205,33 +210,34 @@ export function createSettings(cb: SettingsCallbacks): Settings {
     parts.push(who);
 
     const mode = c.modes.includes(prefs.mode) ? prefs.mode : (c.modes[0] ?? 'joystick');
-    const modeLabel = (m: ControlMode): string => t(`ctrl.mode.${m}` as I18nKey);
+    // Чувствительность — одной строкой над управлением: цветные полоски, своя у каждого вида.
+    const sens = el('section', 'sens');
+    const sensOptions = el('div', 'sens__opts');
+    sensOptions.setAttribute('role', 'radiogroup');
+    for (const s of SENS) {
+      const b = button('sens__opt', undefined, t(`ctrl.sens.${s}` as I18nKey));
+      b.innerHTML = SENS_ICONS[s];
+      b.style.setProperty('--opt', SENS_COLORS[s]);
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(s === prefs.sensitivity[mode]));
+      b.addEventListener('click', () => setPrefs({ sensitivity: { ...prefs.sensitivity, [mode]: s } }));
+      sensOptions.append(b);
+    }
+    sens.append(el('h2', 'set-row__title', t('ctrl.sensitivity')), sensOptions);
     parts.push(
+      sens,
       row(
         t('ctrl.control'),
-        segmented(
+        tiles(
           MODES.filter((m) => c.modes.includes(m)),
           mode,
-          modeLabel,
+          (m) => MODE_ICONS[m],
+          (m) => t(`ctrl.mode.${m}` as I18nKey),
           (m) => setPrefs({ mode: m }),
           (m) => m === 'gyro' && !c.gyroAvailable,
         ),
       ),
     );
-    // У стрелок нет аналоговой оси — чувствительность им не нужна.
-    if (mode !== 'arrows') {
-      parts.push(
-        row(
-          t('ctrl.sensitivity', { mode: modeLabel(mode) }),
-          segmented(
-            SENS,
-            prefs.sensitivity[mode],
-            (s) => t(`ctrl.sens.${s}` as I18nKey),
-            (s) => setPrefs({ sensitivity: { ...prefs.sensitivity, [mode]: s } }),
-          ),
-        ),
-      );
-    }
     if (mode === 'gyro') {
       const recal = button('btn btn--ghost', t('ctrl.recalibrate'));
       recal.addEventListener('click', () => cb.recalibrate());
@@ -244,9 +250,10 @@ export function createSettings(cb: SettingsCallbacks): Settings {
     parts.push(
       row(
         t('ctrl.hand'),
-        segmented(
+        tiles(
           ['right', 'left'] as const,
           prefs.hand,
+          (h) => HAND_ICONS[h],
           (h) => t(`ctrl.hand.${h}` as I18nKey),
           (h) => setPrefs({ hand: h }),
         ),

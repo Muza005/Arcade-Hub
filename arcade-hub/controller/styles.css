@@ -292,13 +292,24 @@ button {
 }
 
 .stick,
-.dpad,
 .tilt {
   position: absolute;
   left: var(--edge);
   bottom: calc(var(--stick-bottom) + env(safe-area-inset-bottom));
 }
 
+/* Зона джойстика (как в Brawl Stars): касание в любом её месте ставит центр под палец.
+   Сторона — та, где джойстик; главная кнопка лежит поверх и ловит свои касания сама. */
+.stick-zone {
+  position: absolute;
+  top: calc(max(12px, env(safe-area-inset-top)) + 68px);
+  bottom: 0;
+  left: 0;
+  width: 62%;
+}
+
+/* Рисунок джойстика — очень тусклый: только подсказка, где управлять. При касании переезжает под палец и
+   становится заметнее, но дальше стоит на месте. Отпустили — плавно возвращается на своё место. */
 .stick {
   width: var(--stick);
   height: var(--stick);
@@ -307,6 +318,16 @@ button {
   border-radius: 50%;
   background: var(--surface);
   box-shadow: inset 0 0 0 2px var(--line);
+  opacity: 0.22;
+  pointer-events: none;
+  transition:
+    transform var(--dur-fast) var(--ease),
+    opacity var(--dur-fast) var(--ease);
+}
+
+.stick.is-active {
+  opacity: 0.7;
+  transition: opacity var(--dur-fast) var(--ease);
 }
 
 .stick__knob {
@@ -315,60 +336,6 @@ button {
   border-radius: 50%;
   background: var(--player);
   pointer-events: none;
-}
-
-.dpad {
-  /* Стрелки крупнее джойстика (кнопки не меньше 96), поэтому стоят выше главной кнопки. */
-  bottom: calc(var(--main-bottom) + var(--main) + 16px + env(safe-area-inset-bottom));
-  display: grid;
-  grid-template: repeat(3, var(--cell)) / repeat(3, var(--cell));
-  gap: 4px;
-}
-
-.dpad__btn {
-  border: 0;
-  border-radius: 20px;
-  background: var(--surface-2);
-  transition: transform var(--dur-fast) var(--ease);
-}
-
-.dpad__btn::before {
-  content: '';
-  display: block;
-  width: 0;
-  height: 0;
-  margin: auto;
-  border: 14px solid transparent;
-  border-bottom: 20px solid var(--text-2);
-  border-top: 0;
-}
-
-.dpad__btn--up {
-  grid-area: 1 / 2;
-}
-
-.dpad__btn--left {
-  grid-area: 2 / 1;
-  rotate: -90deg;
-}
-
-.dpad__btn--right {
-  grid-area: 2 / 3;
-  rotate: 90deg;
-}
-
-.dpad__btn--down {
-  grid-area: 3 / 2;
-  rotate: 180deg;
-}
-
-.dpad__btn.is-pressed {
-  background: var(--player);
-  transform: scale(0.94);
-}
-
-.dpad__btn.is-pressed::before {
-  border-bottom-color: var(--bg);
 }
 
 .tilt {
@@ -495,17 +462,23 @@ button {
   pointer-events: none;
 }
 
-/* Гость в меню: джойстик и кнопка приглушены до 40 %. */
-.pad--muted :is(.stick, .dpad, .tilt, .main-btn, .pad__recal) {
+/* Гость в меню: кнопка приглушена до 40 %, джойстик и так тусклый — оба не отвечают. */
+.pad--muted :is(.tilt, .main-btn, .pad__recal) {
   opacity: 0.4;
+}
+
+.pad--muted :is(.stick-zone, .main-btn, .pad__recal),
+.pad--paused :is(.stick-zone, .main-btn, .pad__recal) {
   pointer-events: none;
 }
 
 /* Пауза у всех: кнопки гаснут до серого. */
-.pad--paused :is(.stick, .dpad, .tilt, .main-btn, .pad__recal) {
+.pad--paused :is(.stick, .tilt, .main-btn, .pad__recal) {
   filter: grayscale(1);
+}
+
+.pad--paused :is(.tilt, .main-btn, .pad__recal) {
   opacity: 0.3;
-  pointer-events: none;
 }
 
 /* Горизонтально: джойстик Ø208 под левым большим пальцем, кнопка Ø156 под правым, 48 px под вырез камеры. */
@@ -519,8 +492,8 @@ button {
     --main-bottom: 48px;
   }
 
-  .dpad {
-    bottom: calc(12px + env(safe-area-inset-bottom));
+  .stick-zone {
+    width: 50%;
   }
 
   .pad__recal {
@@ -530,9 +503,13 @@ button {
 }
 
 /* Левша: джойстик и кнопка меняются местами. */
-[data-hand='left'] .pad :is(.stick, .dpad, .tilt) {
+[data-hand='left'] .pad :is(.stick, .tilt, .stick-zone) {
   left: auto;
   right: var(--edge);
+}
+
+[data-hand='left'] .pad .stick-zone {
+  right: 0;
 }
 
 [data-hand='left'] .pad .main-btn {
@@ -698,6 +675,82 @@ button {
 }
 
 .seg__opt:disabled {
+  opacity: 0.35;
+}
+
+/* Чувствительность — одной строкой: подпись слева, цветные полоски справа. */
+.sens {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sens__opts {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.sens__opt {
+  width: 56px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--opt);
+}
+
+.sens__opt svg {
+  width: 26px;
+  height: 26px;
+}
+
+.sens__opt[aria-checked='true'] {
+  background: var(--opt);
+  color: var(--bg);
+}
+
+/* Квадраты с иконкой и подписью под ней: вид управления, рука. Выбранный залит цветом игрока. */
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 96px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.tile svg {
+  width: 40px;
+  height: 40px;
+}
+
+.tile__label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.tile[aria-checked='true'] {
+  background: var(--player);
+  color: var(--bg);
+}
+
+.tile:disabled {
   opacity: 0.35;
 }
 

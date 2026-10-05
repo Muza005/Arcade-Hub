@@ -18,7 +18,6 @@ import type { Direction } from './ui/spatial';
 const MS_PER_S = 1000;
 
 const MODE_OF: Partial<Record<GameControl, ControlMode>> = {
-  'phone-buttons': 'arrows',
   'phone-gyro': 'gyro',
   'phone-joystick': 'joystick',
 };
